@@ -14,8 +14,8 @@
 ## QA / restrições
 - Testes unitários de cliente e domínio, integração de estoque/edição/foto/paginação com PostgreSQL real e Playwright de gestão e PDV passaram na última execução da PR.
 - O catálogo limita cada página a 50 produtos; um produto pode ter várias variantes.
-- **Limite atual:** foto original de até 2 MiB; thumbnails menores derivadas/otimizadas automaticamente ainda não são geradas. Imagens são servidas pelo servidor local sem CDN paga.
-- **Limite atual:** edição de grade existente atua sobre nome/categoria e preço de variantes; alterar SKU/cor/tamanho de uma variante ou adicionar novas variantes a um produto já existente exige endpoint complementar/novo cadastro.
+- Fotos originais de até 2 MiB com miniaturas WebP geradas automaticamente por sharp no servidor local; GET autenticado de thumbnail e fallback para imagens históricas.
+- Edição de grade inclui POST para adicionar variante a produto existente e PATCH para SKU/cor/tamanho/barcode, ambos com revisão otimista e auditoria.
 - Este estágio não inclui vendas/baixa por venda — elas estão sendo entregues em M3.
 - A homologação de UX por humanos, hardening para produção e merge ficam pendentes.
 

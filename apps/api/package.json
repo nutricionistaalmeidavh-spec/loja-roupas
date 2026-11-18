@@ -14,7 +14,8 @@
   "dependencies": {
     "@loja/domain": "workspace:*",
     "fastify": "^5.0.0",
-    "pg": "^8.13.0"
+    "pg": "^8.13.0",
+    "sharp": "^0.34.4"
   },
   "devDependencies": {
     "tsx": "^4.19.0",

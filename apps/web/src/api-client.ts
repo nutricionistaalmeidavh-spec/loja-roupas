@@ -95,7 +95,7 @@ export function listMovements(session:Session,variantId:string,fetchImpl:typeof 
 }
 export async function uploadPhoto(session:Session,productId:string,file:Blob,key:string,fetchImpl:typeof fetch=fetch) {
  return jsonRequest<{product_id:string;sha256:string;content_type:string}>(
-  '/v1/catalog/products/'+encodeURIComponent(productId)+'/photo',{
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',{
   method:'PUT',headers:{...headers(session,key),'content-type':file.type},body:file
  },fetchImpl);
 }

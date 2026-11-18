@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
+import sharp from 'sharp';
 import { buildApp } from '../src/app.ts';
 import { hashPassword, issueSession } from '../src/security.ts';
 
@@ -54,7 +55,7 @@ test('M2 final: edição otimista, paginação, imagem local e ajuste auditado',
       payload:{price_cents:23990,expected_revision:1}});
     assert.equal(price.statusCode,200,price.body);
     assert.equal(price.json().price_cents,23990);
-    const png=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082','hex');
+    const png=await sharp({create:{width:2,height:2,channels:3,background:'#DDCCBB'}}).png().toBuffer();
     const upload=await app.inject({method:'PUT',url:'/v1/catalog/products/'+ids[0]+'/photo',
       headers:{...headers,'content-type':'image/png','idempotency-key':randomUUID()},payload:png});
     assert.equal(upload.statusCode,200,upload.body);
