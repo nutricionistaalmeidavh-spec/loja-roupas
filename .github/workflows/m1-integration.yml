@@ -49,6 +49,8 @@ jobs:
           pnpm --filter @loja/domain typecheck
           pnpm --filter @loja/api typecheck
           pnpm --filter @loja/web typecheck
+      - name: Testes do cliente Web (fluxos e contrato)
+        run: pnpm --filter @loja/web test
       - name: Build web
         run: pnpm --filter @loja/web build
       - name: Testes de domínio
