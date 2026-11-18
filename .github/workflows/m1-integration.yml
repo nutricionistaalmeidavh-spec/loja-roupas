@@ -57,5 +57,24 @@ jobs:
         run: pnpm test
       - name: Migrações PostgreSQL canônico
         run: pnpm --filter @loja/api migrate
+      - name: Bootstrap de administrador de QA (somente banco efêmero)
+        env:
+          BOOTSTRAP_STORE: Loja QA
+          BOOTSTRAP_ADMIN_LOGIN: qa-admin
+          BOOTSTRAP_ADMIN_PASSWORD: Senha-QA-Somente-CI-2026
+        run: pnpm --filter @loja/api bootstrap
       - name: Testes API/RBAC/catálogo
         run: pnpm --filter @loja/api test
+      - name: Instalar Chromium open source para Playwright
+        run: pnpm --filter @loja/web exec playwright install --with-deps chromium
+      - name: E2E Web real (login → cadastro → estoque → carrinho)
+        run: pnpm --filter @loja/web test:e2e
+      - name: Publicar somente evidências de QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-ui-playwright-evidence
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          if-no-files-found: ignore
