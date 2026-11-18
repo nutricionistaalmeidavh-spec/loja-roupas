@@ -10,7 +10,7 @@ Versão: 0.1.0 · Data-base: 2026-11-17 · Status: **pronto para revisão, não 
 | D3 | [OpenAPI](03-contratos/openapi/openapi.yaml), [73 operações](03-contratos/catalogo-de-operacoes.md), [eventos](03-contratos/eventos.md), [autorização](03-contratos/autorizacao-erros-idempotencia.md) | Interfaces e integração |
 | D4 | [Design system](04-design/design-system.md), [direção Retail Fashion POS](04-design/direcao-visual-retail-pos.md), [mockups estáticos](04-design/mockups-estaticos.md), [jornadas e wireframes](04-design/jornadas-e-wireframes.md), [catálogo de telas](04-design/catalogo-de-telas.md) | UX/UI e interação |
 | D5 | [Plano QA](05-qualidade/plano-testes.md), [critérios](05-qualidade/criterios-aceite.md), [matriz de testes](05-qualidade/casos-de-teste.md) | Prova de qualidade |
-| D6 | [Backlog](06-roadmap/backlog.md), [dependências](06-roadmap/dependencias.md), [prontidão](06-roadmap/criterios-de-prontidao.md) | Execução e aprovação |
+| D6 | [roadmap final](06-roadmap/roadmap-final.md), [Backlog](06-roadmap/backlog.md), [dependências](06-roadmap/dependencias.md), [prontidão](06-roadmap/criterios-de-prontidao.md) | Execução e aprovação |
 
 ### Definições e limites
 - Decisões 1–65 representam **requisitos aprovados**, não implementação concluída.

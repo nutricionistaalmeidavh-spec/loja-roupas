@@ -49,3 +49,6 @@ Metas iniciais: >=80% cobertura de linhas nas regras puras críticas e 100% dos 
 
 ## Execução documentada futura
 Cada prova deve gerar: ID do requisito, commit SHA, ambiente, versão do schema, dados fictícios, passos, resultado esperado, resultado observado, logs e anexos. Relatórios em artefatos controlados; não declarar PASS por inspeção visual isolada.
+
+## QA visual do PDV (UX-RPOS-01)
+Além dos testes transacionais existentes, criar Playwright visual nas larguras 1440, 1366, 1280, 1024, 768, 390 e 320px. Capturar ProductGrid, variantes, carrinho com >10 linhas, resumo mobile, checkout, estados de foto ausente, produto esgotado, timeout e LAN indisponível. Executar teste de keyboard wedge e axe-core; imagens de fixtures licenciadas e hospedadas localmente. QA-UX-01 a QA-UX-12 são gates P0, e não exigem SaaS nem screenshot/cloud pagos. Não declarar PASS até executar os testes sobre UI real.

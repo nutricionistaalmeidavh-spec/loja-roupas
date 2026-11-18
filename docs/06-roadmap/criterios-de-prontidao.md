@@ -31,3 +31,12 @@
 
 ## Entrega à homologação
 Uma aprovação de documentação permite **solicitar** implementação posterior; ela nunca implica autorização para merge ou release. Merge e publicação continuam etapas humanas distintas.
+
+## Homologação adicional UX-RPOS-01
+- [x] Novo escopo visual e critérios de P0 documentados em D0/D4/D5/D6.
+- [ ] Aprovar o mockup visual revisado e suas variantes desktop/mobile.
+- [ ] Conferir fotos fictícias licenciadas, 7 viewports, teclado/barcode e contraste.
+- [ ] Executar QA-UX-01..12 após a implementação, não enquanto só houver documentação.
+- [ ] Autorizar início do código; **merge e release exigem comandos separados**.
+
+[Roadmap final consolidado](roadmap-final.md).

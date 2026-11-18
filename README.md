@@ -14,6 +14,8 @@ Sistema de loja de roupas em planejamento. Escopo: boutique física inicial, des
 - [Contrato HTTP](docs/03-contratos/openapi/openapi.yaml)
 - [Experiência](docs/04-design/jornadas-e-wireframes.md)
 - [Plano de qualidade](docs/05-qualidade/plano-testes.md)
+- [Roadmap final](docs/06-roadmap/roadmap-final.md)
+- [Direção visual Retail Fashion POS](docs/04-design/direcao-visual-retail-pos.md)
 - [Backlog](docs/06-roadmap/backlog.md)
 
 ## Regras de governança

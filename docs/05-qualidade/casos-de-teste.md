@@ -48,3 +48,19 @@ Nenhum caso está executado. QA-Dnn é obrigatório para cada Dnn; a coluna "Ver
 - Teste de logs: não vazar senha, token de sessão, CPF completo nem conteúdo privado em payload de evento.
 - Testes de carga: estoque sob concorrência, importação grande, busca e fechamento.
 - Teste de perda de impressão após venda: fila retoma sem reexecutar venda.
+
+## QA-UX-01 a QA-UX-12 — rastreio adicional Retail Fashion POS
+| Caso | Verificação |
+|---|---|
+| QA-UX-01 | 1440x900 e 1366x768: rail compacto, grade 3 colunas, carrinho sticky e total visível, sem overflow horizontal |
+| QA-UX-02 | 1280x800: nomes longos, preços e variantes não ficam truncados |
+| QA-UX-03 | 1024/768/390/320px: responsividade e drawer de carrinho alcançável |
+| QA-UX-04 | Tamanho+cor mapeiam exatamente a um SKU/variant_id, sem combinações inexistentes |
+| QA-UX-05 | Scanner, pesquisa e card colocam a mesma variante no carrinho único |
+| QA-UX-06 | Preço/estoque alterados no servidor obrigam cotação/revisão, sem confirmação silenciosa |
+| QA-UX-07 | Navegação por teclado, labels, foco, leitor de tela, zoom 200% e contraste AA |
+| QA-UX-08 | Falha da foto/thumbnail não impede busca, scan e venda |
+| QA-UX-09 | Carrinho com mais de 10 linhas mantém subtotal e CTA acessíveis |
+| QA-UX-10 | WAN fora não bloqueia venda LAN; servidor LAN fora impede commit |
+| QA-UX-11 | Timeout pós-commit com mesma chave não duplica venda, baixa ou pagamento |
+| QA-UX-12 | Screenshot de regressão em sete viewports comparado ao mockup aprovado e revisão humana |

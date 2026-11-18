@@ -60,3 +60,10 @@ flowchart TD
 
 ## Responsabilidades
 O domínio é dono do schema e invariantes; contratos são co-revisados; QA define provas; arquitetura revisa mudanças de fronteira; proprietário autoriza prioridades, merge e publicação. Sem estimativa fixa de prazo/esforço até medir tamanho da equipe, acesso a hardware e volume esperado.
+
+## Dependências de UX-RPOS-01
+- EP-04 fornece fotos/thumbnail local, categorias, variant_id e SKU para ProductCard; EP-05 devolve disponibilidade canônica.
+- EP-06 fornece preço/vigência/cotação; EP-09 compõe grade, cart e checkout usando a mesma API/estado.
+- UX e contrato podem progredir em paralelo ao backend; integração funcional depende de API aprovada, não de mock fictício.
+- EP-30 deve validar QA-UX-01..12; performance de imagem não pode degradar leitura de scanner.
+- Os épicos P1/P2 podem ser desenvolvidos em paralelo, mas não bloquear o fechamento do P0.

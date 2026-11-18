@@ -7,12 +7,12 @@ Todos os módulos podem ser **iniciados em paralelo** em especificação, contra
 | EP-01 | Fundação | P0 | estrutura monorepo, pnpm, Turborepo, licença | D0-D6 homologados | build reprodutível e dependências auditadas |
 | EP-02 | Infra | P0 | PostgreSQL, Docker Compose, health | EP-01 | LAN/WAN teste |
 | EP-03 | Identidade | P0 | login, RBAC, sessão, PIN e dispositivos | EP-02 | negar privilégios/loja errada |
-| EP-04 | Catálogo | P0 | produto, variação, grade, SKU | EP-02, EP-03 | unicidade e wizard |
+| EP-04 | Catálogo | P0 | produto, variação, grade, SKU, fotos e thumbnails locais, categorias e variantes selecionáveis | EP-02, EP-03 | SKU canônico, fotos com fallback e catálogo navegável |
 | EP-05 | Estoque | P0 | movimento, saldo, reserva e contagem inicial | EP-04 | concorrência sem oversell |
-| EP-06 | Preço | P0 | preço, desconto e publicação mínima | EP-04 | snapshot na venda |
+| EP-06 | Preço | P0 | preço, desconto, publicação mínima e cotação de variante para cards/carrinho | EP-04 | snapshot de preço vigente no servidor |
 | EP-07 | Caixa | P0 | abertura, movimentos e fechamento | EP-03 | conciliação |
 | EP-08 | Pagamentos | P0 | dinheiro, Pix manual, cartão externo, split | EP-07 | sem PAN/CVV e idempotente |
-| EP-09 | PDV | P0 | carrinho, suspensão, checkout e retorno | EP-04..08 | venda ACID e sem duplicação |
+| EP-09 | PDV Retail Fashion | P0 | grade fotográfica 3 colunas, categorias, icon rail, scanner, variantes no card, cart sidebar/drawer, pagamento por etapas, suspensão | EP-03..08; UX-RPOS-01 | QA-UX-01..12 + venda ACID e idempotente |
 | EP-10 | Impressão | P0 | etiqueta/recibo e fila local | EP-04, EP-09 | reimpressão sem venda extra |
 | EP-11 | Instalador | P0 | wizard, bootstrap, diagnóstico e update assistido | EP-02, EP-03 | instalação sem .env manual |
 | EP-12 | Resiliência | P0 | backup/restore, outbox, auditoria | EP-02, EP-09 | recuperar após falha |
@@ -33,7 +33,7 @@ Todos os módulos podem ser **iniciados em paralelo** em especificação, contra
 | EP-27 | Serviços | P2 | ajustes/costura e consignação | EP-04, EP-15 | propriedade e custos rastreáveis |
 | EP-28 | Inteligência | P2 | coleções, metas, previsões, scores | EP-14, EP-15, EP-25 | explicabilidade |
 | EP-29 | Personalização | P2 | regras/fields e widgets | EP-03, EP-04 | permissões e compatibilidade |
-| EP-30 | QA e Release | contínuo | contratos, Playwright, security, backup | todas as frentes | gates G0–G9, liberação humana |
+| EP-30 | QA e Release | contínuo | contratos, Playwright E2E/visual, acessibilidade, security e backup | todas as frentes | QA-UX-01..12 + gates G0–G9, liberação humana |
 
 ## Entregáveis por épico
 Cada EP é quebrado em: contrato e schema → testes de contrato → migração → serviços do domínio → interface desktop/PWA → integração → E2E + segurança → documentação → evidências de QA → PR para revisão. Não iniciar o código antes da aprovação formal de D0–D6.
@@ -43,3 +43,6 @@ Título: [EP-09][RF-PDV-01] Confirmar venda idempotente. Corpo: decisão D03/D35
 
 ## Marcos de homologação sem datas inventadas
 M0 documentação D0–D6 aprovada → M1 contratos do core compatíveis → M2 infraestrutura e login → M3 operação de produto/estoque → M4 PDV e caixa ponta a ponta → M5 P0 homologado → M6 P1 homologado → M7 P2 homologado. O gestor decide publicar cada marco; não há publicação automática.
+
+## Direção aprovada do PDV no P0
+**UX-RPOS-01** altera EP-04, EP-06, EP-09 e EP-30 sem criar uma decisão 66 nem exigir novas dependências pagas. O PDV será entregue já com catálogo fotográfico, variantes escolhidas no próprio cartão, rail compacto e carrinho sticky/drawer. [Roadmap final](roadmap-final.md) e [especificação D4](../04-design/direcao-visual-retail-pos.md).
