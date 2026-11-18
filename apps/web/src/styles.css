@@ -3,3 +3,35 @@
 @media(max-width:1023px){.shell{padding:9px;gap:8px}.icon-rail{width:54px}.cart-panel{display:none}.work-area{display:block}.mobile-cart{display:block;position:fixed;bottom:12px;left:75px;right:12px;padding:17px;border-radius:12px;background:#1e1e1e;color:white;border:0;z-index:5;font-weight:700;box-shadow:0 8px 20px #0002}.drawer-backdrop{display:block}.product-grid{padding-bottom:90px}}
 @media(max-width:600px){.shell{display:block;padding:8px}.icon-rail{display:none}.topbar{padding:12px;height:auto;min-height:73px}.topbar h1{font-size:19px}.topbar span{font-size:11px}.demo-status{max-width:130px;text-align:center}.work-area{padding-top:16px}.search-row{flex-wrap:wrap}.search-row input{flex-basis:100%}.scan-button{width:100%;min-height:42px}.product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.product-card{padding:7px}.product-visual{height:110px}.product-visual svg{height:85px}.mobile-cart{left:10px;right:10px}.cart-content{padding:14px}}
 @media(max-width:365px){.product-grid{grid-template-columns:1fr}.product-visual{height:150px}.product-visual svg{height:110px}}
+
+/* M2: login e formulários integrados ao PostgreSQL, sem tema ou serviço comercial. */
+.icon-rail .exit{margin-top:auto}
+.mobile-logout{border:1px solid #e8e8e8;border-radius:8px;background:white;padding:9px 12px;color:#333}
+.header-actions{display:flex;align-items:center;gap:10px}
+.demo-status.disconnected{color:#8f251c!important;background:#fcecea}
+.login-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:#f7f7f7}
+.login-panel{width:min(100%,420px);background:#fff;border:1px solid #ececec;border-radius:18px;padding:30px;box-shadow:0 12px 48px #0000000d}
+.login-logo{background:#222;color:#fff;width:48px;height:48px;display:grid;place-items:center;font-weight:bold;font-size:24px;border-radius:12px}
+.eyebrow{margin:26px 0 5px;color:#777;letter-spacing:.1em;font-size:11px;font-weight:700}
+.login-panel h1{font-size:26px;margin:0 0 6px}.login-panel p{line-height:1.6}
+.login-form,.login-chooser,.management-form{display:flex;flex-direction:column;gap:17px}
+.login-form{margin-top:25px}
+.login-form label,.management-form label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:650;color:#444;min-width:0}
+.login-form input,.management-form input,.management-form select{width:100%;height:43px;border:1px solid #ddd;border-radius:9px;background:white;padding:10px 12px;font-size:14px;color:#171717}
+.primary-action{background:#222;border:0;color:#fff;border-radius:9px;min-height:48px;padding:12px 24px;font-weight:700}
+.login-help{color:#777;font-size:12px;margin-top:24px}
+.store-option{min-height:44px;padding:10px;border:1px solid #ddd;border-radius:9px;background:#fff;text-align:left}
+.management-form{background:white;border:1px solid #ebebeb;border-radius:16px;padding:26px;margin-top:18px;max-width:1040px}
+.form-heading h2{font-size:22px;margin:0}.form-heading p{color:#777;margin:4px 0}
+.fields-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.variant-row{border:1px solid #ececec;border-radius:12px;padding:18px;margin:0}
+.variant-row legend{font-weight:700;color:#333;padding:0 6px}
+.variant-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.subhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.subhead h3{font-size:17px;margin:0}.subhead span{font-size:12px;color:#888}
+.light-button{align-self:flex-start;border:1px solid #dedede;background:#fafafa;border-radius:9px;padding:10px 14px;color:#292929}
+.notice{background:#e9f2e9;border-radius:9px;padding:12px;color:#276044}
+.stock-hint{font-size:11px;line-height:1.4;color:#757575;min-height:15px;margin:9px 0 0}
+.empty-catalog{grid-column:1/-1;color:#888;padding:22px;background:white;border-radius:12px}
+@media(max-width:850px){.variant-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.fields-two,.variant-fields{grid-template-columns:1fr}.management-form{padding:16px}.header-actions .demo-status{display:none}.header-actions .mobile-logout{padding:7px}.mobile-drawer .cart-content{padding-top:0}}

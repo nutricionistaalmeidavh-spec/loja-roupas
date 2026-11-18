@@ -9,7 +9,7 @@ export type CatalogPage = { items: ApiProduct[]; next_cursor: string | null };
 export type Product = {
   id: string; name: string; category: string;
   kind: 'shirt' | 'pants' | 'bag' | 'shoe';
-  variants: Variant[];
+  variants: Array<Variant & {barcode:string|null}>;
 };
 export function productCanAdd(variant: Variant | null | undefined): boolean {
   return Boolean(variant && Number.isSafeInteger(variant.available) && variant.available > 0);
@@ -31,7 +31,7 @@ export function mapCatalog(page: CatalogPage): Product[] {
         if (!Number.isSafeInteger(v.available) || v.available < 0)
           throw new Error('Saldo de estoque inválido recebido da API');
         return { id: v.id, sku: v.sku, color: v.color, size: v.size,
-          priceCents: v.price_cents, available: v.available };
+          priceCents: v.price_cents, available: v.available, barcode:v.barcode };
       }),
     };
   });
