@@ -9,3 +9,7 @@ runtime/
 !.env.example
 .DS_Store
 *.log
+
+# Evidências Playwright geradas localmente
+apps/web/test-results/
+apps/web/playwright-report/
