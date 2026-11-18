@@ -20,4 +20,4 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 1
 fi
 docker compose --env-file runtime/local.env -f infra/compose.dev.yml up -d
-echo "PostgreSQL local iniciado. Execute pnpm install; pnpm --filter @loja/api dev e pnpm --filter @loja/web dev."
+echo "PostgreSQL local iniciado. Execute pnpm install; carregue runtime/local.env, rode pnpm --filter @loja/api migrate e scripts/bootstrap-admin.sh antes de iniciar a API."

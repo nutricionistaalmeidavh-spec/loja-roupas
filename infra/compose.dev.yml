@@ -11,7 +11,6 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - loja_pgdata:/var/lib/postgresql/data
-      - ./sql/0001_init.sql:/docker-entrypoint-initdb.d/0001_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U loja -d loja"]
       interval: 5s

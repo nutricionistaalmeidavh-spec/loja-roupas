@@ -25,3 +25,13 @@ Branch: feat/m1-fundacao, derivada da documentação D0–D6, sem merge na main.
 6. `pnpm test` para regras de domínio.
 
 Este bootstrap é **somente para desenvolvedores**, não substitui o wizard de instalação aprovado para usuários. O núcleo permanece gratuito, open source, self-hosted, sem serviço pago obrigatório. Sem segredos no Git, sem merge e sem release.
+
+
+## Atualização M1 — autenticação, migrações e leitura de catálogo
+- Hash de senha com scrypt + salt por usuário, token opaco criptograficamente aleatório e hash da sessão no PostgreSQL.
+- Login com bloqueio básico de tentativas por IP/login em memória; **antes de produção**, substituir por bloqueio distribuído/durável para múltiplos processos.
+- Checagem de sessão revogada/expirada e vínculo com store_id em cada rota privada. Perfis mínimos; papel de gestor criado somente por bootstrap único.
+- Migrações SQL versionadas com checksums e lock transacional, sem segredos em repositório; Docker Compose não executa SQL automaticamente.
+- Catalog GET escopado por loja e protegido por RBAC; ainda não cria produtos reais nem dá baixa de estoque.
+- Comandos: sh scripts/bootstrap-dev.sh; pnpm install; exportar env local; pnpm --filter @loja/api migrate; bash scripts/bootstrap-admin.sh; iniciar API.
+- Testes de auth e catálogo foram adicionados para CI. Checkout continua bloqueado.

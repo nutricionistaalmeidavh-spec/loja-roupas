@@ -85,4 +85,3 @@ CREATE TABLE outbox_events (
   delivered_at timestamptz
 );
 CREATE INDEX outbox_pending ON outbox_events(occurred_at) WHERE delivered_at IS NULL;
-COMMIT;

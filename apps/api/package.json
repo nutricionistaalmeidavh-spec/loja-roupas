@@ -7,7 +7,9 @@
     "dev": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test test/*.test.ts"
+    "test": "node --experimental-strip-types --test test/*.test.ts",
+    "migrate": "tsx src/migrate.ts",
+    "bootstrap": "tsx src/bootstrap.ts"
   },
   "dependencies": {
     "fastify": "^5.0.0",
