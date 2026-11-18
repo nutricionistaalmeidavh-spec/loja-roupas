@@ -22,7 +22,7 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
-async function jsonRequest<T>(url: string, init: RequestInit, fetchImpl: typeof fetch): Promise<T> {
+export async function jsonRequest<T>(url: string, init: RequestInit, fetchImpl: typeof fetch): Promise<T> {
   let response: Response;
   try { response = await fetchImpl(url, { ...init, cache: 'no-store' }); }
   catch { throw new ApiError(0, 'NETWORK_ERROR', 'Não foi possível conectar ao servidor LAN.'); }
@@ -36,7 +36,7 @@ async function jsonRequest<T>(url: string, init: RequestInit, fetchImpl: typeof 
   }
   return body as T;
 }
-function headers(session: Session, idempotencyKey?: string): Record<string,string> {
+export function headers(session: Session, idempotencyKey?: string): Record<string,string> {
   return {
     authorization: 'Bearer ' + session.token,
     'x-store-id': session.storeId,

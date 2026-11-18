@@ -4,6 +4,9 @@ import { registerAuth } from './auth.ts';
 import { registerCatalog } from './catalog.ts';
 import { registerMutations } from './mutations.ts';
 import { registerCatalogAdmin } from './catalog-admin.ts';
+import { registerCash } from './cash.ts';
+import { registerSales } from './sales.ts';
+import { registerSuspendedSales } from './suspended-sales.ts';
 import { DomainError } from './transactions.ts';
 
 export function buildApp(db: Pool) {
@@ -21,6 +24,9 @@ export function buildApp(db: Pool) {
   registerCatalog(app, db);
   registerMutations(app, db);
   registerCatalogAdmin(app, db);
+  registerCash(app, db);
+  registerSales(app, db);
+  registerSuspendedSales(app, db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });
@@ -32,6 +38,6 @@ export function buildApp(db: Pool) {
     app.log.error(error);
     return reply.code(500).send({code:'INTERNAL',message:'Erro interno. Consulte o identificador da solicitação'});
   });
-  // Ainda não há endpoint de checkout, baixa por venda ou confirmação de pagamento.
+  // Pagamentos externos são registro MANUAL, nunca integração silenciosa com TEF/Pix.
   return app;
 }
