@@ -30,7 +30,11 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPcMrGYAQaYGJAAbg4AVzUBwNOahA4AAAAASUVORK5CYII=','base64');
  await page.getByLabel('Selecionar fotografia').setInputFiles({name:'peca.png',mimeType:'image/png',buffer:png});
  await page.getByRole('button',{name:'Enviar fotografia local'}).click();
- await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
+ await expect.poll(async()=>{
+   if(await page.getByText('Atualização confirmada pelo servidor.').count())return 'ok';
+   const errors=await page.locator('.management-form .error').allTextContents();
+   return errors.length?'API ERROR: '+errors.join(' | '):'waiting';
+ },{timeout:10000}).toBe('ok');
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
