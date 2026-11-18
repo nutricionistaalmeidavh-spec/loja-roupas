@@ -1,0 +1,381 @@
+openapi: 3.1.0
+info:
+  title: Loja de Roupas — contratos implementados no M3
+  version: 0.3.0
+  description: >
+    Rotas reais de caixa e PDV. Pagamentos Pix e cartão somente são registrados
+    após confirmação MANUAL fora deste sistema; não existe integração financeira automática.
+servers:
+  - url: /v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Caixa
+  - name: PDV
+  - name: Suspensao
+paths:
+  /cash-sessions/current:
+    get:
+      tags: [Caixa]
+      operationId: currentCash
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - name: terminal
+          in: query
+          schema: { type: string, maxLength: 32, default: CAIXA-01 }
+      responses:
+        '200':
+          description: Caixa aberto ou indicador active false
+          content:
+            application/json:
+              schema: { type: object }
+  /cash-sessions:
+    post:
+      tags: [Caixa]
+      operationId: openCash
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [terminal_code, opening_cents]
+              properties:
+                terminal_code: { type: string, pattern: '^[A-Za-z0-9-]{3,32}$' }
+                opening_cents: { type: integer, minimum: 0 }
+      responses:
+        '201':
+          description: Caixa aberto ou resposta idempotente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashSession' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /cash-sessions/{id}/movements:
+    post:
+      tags: [Caixa]
+      operationId: moveCash
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, amount_cents, reason]
+              properties:
+                kind: { type: string, enum: [supply, withdrawal] }
+                amount_cents: { type: integer, minimum: 1 }
+                reason: { type: string, minLength: 8, maxLength: 250 }
+      responses:
+        '201':
+          description: Sangria ou suprimento registrado
+          content:
+            application/json:
+              schema: { type: object }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /cash-sessions/{id}/close:
+    post:
+      tags: [Caixa]
+      operationId: closeCash
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [counted_cash_cents]
+              properties:
+                counted_cash_cents: { type: integer, minimum: 0 }
+                reason: { type: string, maxLength: 250 }
+      responses:
+        '200':
+          description: Fechamento reconciliado com diferença
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashClose' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /sales/quotes:
+    post:
+      tags: [PDV]
+      operationId: quoteSale
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [lines]
+              properties:
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { $ref: '#/components/schemas/QuoteLineInput' }
+      responses:
+        '200':
+          description: Cotação provisória; revalidada ao confirmar
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Quote' }
+  /sales:
+    post:
+      tags: [PDV]
+      operationId: commitSale
+      summary: Venda ACID com Idempotency-Key e baixa única de estoque
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CommitSale' }
+      responses:
+        '201':
+          description: Venda confirmada ou resposta idempotente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sale' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Invalid' }
+  /sales/{id}:
+    get:
+      tags: [PDV]
+      operationId: getSale
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Venda com linhas e pagamentos
+          content:
+            application/json:
+              schema: { type: object }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /sales/{id}/receipt:
+    get:
+      tags: [PDV]
+      operationId: getNonFiscalReceipt
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Comprovante NÃO FISCAL em texto UTF-8
+          content:
+            text/plain:
+              schema: { type: string }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /sales/drafts:
+    get:
+      tags: [Suspensao]
+      operationId: listSuspendedSales
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+      responses:
+        '200':
+          description: Últimas 50 vendas suspensas autorizadas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { type: object } }
+    post:
+      tags: [Suspensao]
+      operationId: suspendSale
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [cash_session_id, lines]
+              properties:
+                cash_session_id: { type: string, format: uuid }
+                note: { type: string, maxLength: 250 }
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items: { $ref: '#/components/schemas/QuoteLineInput' }
+      responses:
+        '201':
+          description: Carrinho persistido sem reserva de estoque
+          content:
+            application/json:
+              schema: { type: object }
+  /sales/drafts/{id}/resume:
+    post:
+      tags: [Suspensao]
+      operationId: resumeSale
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200':
+          description: Carrinho recuperado; preços e estoque devem ser recotados
+          content:
+            application/json:
+              schema: { type: object }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    StoreId:
+      name: X-Store-Id
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Conflict:
+      description: Violação de estado, preço, saldo ou idempotência
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Invalid:
+      description: Condição de negócio inválida ou pagamento não confirmado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Recurso não encontrado no escopo autorizado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    CashSession:
+      type: object
+      required: [id, terminal_code, opening_cents, opened_at, active]
+      properties:
+        id: { type: string, format: uuid }
+        terminal_code: { type: string }
+        opening_cents: { type: integer, minimum: 0 }
+        opened_at: { type: string, format: date-time }
+        active: { type: boolean }
+    CashClose:
+      type: object
+      required: [id, active, expected_cash_cents, counted_cash_cents, difference_cents]
+      properties:
+        id: { type: string, format: uuid }
+        active: { type: boolean }
+        expected_cash_cents: { type: integer, minimum: 0 }
+        counted_cash_cents: { type: integer, minimum: 0 }
+        difference_cents: { type: integer }
+    QuoteLineInput:
+      type: object
+      additionalProperties: false
+      required: [variant_id, quantity]
+      properties:
+        variant_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 10000 }
+    Quote:
+      type: object
+      required: [total_cents, can_commit, lines]
+      properties:
+        total_cents: { type: integer, minimum: 0 }
+        can_commit: { type: boolean }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [variant_id, quantity, price_cents, price_revision, available]
+            properties:
+              variant_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+              price_cents: { type: integer, minimum: 0 }
+              price_revision: { type: integer, minimum: 1 }
+              available: { type: integer, minimum: 0 }
+              sku: { type: string }
+              product_name: { type: string }
+    SaleLineInput:
+      type: object
+      additionalProperties: false
+      required: [variant_id, quantity, expected_price_cents, expected_price_revision]
+      properties:
+        variant_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 10000 }
+        expected_price_cents: { type: integer, minimum: 0 }
+        expected_price_revision: { type: integer, minimum: 1 }
+    PaymentInput:
+      type: object
+      additionalProperties: false
+      required: [method, amount_cents, confirmed]
+      properties:
+        method: { type: string, enum: [cash, pix_manual, card_external] }
+        amount_cents: { type: integer, minimum: 1 }
+        confirmed: { type: boolean, const: true }
+        external_reference: { type: string, maxLength: 128 }
+    CommitSale:
+      type: object
+      additionalProperties: false
+      required: [cash_session_id, lines, payments]
+      properties:
+        cash_session_id: { type: string, format: uuid }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: '#/components/schemas/SaleLineInput' }
+        payments:
+          type: array
+          minItems: 1
+          maxItems: 6
+          items: { $ref: '#/components/schemas/PaymentInput' }
+    Sale:
+      type: object
+      required: [id, sale_number, status, total_cents, tendered_cents, change_cents, created_at, cash_session_id]
+      properties:
+        id: { type: string, format: uuid }
+        sale_number: { type: integer, minimum: 1 }
+        status: { type: string, enum: [confirmed] }
+        total_cents: { type: integer, minimum: 0 }
+        tendered_cents: { type: integer, minimum: 0 }
+        change_cents: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        cash_session_id: { type: string, format: uuid }

@@ -37,7 +37,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await expect(card.getByText('3 disponíveis')).toBeVisible();
   await card.getByRole('button', {name:'Adicionar '+name}).click();
   await expect(page.getByText('1 peça adicionada')).toBeVisible();
-  await expect(page.getByRole('button', {name:/Pagamento disponível após integração/})).toBeDisabled();
+  await expect(page.getByRole('button', {name:/Abra o caixa para vender/})).toBeDisabled();
   await page.screenshot({path:'test-results/retail-pdv-desktop.png',fullPage:true});
 
   await page.setViewportSize({width:390,height:844});
