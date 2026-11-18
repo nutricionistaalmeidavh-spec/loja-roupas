@@ -3,8 +3,12 @@ import { stableFingerprint } from '@loja/domain/catalog';
 import type { AuthContext } from './auth.ts';
 
 export class DomainError extends Error {
-  constructor(public readonly status: number, public readonly code: string, message: string) {
+  readonly status: number;
+  readonly code: string;
+  constructor(status: number, code: string, message: string) {
     super(message);
+    this.status = status;
+    this.code = code;
   }
 }
 export function requireIdempotencyKey(value: unknown): string {
