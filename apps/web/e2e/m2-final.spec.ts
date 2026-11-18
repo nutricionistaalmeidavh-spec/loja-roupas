@@ -27,7 +27,7 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByLabel('Novo preço (R$)').fill('229,90');
  await page.getByRole('button',{name:'Salvar preço'}).click();
  await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
- const png=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082','hex');
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPcMrGYAQaYGJAAbg4AVzUBwNOahA4AAAAASUVORK5CYII=','base64');
  await page.getByLabel('Selecionar fotografia').setInputFiles({name:'peca.png',mimeType:'image/png',buffer:png});
  await page.getByRole('button',{name:'Enviar fotografia local'}).click();
  await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
