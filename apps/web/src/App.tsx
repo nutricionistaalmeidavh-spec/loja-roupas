@@ -8,6 +8,8 @@ import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { CreateProductForm, ReceiveStockForm } from './Management.tsx';
+import { ProductPhoto } from './ProductPhoto.tsx';
+import { M2CatalogEditor, M2StockAdjustment } from './M2Admin.tsx';
 
 const brl = (cents:number) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
 const sizesFor = (p:Product,color:string) => [...new Set(p.variants.filter(v=>v.color===color).map(v=>v.size))];
@@ -25,6 +27,9 @@ export function App() {
   const [page,setPage] = useState<Page>('pdv');
   const [products,setProducts] = useState<Product[]>([]);
   const [allProducts,setAllProducts] = useState<Product[]>([]);
+  const [cursor,setCursor] = useState<string|null>(null);
+  const [paging,setPaging] = useState(false);
+  const [stockSearch,setStockSearch] = useState('');
   const [search,setSearch] = useState('');
   const [debouncedSearch,setDebouncedSearch] = useState('');
   const [category,setCategory] = useState('Todos');
@@ -49,14 +54,14 @@ export function App() {
     return ()=>clearTimeout(timer);
   },[search]);
   useEffect(()=>{
-    if(!session){setProducts([]);return;}
+    if(!session){setProducts([]);setCursor(null);return;}
     const controller=new AbortController();
     setLoading(true);setCatalogError('');
     void listCatalog(session,debouncedSearch,fetch,controller.signal)
-      .then(data=>{if(!controller.signal.aborted){setProducts(mapCatalog(data));}})
+      .then(data=>{if(!controller.signal.aborted){setProducts(mapCatalog(data));setCursor(data.next_cursor);}})
       .catch(error=>{
         if(controller.signal.aborted)return;
-        setProducts([]);
+        setProducts([]);setCursor(null);
         setCatalogError(error instanceof Error?error.message:'Não foi possível carregar o catálogo');
         if(error instanceof ApiError&&error.status===401){setSession(null);setDraft([]);}
       })
@@ -67,14 +72,28 @@ export function App() {
     if(!session||page!=='estoque'){setAllProducts([]);return;}
     const controller=new AbortController();
     setStockLoading(true);
-    void listCatalog(session,'',fetch,controller.signal).then(data=>{
+    void listCatalog(session,stockSearch,fetch,controller.signal).then(data=>{
       if(!controller.signal.aborted)setAllProducts(mapCatalog(data));
     }).catch(error=>{
       if(!controller.signal.aborted){setAllProducts([]);setCatalogError(error instanceof Error?error.message:'Falha ao carregar estoque');}
     }).finally(()=>{if(!controller.signal.aborted)setStockLoading(false);});
     return ()=>controller.abort();
-  },[session,page,refetch]);
+  },[session,page,refetch,stockSearch]);
 
+  async function loadMore(){
+    if(!session||!cursor||paging)return;
+    setPaging(true);setCatalogError('');
+    try{
+      const data=await listCatalog(session,debouncedSearch,fetch,undefined,cursor);
+      const appended=mapCatalog(data);
+      setProducts(current=>{
+        const ids=new Set(current.map(p=>p.id));
+        return [...current,...appended.filter(p=>!ids.has(p.id))];
+      });
+      setCursor(data.next_cursor);
+    }catch(error){setCatalogError(error instanceof Error?error.message:'Erro ao buscar próxima página');}
+    finally{setPaging(false);}
+  }
   function authenticated(value:Session){
     setSession(value);setDraft([]);setPage('pdv');setSearch('');setSelected({});setCategory('Todos');setCatalogError('');setMessage('');
   }
@@ -166,7 +185,7 @@ export function App() {
             const selectedVariant=resolveVariant(p.variants,color,size);
             const ready=Boolean(choice)||p.variants.length===1;
             return <article key={p.id} className="product-card">
-              <div className={'product-visual '+p.kind}><Garment kind={p.kind}/></div>
+              <div className={'product-visual '+p.kind}>{p.hasPhoto?<ProductPhoto session={session} product={p}/>:<Garment kind={p.kind}/>}</div>
               <div className="card-copy">
                 <h3 title={p.name}>{p.name}</h3>
                 <p className="price">{selectedVariant?brl(selectedVariant.priceCents):'Indisponível'}</p>
@@ -188,11 +207,21 @@ export function App() {
           })}
           {!filtered.length&&<p className="empty-catalog">Nenhuma peça disponível para estes filtros. Cadastre produtos ou altere a busca.</p>}
         </div>}
-        <p className="muted small">Exibindo até 50 produtos por busca. Fotografias de roupas e paginação serão integradas posteriormente.</p>
+        {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
+        <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
-      {page==='produtos'&&manager&&<CreateProductForm session={session} onSaved={refreshed}/>}
-      {page==='estoque'&&canReceive&&<>{stockLoading&&<p className="notice">Carregando variantes para recebimento…</p>}
-        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/></>}
+      {page==='produtos'&&manager&&<><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></>}
+      {page==='estoque'&&canReceive&&<>
+        <div className="management-form">
+          <label>Localizar peça para recebimento (nome ou SKU)
+            <input value={stockSearch} onChange={e=>setStockSearch(e.target.value)} placeholder="Buscar no servidor"/>
+          </label>
+          {stockLoading&&<p className="notice">Carregando variantes para recebimento…</p>}
+          <p className="muted small">Mostrando até 50 resultados; pesquise o SKU exato para outros itens.</p>
+        </div>
+        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
+        {manager&&<M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>}
+      </>}
     </main>
     {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {page==='pdv'&&cartOpen&&<div className="drawer-backdrop" onMouseDown={()=>setCartOpen(false)}>

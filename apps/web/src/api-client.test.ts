@@ -42,3 +42,25 @@ test('erros de autenticação não são interpretados como catálogo vazio',asyn
   const fake:typeof fetch=async()=>Response.json({code:'UNAUTHORIZED',message:'Sem sessão'},{status:401});
   await assert.rejects(()=>listCatalog(session,'',fake),(err:unknown)=>err instanceof ApiError && err.status===401);
 });
+
+test('foto original usa PUT /photo, miniatura privada usa GET /thumbnail',async()=>{
+  const {uploadPhoto,fetchProductPhoto}=await import('./api-client.ts');
+  const id='b69c72ed-45ac-4e36-8c32-3be1fa475ee9';
+  const received:Array<{url:string;method:string|undefined;authorization:unknown;type:unknown}>=[];
+  const fake:typeof fetch=async(input,init)=>{
+    received.push({url:String(input),method:init?.method,
+      authorization:(init?.headers as Record<string,string>)['authorization'],
+      type:(init?.headers as Record<string,string>)['content-type']});
+    if(init?.method==='PUT')return Response.json({product_id:id,sha256:'mock',content_type:'image/png'});
+    return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/webp'}});
+  };
+  await uploadPhoto(session,id,new Blob([new Uint8Array([137,80,78,71])],{type:'image/png'}),'retry-photo-12345',fake);
+  const image=await fetchProductPhoto(session,id,fake);
+  assert.equal(image.type,'image/webp');
+  assert.deepEqual(received.map(x=>[x.method??'GET',x.url]),[
+    ['PUT','/v1/catalog/products/'+id+'/photo'],
+    ['GET','/v1/catalog/products/'+id+'/thumbnail'],
+  ]);
+  assert.equal(received[0].authorization,'Bearer '+session.token);
+  assert.equal(received[1].authorization,'Bearer '+session.token);
+});

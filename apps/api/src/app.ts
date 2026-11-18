@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { registerAuth } from './auth.ts';
 import { registerCatalog } from './catalog.ts';
 import { registerMutations } from './mutations.ts';
+import { registerCatalogAdmin } from './catalog-admin.ts';
 import { DomainError } from './transactions.ts';
 
 export function buildApp(db: Pool) {
@@ -19,6 +20,7 @@ export function buildApp(db: Pool) {
   });
   registerCatalog(app, db);
   registerMutations(app, db);
+  registerCatalogAdmin(app, db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });
