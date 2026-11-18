@@ -24,7 +24,8 @@ CREATE TABLE products (
   store_id uuid NOT NULL REFERENCES stores(id),
   name text NOT NULL CHECK(length(trim(name))>0),
   category text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(id, store_id)
 );
 CREATE TABLE product_variants (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,7 +38,9 @@ CREATE TABLE product_variants (
   price_cents bigint NOT NULL CHECK(price_cents >= 0),
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE(store_id, sku),
-  UNIQUE(product_id, color, size)
+  UNIQUE(id, store_id),
+  UNIQUE(product_id, color, size),
+  FOREIGN KEY(product_id, store_id) REFERENCES products(id, store_id)
 );
 CREATE UNIQUE INDEX product_variants_barcode_unique ON product_variants(store_id, barcode) WHERE barcode IS NOT NULL;
 CREATE TABLE stock_balances (
@@ -46,7 +49,8 @@ CREATE TABLE stock_balances (
   on_hand bigint NOT NULL DEFAULT 0 CHECK(on_hand>=0),
   reserved bigint NOT NULL DEFAULT 0 CHECK(reserved>=0 AND reserved<=on_hand),
   revision bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY(store_id, variant_id)
+  PRIMARY KEY(store_id, variant_id),
+  FOREIGN KEY(variant_id, store_id) REFERENCES product_variants(id, store_id)
 );
 CREATE TABLE stock_movements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -57,7 +61,8 @@ CREATE TABLE stock_movements (
   movement_kind text NOT NULL,
   qty_delta bigint NOT NULL CHECK(qty_delta<>0),
   occurred_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(store_id, source_type, source_id, variant_id, movement_kind)
+  UNIQUE(store_id, source_type, source_id, variant_id, movement_kind),
+  FOREIGN KEY(variant_id, store_id) REFERENCES product_variants(id, store_id)
 );
 CREATE TABLE idempotency_records (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

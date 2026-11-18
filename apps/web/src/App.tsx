@@ -37,7 +37,7 @@ export function App() {
     if(!choice){setMessage('Selecione cor e tamanho para adicionar.'); return;}
     const variant=resolveVariant(product.variants,choice.color,choice.size);
     if(!variant){setMessage('Combinação não cadastrada.');return;}
-    try {setDraft(lines=>addToDraft(lines,variant)); setMessage('');}
+    try {const next=addToDraft(draft,variant); setDraft(next); setMessage('');}
     catch(error){setMessage(error instanceof Error?error.message:'Não foi possível adicionar');}
   }
   const cart = <div className="cart-content">
@@ -47,7 +47,7 @@ export function App() {
       <div className="mini-visual">◆</div><div className="cart-description"><strong>{products.find(p=>p.variants.some(v=>v.id===line.variant.id))?.name}</strong>
       <span>{line.variant.color} · {line.variant.size}</span><div className="qty">
       <button aria-label={'Diminuir '+line.variant.sku} onClick={()=>setDraft(d=>d.flatMap(x=>x.variant.id!==line.variant.id?[x]:x.quantity===1?[]:[{...x,quantity:x.quantity-1}]))}>−</button>
-      <span>{line.quantity}</span><button aria-label={'Aumentar '+line.variant.sku} onClick={()=>{try{setDraft(d=>addToDraft(d,line.variant));setMessage('');}catch(err){setMessage(err instanceof Error?err.message:'Limite atingido');}}}>+</button></div></div>
+      <span>{line.quantity}</span><button aria-label={'Aumentar '+line.variant.sku} onClick={()=>{try{const next=addToDraft(draft,line.variant);setDraft(next);setMessage('');}catch(err){setMessage(err instanceof Error?err.message:'Limite atingido');}}}>+</button></div></div>
       <strong>{brl(line.quantity*line.variant.priceCents)}</strong></div>):
       <p className="empty-cart">Selecione uma peça para começar a montagem do carrinho.</p>}</div>
     <div className="cart-footer"><div className="total-row"><span>Subtotal estimado</span><strong>{brl(total)}</strong></div>
