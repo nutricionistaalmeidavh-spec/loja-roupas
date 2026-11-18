@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "exports": {
-    ".": "./src/cart.ts"
+    ".": "./src/cart.ts",
+    "./catalog": "./src/catalog.ts"
   },
   "scripts": {
     "test": "node --experimental-strip-types --test test/*.test.ts",

@@ -12,6 +12,7 @@
     "bootstrap": "tsx src/bootstrap.ts"
   },
   "dependencies": {
+    "@loja/domain": "workspace:*",
     "fastify": "^5.0.0",
     "pg": "^8.13.0"
   },

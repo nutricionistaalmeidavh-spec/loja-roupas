@@ -11,11 +11,11 @@ test('catálogo bloqueia acesso sem sessão e filtra por loja no SQL',async()=>{
     if(sql.includes('FROM auth_sessions s'))return {rowCount:1,rows:[{user_id:'u',store_id:store,roles:['manager']}]};
     if(sql.includes('SELECT p.id::text AS product_id'))return {rowCount:1,rows:[{
       product_id:'p',name:'Blusa',category:'Feminino',variant_id:'v',sku:'BL-M',barcode:null,
-      color:'Azul',size:'M',price_cents:'14990',available:'3'
+      color:'Azul',size:'M',price_cents:'14990',available:'3',revision:'1'
     }]};
     return {rowCount:0,rows:[]};
   }};
-  const app=buildApp(db as unknown as Pick<Pool,'query'>);
+  const app=buildApp(db as unknown as Pool);
   assert.equal((await app.inject('/v1/catalog/products')).statusCode,401);
   const r=await app.inject({url:'/v1/catalog/products?query=Blusa',headers:{authorization:`Bearer ${token}`,'x-store-id':store}});
   assert.equal(r.statusCode,200);
