@@ -95,13 +95,13 @@ export function listMovements(session:Session,variantId:string,fetchImpl:typeof 
 }
 export async function uploadPhoto(session:Session,productId:string,file:Blob,key:string,fetchImpl:typeof fetch=fetch) {
  return jsonRequest<{product_id:string;sha256:string;content_type:string}>(
-  '/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',{
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/photo',{
   method:'PUT',headers:{...headers(session,key),'content-type':file.type},body:file
  },fetchImpl);
 }
 export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal) {
  let response:Response;
- try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/photo',{
+ try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',{
   headers:headers(session),cache:'no-store',signal
  });} catch {throw new ApiError(0,'NETWORK_ERROR','Imagem indisponível no servidor LAN');}
  if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a fotografia');
