@@ -220,7 +220,7 @@ export function App() {
           <p className="muted small">Mostrando até 50 resultados; pesquise o SKU exato para outros itens.</p>
         </div>
         <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
-        {manager&&<M2StockAdjustment session={session} onSaved={refreshed}/>}
+        {manager&&<M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>}
       </>}
     </main>
     {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}

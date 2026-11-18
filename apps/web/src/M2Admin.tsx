@@ -112,7 +112,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
   {notice&&<p role="status" className="notice">{notice}</p>}
  </section>;
 }
-export function M2StockAdjustment({session,onSaved}:{session:Session;onSaved:()=>void}){
+export function M2StockAdjustment({session,onSaved,refreshKey}:{session:Session;onSaved:()=>void;refreshKey:number}){
  const [q,setQ]=useState('');const [products,setProducts]=useState<Product[]>([]);
  const [variantId,setVariantId]=useState('');const [count,setCount]=useState('');const [reason,setReason]=useState('');
  const [movements,setMovements]=useState<StockMovement[]>([]);
@@ -128,11 +128,11 @@ export function M2StockAdjustment({session,onSaved}:{session:Session;onSaved:()=
    if(!ctrl.signal.aborted)setProducts(mapCatalog(data));
   }).catch(err=>{if(!ctrl.signal.aborted)setError(message(err));}),250);
   return ()=>{clearTimeout(timer);ctrl.abort();};
- },[session,q,refresh]);
+ },[session,q,refresh,refreshKey]);
  useEffect(()=>{
   if(!variantId){setMovements([]);return;}
   void listMovements(session,variantId).then(x=>setMovements(x.items)).catch(()=>setMovements([]));
- },[session,variantId,refresh]);
+ },[session,variantId,refresh,refreshKey]);
  async function submit(e:FormEvent){
   e.preventDefault();if(!selected||busy)return;
   setError('');setStatus('');

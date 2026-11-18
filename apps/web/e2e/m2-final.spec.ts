@@ -1,0 +1,56 @@
+import { test, expect } from '@playwright/test';
+
+test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoque com histórico',async ({page})=>{
+ const sku='M2-END-'+Math.random().toString(36).slice(2,10).toUpperCase();
+ const name='Vestido '+sku;
+ await page.goto('/');
+ await page.getByLabel('Usuário').fill('qa-admin');
+ await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
+ await page.getByRole('button',{name:'Entrar na loja'}).click();
+ await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByLabel('Nome da peça').fill(name);
+ await page.getByLabel('SKU').fill(sku);
+ await page.getByLabel('Cor').fill('Preto');
+ await page.getByLabel('Tamanho').fill('M');
+ await page.getByLabel('Preço (R$)').fill('199,90');
+ await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
+ await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
+
+ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
+ await page.getByLabel('Nome do produto').fill(name+' atual');
+ await page.getByRole('button',{name:'Salvar informações'}).click();
+ await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
+ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name+' atual'});
+ await page.getByRole('combobox',{name:'Variante para preço'}).selectOption({label:new RegExp(sku)});
+ await page.getByLabel('Novo preço (R$)').fill('229,90');
+ await page.getByRole('button',{name:'Salvar preço'}).click();
+ await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
+ const png=Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000b49444154789c636000020000050001a5f645400000000049454e44ae426082','hex');
+ await page.getByLabel('Selecionar fotografia').setInputFiles({name:'peca.png',mimeType:'image/png',buffer:png});
+ await page.getByRole('button',{name:'Enviar fotografia local'}).click();
+ await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
+ await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
+ const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
+ await expect(item).toBeAttached();
+ await page.getByLabel('Variante (SKU)').selectOption((await item.getAttribute('value'))!);
+ await page.getByLabel('Quantidade recebida').fill('6');
+ await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
+ await expect(page.getByText(/Novo saldo em mãos: 6/)).toBeVisible();
+ await page.getByLabel('Localizar SKU para conferência').fill(sku);
+ const adjustment=page.getByLabel('Variante para ajustar').locator('option',{hasText:sku});
+ await expect(adjustment).toBeAttached();
+ await page.getByLabel('Variante para ajustar').selectOption((await adjustment.getAttribute('value'))!);
+ await page.getByLabel('Saldo físico contado').fill('4');
+ await page.getByLabel('Motivo do ajuste').fill('Conferência no provador');
+ await page.getByRole('button',{name:'Confirmar ajuste gerencial'}).click();
+ await expect(page.getByText(/Saldo total em mãos: 4/)).toBeVisible();
+ await expect(page.getByText(/adjustment/)).toBeVisible();
+
+ await page.getByRole('button',{name:'PDV'}).click();
+ await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
+ const card=page.locator('.product-card').filter({hasText:name+' atual'});
+ await expect(card.getByText('R$ 229,90')).toBeVisible();
+ await expect(card.getByText('4 disponíveis')).toBeVisible();
+ await expect(card.locator('img.product-image')).toBeVisible();
+});
