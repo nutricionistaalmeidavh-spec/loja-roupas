@@ -22,7 +22,7 @@ export function buildApp(db: Pool) {
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });
-    if ('validation' in error && error.validation)
+    if (typeof error === 'object' && error !== null && 'validation' in error && error.validation)
       return reply.code(400).send({code:'BAD_REQUEST',message:'Formato de entrada inválido'});
     const dbCode = (error as Error & {code?:string}).code;
     if (dbCode === '23505' || dbCode === '23503' || dbCode === '23514')
