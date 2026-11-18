@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-label="Wireframe visual do PDV de loja de roupas com busca, carrinho e pagamentos">
+<rect width="1440" height="900" fill="#F5F1EA"/>
+<rect width="232" height="900" fill="#302B26"/>
+<text x="32" y="59" fill="#F5F1EA" font-family="Arial, sans-serif" font-size="26" font-weight="700">Loja de Roupas</text>
+<text x="32" y="86" fill="#C5BBAF" font-family="Arial, sans-serif" font-size="13">CENTRAL DE GESTÃO</text>
+<g font-family="Arial, sans-serif" font-size="17" fill="#D8D0C6"><text x="32" y="170" fill="#FFFFFF">PDV  •  Caixa</text><text x="32" y="223">Produtos</text><text x="32" y="276">Estoque</text><text x="32" y="329">Clientes</text><text x="32" y="382">Financeiro</text><text x="32" y="435">Relatórios</text></g>
+<rect x="256" y="20" rx="14" width="1160" height="86" fill="#FFFFFF"/>
+<text x="282" y="55" fill="#302B26" font-family="Arial, sans-serif" font-size="25" font-weight="700">Nova venda</text>
+<text x="282" y="80" fill="#705A48" font-family="Arial, sans-serif" font-size="14">Loja principal  /  Caixa 01  /  Operador Ana</text>
+<rect x="1186" y="46" width="190" height="34" rx="17" fill="#E0EDE5"/>
+<text x="1222" y="68" fill="#286B4A" font-family="Arial, sans-serif" font-size="14" font-weight="700">Servidor LAN ativo</text>
+<rect x="256" y="124" rx="14" width="740" height="100" fill="#FFFFFF"/>
+<text x="280" y="158" fill="#302B26" font-family="Arial, sans-serif" font-size="18" font-weight="700">Buscar produto ou ler código de barras</text>
+<rect x="280" y="175" rx="8" width="690" height="33" fill="#F5F1EA"/>
+<text x="294" y="197" fill="#8B8075" font-family="Arial, sans-serif" font-size="13">SKU, código, nome, cor ou tamanho…</text>
+<rect x="256" y="242" rx="14" width="740" height="584" fill="#FFFFFF"/>
+<text x="280" y="283" fill="#302B26" font-family="Arial, sans-serif" font-size="20" font-weight="700">Itens da venda</text>
+<text x="894" y="283" fill="#705A48" font-family="Arial, sans-serif" font-size="14">2 peças</text>
+<line x1="280" y1="305" x2="970" y2="305" stroke="#EAE2D8"/>
+<rect x="280" y="326" width="78" height="91" rx="10" fill="#EAE2D8"/><text x="300" y="379" fill="#705A48" font-family="Arial" font-size="12">BLUSA</text>
+<text x="380" y="356" fill="#302B26" font-family="Arial" font-size="18" font-weight="700">Blusa de linho</text><text x="380" y="383" fill="#705A48" font-family="Arial" font-size="14">Bege · Tam. M · BLU-LIN-BG-M</text>
+<text x="778" y="367" fill="#302B26" font-family="Arial" font-size="17">1 × R$ 129,90</text>
+<line x1="280" y1="431" x2="970" y2="431" stroke="#EAE2D8"/>
+<rect x="280" y="454" width="78" height="91" rx="10" fill="#EAE2D8"/><text x="299" y="507" fill="#705A48" font-family="Arial" font-size="12">CALÇA</text>
+<text x="380" y="487" fill="#302B26" font-family="Arial" font-size="18" font-weight="700">Calça jeans reta</text><text x="380" y="514" fill="#705A48" font-family="Arial" font-size="14">Azul · Tam. 40 · CAL-JEA-AZ-40</text>
+<text x="778" y="499" fill="#302B26" font-family="Arial" font-size="17">1 × R$ 159,90</text>
+<line x1="280" y1="558" x2="970" y2="558" stroke="#EAE2D8"/>
+<rect x="280" y="768" rx="9" width="180" height="40" fill="#F5F1EA"/><text x="307" y="794" fill="#54463B" font-family="Arial" font-size="14" font-weight="700">Suspender venda</text>
+<rect x="1014" y="124" rx="14" width="402" height="702" fill="#FFFFFF"/>
+<text x="1040" y="166" fill="#302B26" font-family="Arial" font-size="21" font-weight="700">Resumo e pagamento</text>
+<g font-family="Arial" font-size="15" fill="#705A48"><text x="1040" y="220">Subtotal</text><text x="1300" y="220">R$ 289,80</text><text x="1040" y="263">Desconto</text><text x="1320" y="263">R$ 0,00</text></g>
+<line x1="1040" y1="287" x2="1388" y2="287" stroke="#EAE2D8"/>
+<text x="1040" y="326" fill="#302B26" font-family="Arial" font-size="18" font-weight="700">Total</text><text x="1222" y="326" fill="#302B26" font-family="Arial" font-size="27" font-weight="700">R$ 289,80</text>
+<text x="1040" y="390" fill="#302B26" font-family="Arial" font-size="16" font-weight="700">Forma de pagamento</text>
+<rect x="1040" y="412" width="165" height="47" rx="9" fill="#54463B"/><text x="1071" y="441" fill="#FFFFFF" font-family="Arial" font-size="15">Dinheiro</text>
+<rect x="1221" y="412" width="165" height="47" rx="9" fill="#F5F1EA"/><text x="1272" y="441" fill="#54463B" font-family="Arial" font-size="15">Pix</text>
+<rect x="1040" y="470" width="165" height="47" rx="9" fill="#F5F1EA"/><text x="1088" y="499" fill="#54463B" font-family="Arial" font-size="15">Cartão</text>
+<rect x="1221" y="470" width="165" height="47" rx="9" fill="#F5F1EA"/><text x="1254" y="499" fill="#54463B" font-family="Arial" font-size="15">Crediário</text>
+<text x="1040" y="575" fill="#705A48" font-family="Arial" font-size="14">Pagamento misto disponível</text>
+<rect x="1040" y="724" rx="10" width="346" height="68" fill="#54463B"/>
+<text x="1109" y="764" fill="#FFFFFF" font-family="Arial" font-size="20" font-weight="700">Revisar e confirmar</text>
+<text x="266" y="865" fill="#705A48" font-family="Arial" font-size="13">Protótipo estático para revisão do fluxo — não é tela implementada.</text>
+</svg>
