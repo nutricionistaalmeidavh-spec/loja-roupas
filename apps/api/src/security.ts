@@ -1,10 +1,12 @@
-import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
-const scrypt = promisify(scryptCallback);
+import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 const N = 16384;
 const R = 8;
 const P = 1;
 const LEN = 64;
+const deriveKey = (password: string, salt: Buffer): Promise<Buffer> => new Promise((resolve, reject) => {
+  scrypt(password, salt, LEN, { N, r: R, p: P, maxmem: 64 * 1024 * 1024 }, (error, key) =>
+    error ? reject(error) : resolve(key));
+});
 const roleCapabilities: Readonly<Record<string, readonly string[]>> = {
   manager: ['*'],
   cashier: ['catalog.read','stock.read','sale.commit','sale.read','cash.manage','payments.record'],
@@ -17,7 +19,7 @@ const roleCapabilities: Readonly<Record<string, readonly string[]>> = {
 export async function hashPassword(password: string): Promise<string> {
   if (password.length < 12 || password.length > 1024) throw new Error('Senha deve ter entre 12 e 1024 caracteres');
   const salt = randomBytes(16);
-  const key = (await scrypt(password, salt, LEN, { N, r: R, p: P, maxmem: 64 * 1024 * 1024 })) as Buffer;
+  const key = await deriveKey(password, salt);
   return `scrypt$${N}$${R}$${P}$${salt.toString('base64url')}$${key.toString('base64url')}`;
 }
 export async function verifyPassword(password: string, encoded: string): Promise<boolean> {
@@ -28,7 +30,7 @@ export async function verifyPassword(password: string, encoded: string): Promise
     const salt = Buffer.from(parts[4], 'base64url');
     const expected = Buffer.from(parts[5], 'base64url');
     if (salt.length !== 16 || expected.length !== LEN) return false;
-    const actual = (await scrypt(password, salt, LEN, { N, r: R, p: P, maxmem: 64 * 1024 * 1024 })) as Buffer;
+    const actual = await deriveKey(password, salt);
     return timingSafeEqual(expected, actual);
   } catch { return false; }
 }
