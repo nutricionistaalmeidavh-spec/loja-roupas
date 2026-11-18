@@ -29,7 +29,7 @@ test('M2: ampliar e editar grade; gerar miniatura WebP sem CDN', {skip:!url&&'Ex
     headers:write(),payload:{sku:anotherSku,color:'Bege',size:'G',price_cents:31500,expected_product_revision:1}});
   assert.equal(added.statusCode,201,added.body);
   assert.equal(added.json().revision,1);
-  const renamedSku='BLZ-'+randomUUID().slice(0,6);
+  const renamedSku=('BLZ-'+randomUUID().slice(0,6)).toUpperCase();
   const edited=await app.inject({method:'PATCH',url:'/v1/catalog/variants/'+added.json().id+'/attributes',
     headers:write(),payload:{sku:renamedSku,color:'Areia',size:'G',barcode:null,expected_revision:1}});
   assert.equal(edited.statusCode,200,edited.body);
