@@ -26,5 +26,7 @@
 - Catálogo apresenta até 50 produtos por consulta; paginação e busca abrangente para estoque além deste limite serão tratados em nova entrega.
 - Não há sessão persistente deliberadamente: atualizar a página exige autenticação novamente; nenhum token em localStorage.
 - Dev Vite e Compose são ferramentas para desenvolvedores; instalador e disponibilidade na LAN pública serão parte de M4.
-- A UI deve ser validada em navegador/Playwright e os contratos reais antes da aprovação deste PR.
+- **Validado em GitHub Actions:** build, tipagem, domínio, migrações PostgreSQL, testes de API e Playwright real (login → cadastro → entrada de estoque → carrinho desktop/mobile).
+- Evidências de QA: https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44307475803/artifacts/14429390478
+- **Não confundir:** um E2E bem-sucedido não encerra o módulo M2 completo; faltam imagens, paginação abrangente e outros fluxos de cadastro/estoque, além da revisão visual humana.
 - Sem emissão fiscal nativa. Comprovante não fiscal não substitui obrigações legais.
