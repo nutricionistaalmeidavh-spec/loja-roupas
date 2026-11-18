@@ -6,10 +6,10 @@
 | UI-02 | Login / PIN | todos | credenciais, operador, dispositivo | bloqueio por tentativas |
 | UI-03 | Seleção de loja | todos | loja autorizada, contexto | usuário sem vínculo |
 | UI-04 | Visão geral | gestor | widgets, metas e alertas | projeção indisponível |
-| UI-05 | PDV buscar item | caixa | leitor, busca, grade | SKU inexistente |
-| UI-06 | PDV carrinho | caixa | itens, unidades, desconto | estoque alterado |
-| UI-07 | PDV pagamento | caixa | meios, split e saldo restante | confirmação desconhecida |
-| UI-08 | PDV comprovante | caixa | número, resumo, imprimir | fila parada |
+| UI-05 | PDV catálogo visual | caixa/vendedor | rail compacto, busca/scan, filtros de categoria, grade fotográfica 3 colunas desktop, escolha cor/tamanho/variante exata | SKU inexistente, foto ausente, sem saldo, LAN caída |
+| UI-06 | PDV carrinho persistente | caixa | sidebar desktop ou drawer mobile, miniatura, SKU, qty +/- , desconto, subtotal e total | estoque alterado, preço revisado, item removido |
+| UI-07 | PDV etapa de pagamento | caixa | revisão separada, dinheiro/Pix manual/cartão/crediário, split, confirmação explícita | pagamento parcial, autorização negada, commit desconhecido |
+| UI-08 | PDV comprovante | caixa | venda confirmada, identificação não fiscal, número, fila de impressão | impressão pendente, reimpressão auditada |
 | UI-09 | Caixa abertura | caixa | troco, estação | caixa já aberto |
 | UI-10 | Caixa fechamento | caixa | conferência, diferença | sem permissão |
 | UI-11 | Cadastro produto | catálogo | wizard, mídia, categoria | duplicidade de SKU |
@@ -59,3 +59,6 @@
 
 ## Fluxo de homologação UX
 Revisar estrutura por papel → desenhar protótipo visual → simular erros/estados vazios → validar teclado/leitor de tela/contraste → testar tarefas com operadores reais → aprovar antes do código. Este arquivo entrega inventário e comportamento, não artefato navegável.
+
+## Critério transversal do PDV
+O layout aprovado pelas preferências do gestor está em [UX-RPOS-01](direcao-visual-retail-pos.md). As telas UI-05 a UI-08 devem compartilhar o mesmo carrinho, independentemente do modo de seleção por scanner ou catálogo; não criar dois estados de venda. O mockup antigo marrom com lista está obsoleto para UI-05.

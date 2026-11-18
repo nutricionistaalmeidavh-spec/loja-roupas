@@ -8,7 +8,7 @@ Versão: 0.1.0 · Data-base: 2026-11-17 · Status: **pronto para revisão, não 
 | D1 | [C4](01-arquitetura/visao-c4.md), [módulos](01-arquitetura/modulos-e-dependencias.md), [implantação](01-arquitetura/implantacao-seguranca.md) e ADRs | Como se organiza |
 | D2 | [ER](02-dados/modelo-er.md), [dicionário](02-dados/dicionario.md), [transações](02-dados/transacoes-migracoes.md) | Dados e invariantes |
 | D3 | [OpenAPI](03-contratos/openapi/openapi.yaml), [73 operações](03-contratos/catalogo-de-operacoes.md), [eventos](03-contratos/eventos.md), [autorização](03-contratos/autorizacao-erros-idempotencia.md) | Interfaces e integração |
-| D4 | [Design system](04-design/design-system.md), [mockups estáticos](04-design/mockups-estaticos.md), [jornadas e wireframes](04-design/jornadas-e-wireframes.md), [catálogo de telas](04-design/catalogo-de-telas.md) | UX/UI e interação |
+| D4 | [Design system](04-design/design-system.md), [direção Retail Fashion POS](04-design/direcao-visual-retail-pos.md), [mockups estáticos](04-design/mockups-estaticos.md), [jornadas e wireframes](04-design/jornadas-e-wireframes.md), [catálogo de telas](04-design/catalogo-de-telas.md) | UX/UI e interação |
 | D5 | [Plano QA](05-qualidade/plano-testes.md), [critérios](05-qualidade/criterios-aceite.md), [matriz de testes](05-qualidade/casos-de-teste.md) | Prova de qualidade |
 | D6 | [Backlog](06-roadmap/backlog.md), [dependências](06-roadmap/dependencias.md), [prontidão](06-roadmap/criterios-de-prontidao.md) | Execução e aprovação |
 
@@ -19,3 +19,6 @@ Versão: 0.1.0 · Data-base: 2026-11-17 · Status: **pronto para revisão, não 
 - Emissão fiscal não está no core definido; recibo não fiscal **não substitui** documento fiscal legalmente devido. Integração externa será escopo futuro explícito.
 - Protótipos D4 aqui são jornadas e wireframes textuais revisáveis; maquetes navegáveis/visuais finais dependem de homologação de design. Não são apresentados como já implementados.
 - Três estados de aprovação: **documentado**, **revisado**, **homologado**. Este pacote só afirma o primeiro.
+
+### Refinamento do escopo após D0–D6
+**UX-RPOS-01** adota como direção do PDV a referência visual apresentada pelo gestor: catálogo fotográfico em grade, categorias, variantes cor/tamanho, menu de ícones compacto e carrinho persistente. Detalhes e QA em [D4 Retail POS](04-design/direcao-visual-retail-pos.md). As 65 decisões canônicas permanecem intactas.

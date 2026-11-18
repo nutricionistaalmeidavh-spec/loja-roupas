@@ -26,20 +26,28 @@ Bege            [SKU]    [SKU]    [SKU]   [SKU]
 ~~~
 Fluxo: dados-base → grade → códigos → preço e custo → imagens/etiquetas → revisão. Conflitos de SKU na mesma loja devem destacar a célula e impedir salvar como publicado.
 
-## J03 PDV guiado
+## J03 PDV guiado — Retail Fashion POS (UX-RPOS-01, direção obrigatória)
+[Especificação visual integral](direcao-visual-retail-pos.md) define o layout aprovado pela referência.
+
 ~~~text
-[Loja] [Caixa #01 ABERTO] [Operador] [LAN OK]
-Buscar produto / código de barras [____________]
-Itens do carrinho                  Resumo
-Blusa M x1      R$ 129,90          Subtotal R$...
-Calça 40 x1     R$ 159,90          Desconto R$...
-[-] [+] [Suspender]                Total R$...
-[Aplicar cupom/benefício] [Pagamento →]
-[Dinheiro] [Pix manual] [Cartão externo] [Crédito]
-Pagamento misto:  restante R$...
-[Confirmar venda] [Solicitar autorização]
+Desktop: rail de ícones | cabeçalho (loja / caixa / operador / LAN)
+                       | Busca por nome / SKU / código   [Escanear]
+                       | [Todos] [Feminino] [Masculino] [Acessórios] ...
+                       | ┌ cartão 1 ┐ ┌ cartão 2 ┐ ┌ cartão 3 ┐ | Carrinho sempre visível
+                       | │ FOTO     │ │ FOTO     │ │ FOTO     │ | Blusa · Bege · M  [-] 1 [+]
+                       | │ nome     │ │ nome     │ │ nome     │ | Calça · Azul · 40 [-] 1 [+]
+                       | │ tamanhos │ │ tamanhos │ │ tamanhos │ | Subtotal / desconto / total
+                       | │ cores    │ │ cores    │ │ cores    │ | [Ir para pagamento]
+                       | └ adicionar┘ └ adicionar┘ └ adicionar┘ |
 ~~~
-Fluxo: leitura → consulta de preço e estoque → carrinho → benefício → meios → revisão → commit → número/recibo. Se LAN cair após clique, UI deve consultar a idempotency-key; jamais presumir falha e reenviar como venda nova. Periférico offline = recibo pendente, venda permanece confirmada.
+
+**Passos e regras:** (1) scanner ou descoberta visual → (2) selecionar combinação exata tamanho/cor (SKU) → (3) adicionar ao carrinho único por variante → (4) editar quantidade/benefício sem alterar estoque canônico → (5) abrir revisão/pagamento em etapa separada → (6) servidor revalida preço, estoque, autorização, caixa e idempotência → (7) confirmar venda uma vez → (8) recibo na fila, mesmo que impressora esteja offline.
+
+**Interação acessível:** scanner deve funcionar após navegação por filtro; foco manual não deve se perder; atalhos precisam ser configuráveis e não conflitar com inputs. Produto sem variante escolhida não pode ser adicionado se possuir múltiplas opções. Carrinho deve exibir foto, descrição, cor, tamanho, quantidade, preço aplicado e total.
+
+**Telas menores:** catálogo mantém grade de 2 ou 1 coluna; carrinho vira barra-resumo + drawer; o fluxo de pagamento continua em etapa isolada; nenhuma barra lateral deve consumir a maior parte da tela mobile.
+
+**Falha:** timeout pós-commit consulta idempotency-key/GET venda; nunca conclui segunda venda. Falta de LAN impede confirmação, mas pode manter rascunho sem débito. Falha de imagem não impede cadastro/leitura por código. Produto sem saldo permite visualizar, não adicionar acima da disponibilidade.
 
 ## J04 Devolução/troca
 Buscar venda → selecionar itens e quantidade → conferir estado físico → escolher devolução, troca ou crédito → revisão de valores → autorização quando aplicável → confirmação → comprovante. Mostrar "já devolvido" e saldo restante.

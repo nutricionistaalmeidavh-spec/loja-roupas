@@ -26,6 +26,15 @@ Sistema de gestão e ponto de venda para boutique/loja de roupas, inicialmente u
 7. **Inteligência e planejamento:** dashboards, metas, previsões locais, análise por coleção, alertas com premissas explicadas; sempre recomendação, não ação financeira silenciosa.
 8. **Plataforma:** importação com prévia e rollback lógico, segurança RBAC, logs e auditoria, busca contextual, instalação guiada, backups cifrados, atualizações supervisionadas e modo LAN.
 
+## 3.1 Direção visual obrigatória — Retail Fashion POS (refinamento D4)
+A referência visual aprovada pelo gestor é a captura do conceito **“Lunatics – Retail POS Dashboard”**, apresentada em 17/11/2026. Sua função é orientar **hierarquia de informação e experiência**, não autorizar cópia de recursos, marca, código, fontes, layouts pixel a pixel ou imagens de terceiros.
+
+O **PDV desktop P0** adota o padrão *retail-first*: barra lateral estreita com ícones e rótulos acessíveis; barra superior discreta com operador/caixa/estado da LAN; **catálogo fotográfico em grade**, categorias horizontais, busca e leitura por código de barras; **seleção de cor e tamanho por cartão**; carrinho **persistente à direita** com miniaturas, quantidade, descontos e total; progressão separada para revisão e pagamento. Outras telas administrativas mantêm identidade compartilhada, mas não precisam replicar a estrutura do PDV.
+
+O visual-base do PDV passa a ser **branco e cinza muito claro, tipografia escura, ação principal preta**. Os tons creme e café da decisão D16 continuam como identidade secundária e opções de marca; não devem dominar o fundo do PDV. Essa é uma **especificação de UX posterior às 65 decisões**, sem mudar o número de decisões ou a arquitetura.
+
+Aceite de P0: no desktop >=1280px, 3 colunas de cartões e resumo lateral sem rolagem horizontal; variantes selecionadas correspondem ao SKU canônico; leitura rápida de código funciona com teclado e scanner; no PWA, carrinho acessível por drawer/área fixa sem ocultar confirmação; preço/estoque/discounts são revalidados na API; estados sem foto, sem estoque, carregando, falha LAN, aprovação e timeout são explícitos. Consulte [UX-RPOS-01](../04-design/direcao-visual-retail-pos.md).
+
 ## 4. Jornadas críticas e resultados
 | Jornada | Entrada | Resultado comprovável |
 |---|---|---|
@@ -57,7 +66,7 @@ Emissão fiscal embarcada, gateway obrigatório, antifraude terceirizado, market
 Consultar [RNFs](requisitos-nao-funcionais.md). Priorização por criticidade operacional, segurança, perda de dados, acessibilidade e disponibilidade LAN.
 
 ## 8. Definição de pronto do produto
-- Todos os fluxos P0 com critérios de aceite e testes reproduzíveis.
+- Todos os fluxos P0 com critérios de aceite e testes reproduzíveis, incluindo homologação visual do novo PDV Retail Fashion de referência (UX-RPOS-01).
 - Documentação, contratos e migrações revisados antes da escrita de código.
 - Sem bugs P0/P1 pendentes na candidata à homologação, backup e restore demonstrados.
 - Instalador e operação LAN sem dependência de conta externa ou assinatura.

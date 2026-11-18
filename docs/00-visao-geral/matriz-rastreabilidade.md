@@ -78,3 +78,8 @@ A chave Dnn é imutável. Requisitos de execução vinculam a decisão ao docume
 
 ## Lacunas de homologação
 Este documento relaciona toda decisão a uma prova-base. Detalhes de tributação, legislação estadual, transportadoras, provedores TEF/Pix, políticas de expiração de créditos, tempos de retenção e carga real de operação dependem da loja e devem ser parametrizados, nunca supostos como regra universal.
+
+## Refinamento visual transversal
+| Referência | Decisões preservadas | Especificação | Verificação |
+|---|---|---|---|
+| UX-RPOS-01 | D03, D04, D16, D18, D27, D28, D35, D37, D38, D47 | [Retail Fashion POS](../04-design/direcao-visual-retail-pos.md) | QA-UX-01 a QA-UX-12 em D5 |

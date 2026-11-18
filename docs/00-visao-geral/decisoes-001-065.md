@@ -87,3 +87,6 @@ Fonte: decisões tomadas na conversa de planejamento da Loja de Roupas. Data-bas
 
 ## Critério de alteração de decisão
 Mudanças precisam registrar autor, justificativa, impacto, compatibilidade, documentos afetados e autorização explícita.
+
+## Refinamento de interface posterior às decisões (não é decisão 66)
+**UX-RPOS-01, 17/11/2026:** em resposta à preferência explícita pela referência visual “Lunatics – Retail POS Dashboard”, a interface do **PDV** deixa de usar como principal o mockup marrom/creme baseado em lista e passa a utilizar catálogo fotográfico em grade, barra lateral compacta, seleção de variantes no cartão e carrinho persistente. O sistema mantém identidade boutique premium (D16), paleta creme/café como secundária, stack Electron + React + Web/PWA (D28) e todos os contratos/validações do checkout (D03/D18/D27/D35/D37/D38/D47). Regras e critérios: [direção visual Retail POS](../04-design/direcao-visual-retail-pos.md). Nenhuma das 65 decisões foi reaberta ou excluída.
