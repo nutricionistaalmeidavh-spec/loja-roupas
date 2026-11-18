@@ -1,15 +1,15 @@
 import type { Variant } from '@loja/domain';
 
-export type ApiVariant = {
+export type ApiVariant = {variant_revision?:number;
   id: string; product_id: string; sku: string; barcode: string | null;
   color: string; size: string; price_cents: number; available: number; revision: number;
 };
-export type ApiProduct = { id: string; name: string; category: string; variants: ApiVariant[] };
+export type ApiProduct = {id:string;name:string;category:string;revision?:number;has_photo?:boolean;variants:ApiVariant[]};
 export type CatalogPage = { items: ApiProduct[]; next_cursor: string | null };
 export type Product = {
-  id: string; name: string; category: string;
+  id: string; name: string; category: string; revision:number;hasPhoto:boolean;
   kind: 'shirt' | 'pants' | 'bag' | 'shoe';
-  variants: Array<Variant & {barcode:string|null}>;
+  variants: Array<Variant & {barcode:string|null;stockRevision:number;variantRevision:number}>;
 };
 export function productCanAdd(variant: Variant | null | undefined): boolean {
   return Boolean(variant && Number.isSafeInteger(variant.available) && variant.available > 0);
@@ -23,7 +23,7 @@ export function mapCatalog(page: CatalogPage): Product[] {
       : /sapato|mocassim|tênis|sandália|calçado/.test(label) ? 'shoe'
       : /calça|jeans|bermuda|short/.test(label) ? 'pants' : 'shirt';
     return {
-      id: p.id, name: p.name, category: p.category, kind,
+      id: p.id, name: p.name, category: p.category, revision:p.revision??1,hasPhoto:p.has_photo??false,kind,
       variants: p.variants.map(v => {
         if (!v.id || !v.sku || !v.color || !v.size ||
           !Number.isSafeInteger(v.price_cents) || v.price_cents < 0)
@@ -31,7 +31,7 @@ export function mapCatalog(page: CatalogPage): Product[] {
         if (!Number.isSafeInteger(v.available) || v.available < 0)
           throw new Error('Saldo de estoque inválido recebido da API');
         return { id: v.id, sku: v.sku, color: v.color, size: v.size,
-          priceCents: v.price_cents, available: v.available, barcode:v.barcode };
+          priceCents: v.price_cents, available: v.available, barcode:v.barcode,stockRevision:v.revision,variantRevision:v.variant_revision??1 };
       }),
     };
   });

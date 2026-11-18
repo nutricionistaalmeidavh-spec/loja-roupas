@@ -3,6 +3,10 @@ import type { CatalogPage } from './catalog-model.ts';
 export type StoreAccess = { store_id: string; roles: string[] };
 export type LoginResult = { token: string; expires_at: string; stores: StoreAccess[] };
 export type Session = { token: string; storeId: string; roles: string[] };
+export type ProductPatchPayload = {name:string;category:string;expected_revision:number};
+export type VariantPricePayload = {price_cents:number;expected_revision:number};
+export type StockAdjustPayload = {variant_id:string;reference_id:string;counted_on_hand:number;expected_revision:number;reason:string};
+export type StockMovement = {id:string;movement_kind:string;qty_delta:number;occurred_at:string;source_type:string};
 export type ProductPayload = {
   name: string; category: string;
   variants: Array<{sku:string;color:string;size:string;price_cents:number;barcode?:string|null}>;
@@ -45,8 +49,10 @@ export function login(loginName: string, password: string, fetchImpl: typeof fet
     body:JSON.stringify({login:loginName,password}),
   }, fetchImpl);
 }
-export function listCatalog(session: Session, query = '', fetchImpl: typeof fetch = fetch, signal?: AbortSignal): Promise<CatalogPage> {
-  const path = '/v1/catalog/products?query=' + encodeURIComponent(query.trim()) + '&limit=50';
+export function listCatalog(session: Session, query = '', fetchImpl: typeof fetch = fetch, signal?: AbortSignal, cursor?: string, category?: string): Promise<CatalogPage> {
+  const path = '/v1/catalog/products?query=' + encodeURIComponent(query.trim()) + '&limit=50' +
+    (cursor ? '&cursor=' + encodeURIComponent(cursor) : '') +
+    (category ? '&category=' + encodeURIComponent(category) : '');
   return jsonRequest<CatalogPage>(path, {method:'GET',headers:headers(session),signal}, fetchImpl);
 }
 export function createProduct(session: Session, payload: ProductPayload, key: string, fetchImpl: typeof fetch = fetch) {
@@ -65,4 +71,39 @@ export function revokeSession(session: Session, fetchImpl: typeof fetch = fetch)
   return jsonRequest<{revoked:boolean}>('/v1/auth/sessions/revoke', {
     method:'POST',headers:headers(session),
   }, fetchImpl);
+}
+
+export function patchProduct(session:Session,id:string,payload:ProductPatchPayload,key:string,fetchImpl:typeof fetch=fetch) {
+ return jsonRequest<{id:string;name:string;category:string;revision:number}>('/v1/catalog/products/'+encodeURIComponent(id),{
+  method:'PATCH',headers:{...headers(session,key),'content-type':'application/json'},body:JSON.stringify(payload)
+ },fetchImpl);
+}
+export function patchVariantPrice(session:Session,id:string,payload:VariantPricePayload,key:string,fetchImpl:typeof fetch=fetch) {
+ return jsonRequest<{id:string;price_cents:number;revision:number}>('/v1/catalog/variants/'+encodeURIComponent(id),{
+  method:'PATCH',headers:{...headers(session,key),'content-type':'application/json'},body:JSON.stringify(payload)
+ },fetchImpl);
+}
+export function adjustStock(session:Session,payload:StockAdjustPayload,key:string,fetchImpl:typeof fetch=fetch) {
+ return jsonRequest<StockReceiptResult>('/v1/stock/adjustments',{
+  method:'POST',headers:{...headers(session,key),'content-type':'application/json'},body:JSON.stringify(payload)
+ },fetchImpl);
+}
+export function listMovements(session:Session,variantId:string,fetchImpl:typeof fetch=fetch) {
+ return jsonRequest<{items:StockMovement[]}>('/v1/stock/movements?variant_id='+encodeURIComponent(variantId),{
+  method:'GET',headers:headers(session)
+ },fetchImpl);
+}
+export async function uploadPhoto(session:Session,productId:string,file:Blob,key:string,fetchImpl:typeof fetch=fetch) {
+ return jsonRequest<{product_id:string;sha256:string;content_type:string}>(
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/photo',{
+  method:'PUT',headers:{...headers(session,key),'content-type':file.type},body:file
+ },fetchImpl);
+}
+export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal) {
+ let response:Response;
+ try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/photo',{
+  headers:headers(session),cache:'no-store',signal
+ });} catch {throw new ApiError(0,'NETWORK_ERROR','Imagem indisponível no servidor LAN');}
+ if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a fotografia');
+ return response.blob();
 }
