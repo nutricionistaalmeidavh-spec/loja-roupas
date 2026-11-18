@@ -35,3 +35,10 @@
 .empty-catalog{grid-column:1/-1;color:#888;padding:22px;background:white;border-radius:12px}
 @media(max-width:850px){.variant-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.fields-two,.variant-fields{grid-template-columns:1fr}.management-form{padding:16px}.header-actions .demo-status{display:none}.header-actions .mobile-logout{padding:7px}.mobile-drawer .cart-content{padding-top:0}}
+
+.product-visual{overflow:hidden}
+.product-image{display:block;width:100%;height:100%;object-fit:contain;border-radius:9px}
+.photo-placeholder{font-size:12px;font-weight:500;color:#777}
+.editor-block{border:1px solid #eaeaea;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.editor-block h3{font-size:16px;margin:0}
+.management-form .editor-block .light-button{align-self:flex-start}
