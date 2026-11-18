@@ -2,7 +2,9 @@
 
 Sistema de loja de roupas em planejamento. Escopo: boutique física inicial, desktop Electron, Web/PWA, backend modular TypeScript, PostgreSQL central, operação LAN sem internet. **Núcleo obrigatório gratuito (R$ 0), open source e self-hosted.**
 
-**Estado:** documentação D0–D6 proposta para revisão; nenhuma implementação, merge ou release autorizada.
+**Estado:** documentação D0–D6 proposta para revisão no PR #1; implementação **M1 inicial** em branch separada para revisão (sem merge/release). O pagamento permanece bloqueado até autenticação e transações canônicas.
+
+Leia [STATUS DA IMPLEMENTAÇÃO](IMPLEMENTATION_STATUS.md) para detalhes de código, limitações e comandos de desenvolvimento.
 
 ## Índice
 - [Portal da documentação](docs/README.md)

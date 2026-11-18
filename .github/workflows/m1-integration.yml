@@ -1,0 +1,58 @@
+name: M1 - Build, Auth e Banco (self-hosted compatível)
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+      - '.github/workflows/m1-integration.yml'
+jobs:
+  m1:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: loja
+          POSTGRES_USER: loja
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loja -d loja"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: pnpm 10
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+      - name: Instalar pacotes OSS
+        run: pnpm install --no-frozen-lockfile
+      - name: Typecheck de domínio, API e Web
+        run: |
+          pnpm --filter @loja/domain typecheck
+          pnpm --filter @loja/api typecheck
+          pnpm --filter @loja/web typecheck
+      - name: Build web
+        run: pnpm --filter @loja/web build
+      - name: Testes de domínio
+        run: pnpm test
+      - name: Migrações PostgreSQL canônico
+        run: pnpm --filter @loja/api migrate
+      - name: Testes API/RBAC/catálogo
+        run: pnpm --filter @loja/api test
