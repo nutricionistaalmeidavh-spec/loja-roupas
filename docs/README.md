@@ -1,6 +1,6 @@
 # D0–D6: pacote documental
 
-Versão: 0.1.0 · Data-base: 2026-11-17 · Status: **pronto para revisão, não homologado**.
+Versão documental 0.1.0 · Data-base: 2026-11-17 · **Integrada à main em 18/11/2026**, junto com o código de M1–M3. Falta homologação fiscal/operacional e release. [Situação atual de M0–M8](06-roadmap/status-execucao.md).
 
 | Fase | Documento principal | Conteúdo |
 |---|---|---|
@@ -18,7 +18,12 @@ Versão: 0.1.0 · Data-base: 2026-11-17 · Status: **pronto para revisão, não 
 - Nenhum serviço pago pode ser requisito do core. Custos de equipamento, energia ou infraestrutura própria não são anulados pela licença gratuita.
 - Emissão fiscal não está no core definido; recibo não fiscal **não substitui** documento fiscal legalmente devido. Integração externa será escopo futuro explícito.
 - Protótipos D4 aqui são jornadas e wireframes textuais revisáveis; maquetes navegáveis/visuais finais dependem de homologação de design. Não são apresentados como já implementados.
-- Três estados de aprovação: **documentado**, **revisado**, **homologado**. Este pacote só afirma o primeiro.
+- Estados distintos: **documentado**, **implementado/CI verificado**, **homologado em operação**. A integração M0–M3 atende ao segundo estado nos fluxos testados, mas não ao último.
 
 ### Refinamento do escopo após D0–D6
 **UX-RPOS-01** adota como direção do PDV a referência visual apresentada pelo gestor: catálogo fotográfico em grade, categorias, variantes cor/tamanho, menu de ícones compacto e carrinho persistente. Detalhes e QA em [D4 Retail POS](04-design/direcao-visual-retail-pos.md). As 65 decisões canônicas permanecem intactas.
+
+## Depois da incorporação na main
+- [Status real de execução](06-roadmap/status-execucao.md), [roadmap atualizado](06-roadmap/roadmap-final.md) e [comandos técnicos](../IMPLEMENTATION_STATUS.md).
+- [OpenAPI do M3 realmente implementado](03-contratos/openapi/m3-implemented.yaml). O OpenAPI D3 original contém também rotas **futuras**.
+- [Issues M4–M8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues) #7–#11 organizam o trabalho restante; nenhum serviço pago é obrigatório.

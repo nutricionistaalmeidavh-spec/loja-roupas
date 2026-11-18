@@ -1,45 +1,46 @@
-# M1 — Execução inicial (sem release)
-Branch: feat/m1-fundacao, derivada da documentação D0–D6, sem merge na main.
+# Estado da implementação — Loja de Roupas
 
-## Existe neste commit
-- Monorepo pnpm/Turborepo + tsconfig.
-- PostgreSQL de desenvolvimento em Docker Compose, com bootstrap de segredo gerado localmente sem intervenção manual em .env.
-- Migração de base inicial, com loja, usuários, produto, variantes, estoque, idempotência e outbox. Sem endpoints de escrita expostos antes de auth/ACID.
-- API Fastify com /health (liveness) e /ready (consulta real ao PostgreSQL).
-- Frontend React/PWA inicial em estilo Retail Fashion: catálogo sintético, categorias, cor/tamanho, rascunho de carrinho, visão responsiva e botão de pagamento **desabilitado**.
-- Casos de teste de carrinho/variantes com Node test runner. Electron inicia o mesmo frontend de desenvolvimento.
+**Snapshot:** 18/11/2026. M0–M3 incorporados à `main` via PRs #1–#6 com autorização do proprietário; **sem release**. Rastreio detalhado em [status M0–M8](docs/06-roadmap/status-execucao.md).
 
-## Não existe ainda
-- Autenticação funcional, permissões completas, vendas reais, pagamentos, estoque integrado na API, instalador final, build de release, sincronização WebSocket, backup/recovery completo.
-- UI usa **dados fictícios** e preços ilustrativos; não cria movimentações financeiras.
-- A migração SQL é baseline de desenvolvimento, não sistema de migrações para upgrades. Docker Compose inicia banco somente no primeiro volume novo; execução de migrações futuras exige runner dedicado.
-- Dependências não foram instaladas neste ambiente isolado; build React/Fastify e teste de API com Fastify precisam ser executados em máquina/runner com acesso aos pacotes.
-- O workflow inicial de CI exercita apenas testes puros de domínio.
+| Marco | Implementado no repositório | Limites |
+|---|---|---|
+| M0 | Documentação D0–D6, 65 decisões e direção Retail Fashion | Validação legal/fiscal e homologação final UX pendentes |
+| M1 | Monorepo pnpm/Turborepo; PostgreSQL Docker; migrações versionadas; Fastify; autenticação/RBAC; Web/PWA e casca Electron | PIN/dispositivos avançados, hardening e empacotamento não concluídos |
+| M2 | Cadastro/edição de SKU, cor/tamanho, preço; fotos PostgreSQL com thumbnails Sharp; consulta paginada; estoque, histórico e ajustes idempotentes/auditados | Inventário colaborativo e testes com hardware/carga ainda pendentes |
+| M3 | Abertura/movimentação/fechamento de caixa; cotação; venda ACID com baixa única; Pix manual/dinheiro/cartão externo; troco; suspensão e recibo não fiscal | Sem fiscal, PSP/TEF automático nem impressão em hardware |
 
-## Comandos para ambiente de desenvolvimento
-1. Node >=22.12, pnpm 10, Docker Compose e OpenSSL instalados.
-2. `sh scripts/bootstrap-dev.sh` (gera senha aleatória e PostgreSQL local).
-3. `pnpm install` (na primeira instalação gera lockfile; revisar e commitar lockfile antes da CI completa).
-4. `set -a; . runtime/local.env; set +a; pnpm --filter @loja/api dev`.
-5. Outro terminal: `pnpm --filter @loja/web dev`. Para Electron: `pnpm --filter @loja/desktop dev`.
-6. `pnpm test` para regras de domínio.
+[**CI final de M3: PASS, 5/5 E2E**](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44326485213) com PostgreSQL e Playwright. Isso **não** é homologação para produção.
 
-Este bootstrap é **somente para desenvolvedores**, não substitui o wizard de instalação aprovado para usuários. O núcleo permanece gratuito, open source, self-hosted, sem serviço pago obrigatório. Sem segredos no Git, sem merge e sem release.
+## Testar o desenvolvimento local
 
+Pré-requisitos: Node >=22.12, pnpm 10, Docker Compose e OpenSSL. Na pasta do repositório:
 
-## Atualização M1 — autenticação, migrações e leitura de catálogo
-- Hash de senha com scrypt + salt por usuário, token opaco criptograficamente aleatório e hash da sessão no PostgreSQL.
-- Login com bloqueio básico de tentativas por IP/login em memória; **antes de produção**, substituir por bloqueio distribuído/durável para múltiplos processos.
-- Checagem de sessão revogada/expirada e vínculo com store_id em cada rota privada. Perfis mínimos; papel de gestor criado somente por bootstrap único.
-- Migrações SQL versionadas com checksums e lock transacional, sem segredos em repositório; Docker Compose não executa SQL automaticamente.
-- Catalog GET escopado por loja e protegido por RBAC; ainda não cria produtos reais nem dá baixa de estoque.
-- Comandos: sh scripts/bootstrap-dev.sh; pnpm install; exportar env local; pnpm --filter @loja/api migrate; bash scripts/bootstrap-admin.sh; iniciar API.
-- Testes de auth e catálogo foram adicionados para CI. Checkout continua bloqueado.
+```sh
+sh scripts/bootstrap-dev.sh
+pnpm install
+set -a
+. runtime/local.env
+set +a
+pnpm --filter @loja/api migrate
+bash scripts/bootstrap-admin.sh
+```
 
+Em dois terminais separados (com as variáveis de `runtime/local.env` no terminal da API):
 
-## M2 em desenvolvimento (PR separado)
-- API de escrita autenticada: POST /v1/catalog/products, com variações por SKU e valor em centavos.
-- POST /v1/stock/receipts: entrada manual com reference_id, movimentação única e saldo sob UPSERT transacional.
-- Idempotency-Key persistida no PostgreSQL por loja, ator e operação; fingerprint canônico, retries sem duplicar saldos/produtos.
-- Outbox e audit_logs no mesmo commit; transações ACID e escopo store_id.
-- Teste real com PostgreSQL em CI é obrigatório. Checkout e pagamento continuam desabilitados.
+```sh
+pnpm --filter @loja/api dev
+pnpm --filter @loja/web dev
+```
+
+Abrir http://127.0.0.1:5173 no computador de desenvolvimento. O Vite proxy atende `/v1` via API na porta 3000. **Não expor este servidor de desenvolvimento na LAN pública nem instalar em cliente como produto acabado.** Testes de API sobre PostgreSQL exigem banco exclusivo de testes e bootstrap de QA.
+
+## Restrições antes de uso comercial
+
+- Electron ainda é **casca de desenvolvimento**, sem instalador GUI e sem binário distribuível testado.
+- Sem internet pública, a operação LAN é objetivo; exige teste WAN-off real. Sem PostgreSQL acessível não se confirma venda.
+- Pix e cartão são **confirmados manualmente pelo operador**, após conferência em banco/maquininha fora do sistema. Não há cobrança automática, guarda de cartão, PSP ou TEF.
+- Comprovante **NÃO FISCAL** não substitui NFC-e/NF-e ou obrigação fiscal aplicável.
+- Impressão de etiquetas/recibo com filas idempotentes, backup/restauração com fotos, atualização assistida, segurança de rede e QA em hardware são **M4**.
+- Demais módulos M5–M8 continuam no escopo original e estão rastreados nas [issues #8–#11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues).
+
+**Core R$0 / AGPLv3 / open source / self-hosted.** Merge e publicação de release exigem comandos independentes.

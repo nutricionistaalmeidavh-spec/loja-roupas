@@ -1,6 +1,6 @@
 # D6 — Backlog executável, P0/P1/P2 e frentes paralelas
 
-Todos os módulos podem ser **iniciados em paralelo** em especificação, contratos e implementação posterior. P0/P1/P2 são ondas de integração/homologação, **não** autorização para ignorar módulos ou construir sem dependências. Cada épico exige branch, PR, contrato e QA.
+Todos os módulos podem **evoluir em paralelo** por contratos versionados e gates de CI, com M0–M3 já incorporados à main. O backlog preserva os 30 épicos; integração e homologação são etapas distintas. P0/P1/P2 são ondas de integração/homologação, **não** autorização para ignorar módulos ou construir sem dependências. Cada épico exige branch, PR, contrato e QA.
 
 | Épico | Frente | Prioridade de integração | Escopo | Pré-requisitos | Gate de aceite |
 |---|---|---|---|---|---|
@@ -36,13 +36,21 @@ Todos os módulos podem ser **iniciados em paralelo** em especificação, contra
 | EP-30 | QA e Release | contínuo | contratos, Playwright E2E/visual, acessibilidade, security e backup | todas as frentes | QA-UX-01..12 + gates G0–G9, liberação humana |
 
 ## Entregáveis por épico
-Cada EP é quebrado em: contrato e schema → testes de contrato → migração → serviços do domínio → interface desktop/PWA → integração → E2E + segurança → documentação → evidências de QA → PR para revisão. Não iniciar o código antes da aprovação formal de D0–D6.
+Cada EP é quebrado em: contrato e schema → testes de contrato → migração → serviços do domínio → interface desktop/PWA → integração → E2E + segurança → documentação → evidências de QA → PR para revisão. A documentação D0–D6 precedeu a implementação M1–M3; qualquer evolução deverá respeitar contratos, testes e autorização de merge/release.
 
 ## Convenção de issues
 Título: [EP-09][RF-PDV-01] Confirmar venda idempotente. Corpo: decisão D03/D35/D37, contexto, história, contrato afetado, entidades, permissão, estados, critérios Given/When/Then, testes positivos/negativos, riscos e dependências. Labels propostas: ep:09, prioridade:p0, dominio:pdv, tipo:contrato|implementacao|qa, status:blocked|ready|review.
 
-## Marcos de homologação sem datas inventadas
-M0 documentação D0–D6 aprovada → M1 contratos do core compatíveis → M2 infraestrutura e login → M3 operação de produto/estoque → M4 PDV e caixa ponta a ponta → M5 P0 homologado → M6 P1 homologado → M7 P2 homologado. O gestor decide publicar cada marco; não há publicação automática.
+## Marcos de execução sem datas artificiais
+
+- M0–M3: na main via PRs #1–#6, CI verde de catálogo/caixa. **Não equivale a P0 homologado.**
+- M4 P0: [issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) — instalador, impressoras/filas, backup/restore, rede LAN, segurança e QA real.
+- M5 P1: [issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) — EP-13..20, inclusive financeiro, compras, CRM e crediário.
+- M6 P2: [issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) — EP-21..27.
+- M7 P2: [issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) — EP-28/29.
+- M8: [issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) — EP-30, QA transversal e release candidate.
+
+Consulte a [tabela de status e pendências](status-execucao.md); EP-03, EP-05, EP-06 e EP-09 possuem requisitos pendentes de homologação além das implementações já entregues.
 
 ## Direção aprovada do PDV no P0
 **UX-RPOS-01** altera EP-04, EP-06, EP-09 e EP-30 sem criar uma decisão 66 nem exigir novas dependências pagas. O PDV será entregue já com catálogo fotográfico, variantes escolhidas no próprio cartão, rail compacto e carrinho sticky/drawer. [Roadmap final](roadmap-final.md) e [especificação D4](../04-design/direcao-visual-retail-pos.md).

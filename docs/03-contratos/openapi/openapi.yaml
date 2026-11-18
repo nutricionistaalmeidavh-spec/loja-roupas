@@ -3,7 +3,8 @@ info:
   title: Loja de Roupas - API do monolito modular
   version: 0.1.0-draft
   description: |
-    Contrato documental D3 para revisao. Nenhuma rota esta implementada.
+    Contrato documental D3 do escopo integral D01-D65. Varias rotas descritas sao FUTURAS.
+    Consultar m3-implemented.yaml para as operacoes de PDV/caixa realmente entregues em M3.
     Nucleo self-hosted gratuito, operacao LAN e PostgreSQL canonico.
 servers:
   - url: /v1

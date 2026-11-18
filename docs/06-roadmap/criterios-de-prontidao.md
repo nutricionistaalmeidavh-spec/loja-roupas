@@ -9,9 +9,9 @@
 - [x] D5: testes, gates, critérios de aceite e matriz de cenários.
 - [x] D6: épicos, dependências, riscos e plano de integração paralelo.
 
-**Este checklist sinaliza presença de especificação, não revisão concluída, protótipo navegável, execução de teste ou software implementado.**
+**Checklist histórico D0–D6:** em 18/11/2026 os PRs #1–#6 levaram M0–M3 para a main com CI aprovado. Isso **não** prova homologação fiscal, UX ou distribuição. Ver [status atual](status-execucao.md).
 
-## Antes de aprovar o pacote
+## Revisão adicional antes da homologação operacional
 - [ ] Validar com gestor os detalhes técnicos adicionais não escolhidos nas 65 decisões (ex.: Fastify, formato de sessões, tempos de recuperação e limites operacionais).
 - [ ] Fazer revisão legal/fiscal das operações não fiscais, créditos, gift cards, LGPD, retenção e canais de comunicação conforme realidade do estabelecimento.
 - [ ] Validar inventário de telas e wireframes com gestor/usuários; se exigido, criar protótipos visuais navegáveis antes de implementar.
@@ -21,7 +21,7 @@
 - [ ] Revisar composição de software open source e licenças antes de distribuir.
 - [ ] Aprovar a especificação D0–D6 e só então autorizar trabalho de implementação.
 
-## Antes de iniciar EP-01
+## Checklist histórico de engenharia e pendências de M4
 - [ ] Abrir issues por épico e tarefa com Dnn, RF, schema, permissão, caso de teste e dependências.
 - [ ] Definir proprietários dos contratos e revisores; estabelecer branch protection.
 - [ ] Fixar versões de linguagem, Node, pnpm, PostgreSQL, Electron e browsers por ADR.
@@ -37,6 +37,16 @@ Uma aprovação de documentação permite **solicitar** implementação posterio
 - [ ] Aprovar o mockup visual revisado e suas variantes desktop/mobile.
 - [ ] Conferir fotos fictícias licenciadas, 7 viewports, teclado/barcode e contraste.
 - [ ] Executar QA-UX-01..12 após a implementação, não enquanto só houver documentação.
-- [ ] Autorizar início do código; **merge e release exigem comandos separados**.
+- [x] Início do código autorizado; M0–M3 integrados à main. **Release não autorizada nem publicada.**
 
 [Roadmap final consolidado](roadmap-final.md).
+
+## Gate P0 pendente — M4
+- [ ] Instalar por wizard guiado sem edição manual de env/secrets.
+- [ ] Operar Web/PWA/Electron em LAN com internet desligada; bloquear commit sem PostgreSQL.
+- [ ] Imprimir e reimprimir com fila idempotente, validar etiquetas e recibo não fiscal em impressora real.
+- [ ] Fazer backup cifrado com fotos e restauração com checagem de integridade.
+- [ ] Verificar segurança, acesso por dispositivo, carga, acessibilidade e sete viewports.
+- [ ] Cumprir revisão fiscal/operacional e aprovar separadamente eventual release.
+
+[Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) · [Acompanhamento M0–M8](status-execucao.md).
