@@ -1,0 +1,18 @@
+name: M1 - dominio sem dependencias externas
+on:
+  pull_request:
+    paths:
+      - 'packages/domain/**'
+      - '.github/workflows/m1-domain.yml'
+jobs:
+  domain:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testar dominio puro (Node TypeScript strip)
+        run: node --experimental-strip-types --test packages/domain/test/*.test.ts

@@ -1,0 +1,14 @@
+{
+  "name": "@loja/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/main.cjs",
+  "scripts": {
+    "dev": "electron .",
+    "build": "echo 'Empacotamento nao autorizado nesta etapa'"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0"
+  }
+}
