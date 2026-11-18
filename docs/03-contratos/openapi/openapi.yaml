@@ -1,0 +1,812 @@
+openapi: 3.1.0
+info:
+  title: Loja de Roupas - API do monolito modular
+  version: 0.1.0-draft
+  description: |
+    Contrato documental D3 para revisao. Nenhuma rota esta implementada.
+    Nucleo self-hosted gratuito, operacao LAN e PostgreSQL canonico.
+servers:
+  - url: /v1
+tags:
+  - name: Identidade
+  - name: Catalogo
+  - name: Estoque
+  - name: PDV
+  - name: Financeiro
+  - name: Pedidos
+  - name: Compras
+  - name: Beneficios
+  - name: Precos
+  - name: Privacidade
+  - name: Auditoria
+security:
+  - cookieSession: []
+  - bearerSession: []
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Diagnostico nao sensivel de prontidao
+      security: []
+      responses:
+        '200':
+          description: API funcional
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /auth/sessions:
+    post:
+      tags: [Identidade]
+      operationId: createSession
+      summary: Login e criacao de sessao
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sessao criada; sessao web em cookie HttpOnly
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /catalog/products:
+    get:
+      tags: [Catalogo]
+      operationId: listProducts
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/Cursor'
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        '200':
+          description: Produtos do escopo autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPage'
+    post:
+      tags: [Catalogo]
+      operationId: createProduct
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProduct'
+      responses:
+        '201':
+          description: Produto e variacoes cadastradas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Invalid'
+  /catalog/variants/{variantId}:
+    get:
+      tags: [Catalogo]
+      operationId: getVariant
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/VariantId'
+      responses:
+        '200':
+          description: Variante do produto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Variant'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /stock/availability/{variantId}:
+    get:
+      tags: [Estoque]
+      operationId: getStockAvailability
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/VariantId'
+      responses:
+        '200':
+          description: Saldo autoritativo para a loja
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /stock/counts:
+    post:
+      tags: [Estoque]
+      operationId: openStockCount
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenCount'
+      responses:
+        '201':
+          description: Inventario aberto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /cash-sessions:
+    post:
+      tags: [Financeiro]
+      operationId: openCashSession
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenCashSession'
+      responses:
+        '201':
+          description: Caixa aberto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /cash-sessions/{sessionId}/close:
+    post:
+      tags: [Financeiro]
+      operationId: closeCashSession
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseCashSession'
+      responses:
+        '200':
+          description: Fechamento conciliado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /sales:
+    post:
+      tags: [PDV]
+      operationId: commitSale
+      summary: Confirma venda atomica; valor final calculado no servidor
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitSale'
+      responses:
+        '201':
+          description: Venda confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Invalid'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /sales/{saleId}:
+    get:
+      tags: [PDV]
+      operationId: getSale
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/SaleId'
+      responses:
+        '200':
+          description: Estado da venda para recuperacao de timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sale'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /sales/{saleId}/returns:
+    post:
+      tags: [PDV]
+      operationId: createSaleReturn
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/SaleId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaleReturnRequest'
+      responses:
+        '201':
+          description: Devolucao e compensacoes registradas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /reservations:
+    post:
+      tags: [Pedidos]
+      operationId: reserveItems
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationRequest'
+      responses:
+        '201':
+          description: Reserva criada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /orders:
+    post:
+      tags: [Pedidos]
+      operationId: createOrder
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrder'
+      responses:
+        '201':
+          description: Pedido criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /orders/{orderId}/transitions:
+    post:
+      tags: [Pedidos]
+      operationId: transitionOrder
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/OrderId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransitionOrder'
+      responses:
+        '200':
+          description: Transicao aceita
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /purchases/receipts:
+    post:
+      tags: [Compras]
+      operationId: acceptPurchaseReceipt
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseReceipt'
+      responses:
+        '201':
+          description: Recebimento registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /gift-cards/{cardId}/redemptions:
+    post:
+      tags: [Beneficios]
+      operationId: redeemGiftCard
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/CardId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GiftCardRedeem'
+      responses:
+        '201':
+          description: Resgate debitado uma vez
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /price-publications/{publicationId}/activate:
+    post:
+      tags: [Precos]
+      operationId: activatePricePublication
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/PublicationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Approval'
+      responses:
+        '200':
+          description: Versao ativada se autorizada e valida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /customers/{customerId}/consents:
+    post:
+      tags: [Privacidade]
+      operationId: recordConsent
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/CustomerId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsentRequest'
+      responses:
+        '201':
+          description: Historico de consentimento registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /audit-log:
+    get:
+      tags: [Auditoria]
+      operationId: listAuditLog
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Registros com filtragem de privilegios e dados sensiveis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    cookieSession:
+      type: apiKey
+      in: cookie
+      name: loja_session
+    bearerSession:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  parameters:
+    StoreId:
+      name: X-Store-Id
+      in: header
+      required: true
+      description: Escopo validado contra a sessao; nunca autoridade de acesso isoladamente
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    VariantId:
+      name: variantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SaleId:
+      name: saleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CardId:
+      name: cardId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PublicationId:
+      name: publicationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CustomerId:
+      name: customerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: Sessao ausente ou invalida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Permissao insuficiente
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Recurso nao encontrado neste escopo
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Estado, estoque ou idempotencia conflitante
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Invalid:
+      description: Validacao de dominio
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: Limite de tentativas atingido
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unavailable:
+      description: Servidor ou dependencia critica indisponivel
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code, request_id]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        code: { type: string }
+        request_id: { type: string }
+        detail: { type: string }
+        retryable: { type: boolean }
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ready, degraded] }
+        version: { type: string }
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string, maxLength: 128 }
+        password: { type: string, minLength: 1 }
+    Session:
+      type: object
+      required: [id, user_id, store_ids, expires_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        store_ids:
+          type: array
+          items: { type: string, format: uuid }
+        expires_at: { type: string, format: date-time }
+    Variant:
+      type: object
+      required: [id, sku, product_id, color, size, revision]
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string, format: uuid }
+        sku: { type: string }
+        barcode: { type: [string, 'null'] }
+        color: { type: string }
+        size: { type: string }
+        revision: { type: integer, minimum: 0 }
+    Product:
+      type: object
+      required: [id, name, variants]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variant'
+    CreateProduct:
+      type: object
+      required: [name, variants]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        variants:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [sku, color, size]
+            properties:
+              sku: { type: string, minLength: 1 }
+              barcode: { type: string }
+              color: { type: string }
+              size: { type: string }
+    ProductPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        next_cursor: { type: [string, 'null'] }
+    Availability:
+      type: object
+      required: [variant_id, on_hand, reserved, available, revision]
+      properties:
+        variant_id: { type: string, format: uuid }
+        on_hand: { type: integer }
+        reserved: { type: integer }
+        available: { type: integer }
+        revision: { type: integer }
+    OpenCount:
+      type: object
+      required: [location_id]
+      properties:
+        location_id: { type: string, format: uuid }
+    OpenCashSession:
+      type: object
+      required: [workstation_id, opening_amount_cents]
+      properties:
+        workstation_id: { type: string, format: uuid }
+        opening_amount_cents: { type: integer, minimum: 0 }
+    CloseCashSession:
+      type: object
+      required: [counted_amount_cents]
+      properties:
+        counted_amount_cents: { type: integer, minimum: 0 }
+        reason: { type: string }
+    SaleLineInput:
+      type: object
+      required: [variant_id, quantity]
+      properties:
+        variant_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        expected_price_version: { type: string }
+    PaymentInput:
+      type: object
+      required: [method, amount_cents]
+      properties:
+        method: { type: string, enum: [cash, pix_manual, card_external, store_credit, gift_card, crediario] }
+        amount_cents: { type: integer, minimum: 1 }
+        external_reference: { type: string }
+    CommitSale:
+      type: object
+      required: [cash_session_id, lines, payments]
+      properties:
+        cash_session_id: { type: string, format: uuid }
+        customer_id: { type: string, format: uuid }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/SaleLineInput'
+        payments:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PaymentInput'
+        discount_reason: { type: string }
+        approval_id: { type: string, format: uuid }
+    Sale:
+      type: object
+      required: [id, status, total_cents, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [confirmed, cancelled, partially_returned, returned] }
+        total_cents: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        receipt_job_id: { type: string, format: uuid }
+    SaleReturnRequest:
+      type: object
+      required: [lines, reason]
+      properties:
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [sale_line_id, quantity]
+            properties:
+              sale_line_id: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+        reason: { type: string }
+        refund_method: { type: string, enum: [original_method, store_credit, exchange] }
+    ReservationRequest:
+      type: object
+      required: [variant_id, quantity, expires_at]
+      properties:
+        customer_id: { type: string, format: uuid }
+        variant_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        expires_at: { type: string, format: date-time }
+        deposit_cents: { type: integer, minimum: 0 }
+    CreateOrder:
+      type: object
+      required: [fulfillment_type, lines]
+      properties:
+        customer_id: { type: string, format: uuid }
+        fulfillment_type: { type: string, enum: [pickup, delivery] }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/SaleLineInput'
+    TransitionOrder:
+      type: object
+      required: [expected_revision, next_status]
+      properties:
+        expected_revision: { type: integer }
+        next_status: { type: string, enum: [reserved, picking, ready_for_pickup, out_for_delivery, fulfilled, cancelled] }
+        reason: { type: string }
+    PurchaseReceipt:
+      type: object
+      required: [purchase_order_id, lines]
+      properties:
+        purchase_order_id: { type: string, format: uuid }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [purchase_line_id, accepted_quantity, rejected_quantity]
+            properties:
+              purchase_line_id: { type: string, format: uuid }
+              accepted_quantity: { type: integer, minimum: 0 }
+              rejected_quantity: { type: integer, minimum: 0 }
+    GiftCardRedeem:
+      type: object
+      required: [amount_cents, checkout_id]
+      properties:
+        amount_cents: { type: integer, minimum: 1 }
+        checkout_id: { type: string, format: uuid }
+    Approval:
+      type: object
+      required: [expected_revision]
+      properties:
+        expected_revision: { type: integer }
+        reason: { type: string }
+    ConsentRequest:
+      type: object
+      required: [purpose, channel, granted]
+      properties:
+        purpose: { type: string, enum: [marketing, loyalty, personalization] }
+        channel: { type: string, enum: [email, sms, whatsapp, in_app] }
+        granted: { type: boolean }
+        source: { type: string }
+    ResourceStatus:
+      type: object
+      required: [id, status, revision]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string }
+        revision: { type: integer }
+    AuditPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              action: { type: string }
+              actor_id: { type: string, format: uuid }
+              occurred_at: { type: string, format: date-time }
+        next_cursor: { type: [string, 'null'] }
