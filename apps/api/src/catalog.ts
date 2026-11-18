@@ -5,7 +5,7 @@ import { requirePermission } from './auth.ts';
 type Row = {
   product_id:string; name:string; category:string;
   variant_id:string; sku:string; barcode:string|null; color:string; size:string;
-  price_cents:string; available:string;
+  price_cents:string; available:string; revision:string;
 };
 
 export function registerCatalog(app: FastifyInstance, db: Pick<Pool,'query'>) {
@@ -20,7 +20,8 @@ export function registerCatalog(app: FastifyInstance, db: Pick<Pool,'query'>) {
     const {query='',limit=30}=request.query;
     const rows=await db.query<Row>(`SELECT p.id::text AS product_id,p.name,p.category,
       v.id::text AS variant_id,v.sku,v.barcode,v.color,v.size,v.price_cents::text,
-      (coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available
+      (coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available,
+      coalesce(s.revision,0)::text AS revision
       FROM (
         SELECT DISTINCT p0.id,p0.name,p0.category
         FROM products p0
@@ -35,11 +36,11 @@ export function registerCatalog(app: FastifyInstance, db: Pick<Pool,'query'>) {
     const byId = new Map<string,{id:string;name:string;category:string;variants:Array<unknown>}>();
     for (const row of rows.rows) {
       if(!byId.has(row.product_id))byId.set(row.product_id,{id:row.product_id,name:row.name,category:row.category,variants:[]});
-      const cents=Number(row.price_cents), available=Number(row.available);
-      if(!Number.isSafeInteger(cents)||!Number.isSafeInteger(available))throw new Error('Valor canônico fora do limite');
+      const cents=Number(row.price_cents), available=Number(row.available), revision=Number(row.revision);
+      if(!Number.isSafeInteger(cents)||!Number.isSafeInteger(available)||!Number.isSafeInteger(revision))throw new Error('Valor canônico fora do limite');
       byId.get(row.product_id)!.variants.push({
         id:row.variant_id,product_id:row.product_id,sku:row.sku,barcode:row.barcode,
-        color:row.color,size:row.size,price_cents:cents,available
+        color:row.color,size:row.size,price_cents:cents,available,revision
       });
     }
     return { items:[...byId.values()], next_cursor:null };

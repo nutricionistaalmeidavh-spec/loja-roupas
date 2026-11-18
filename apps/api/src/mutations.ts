@@ -5,7 +5,7 @@ import { normalizeProductDraft, validateReceiptQuantity } from '@loja/domain/cat
 import { requirePermission } from './auth.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
-type ProductRecord = { id:string; name:string; category:string; variants:Array<{id:string;sku:string;color:string;size:string;price_cents:number;barcode:string|null}> };
+type ProductRecord = { id:string; name:string; category:string; variants:Array<{id:string;product_id:string;sku:string;color:string;size:string;price_cents:number;barcode:string|null;available:number;revision:number}> };
 type ReceiptInput = { variant_id:string; reference_id:string; quantity:number; note?:string };
 const uuid = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
 
@@ -47,7 +47,7 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
           (store_id,product_id,sku,barcode,color,size,price_cents)
           VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,
           [auth.storeId,productId,variant.sku,variant.barcode,variant.color,variant.size,variant.price_cents]);
-        variants.push({...variant,id:row.rows[0].id,barcode:variant.barcode??null});
+        variants.push({...variant,id:row.rows[0].id,product_id:productId,barcode:variant.barcode??null,available:0,revision:0});
       }
       await client.query(`INSERT INTO outbox_events
         (store_id,event_type,aggregate_id,aggregate_revision,payload)
