@@ -6,15 +6,15 @@
 
 | Marco | Integração de código | Homologação para produção | Rastreio |
 |---|---|---|---|
-| M0 — Documentação D0–D6 | Incorporada à `main` | Validação legal/fiscal e UX final ainda pendentes | [PR #1](../../pull/1) |
-| M1 — Fundação | Incorporada à `main`; monorepo, PostgreSQL, migrações, autenticação inicial e RBAC | PIN, dispositivos, hardening e empacotamento pendentes | [PR #2](../../pull/2) |
-| M2 — Catálogo/estoque | Incorporada à `main`; grades/SKUs, preços, fotos + thumbnails, estoque, edição, auditoria, paginação | Operação em hardware, cenários de carga e inventário colaborativo pendentes | [PRs #3–#5](../../pull/5) |
-| M3 — PDV/caixa | Incorporada à `main`; cotação, venda transacional, carrinho suspenso, caixa e recebimentos manuais mistos | Impressão periférica e autorização de descontos avançados pendentes | [PR #6](../../pull/6) |
-| M4 — P0 operacional | **Não implementado** | Instalador, impressão, backup/restore, LAN/WAN-off e QA real bloqueiam P0 | [Issue #7](../../issues/7) |
-| M5 — Gestão P1 | **Planejado** | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](../../issues/8) |
-| M6 — Experiências P2 | **Planejado** | Provador, reserva, online, entregas, kits/gift cards e serviços | [Issue #9](../../issues/9) |
-| M7 — Inteligência P2 | **Planejado** | Metas, análises, coleções, previsões e regras | [Issue #10](../../issues/10) |
-| M8 — QA e RC | **Planejado** | E2E global, segurança, hardware, recuperação e release candidate não publicada | [Issue #11](../../issues/11) |
+| M0 — Documentação D0–D6 | Incorporada à `main` | Validação legal/fiscal e UX final ainda pendentes | [PR #1](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/1) |
+| M1 — Fundação | Incorporada à `main`; monorepo, PostgreSQL, migrações, autenticação inicial e RBAC | PIN, dispositivos, hardening e empacotamento pendentes | [PR #2](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/2) |
+| M2 — Catálogo/estoque | Incorporada à `main`; grades/SKUs, preços, fotos + thumbnails, estoque, edição, auditoria, paginação | Operação em hardware, cenários de carga e inventário colaborativo pendentes | [PRs #3–#5](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/5) |
+| M3 — PDV/caixa | Incorporada à `main`; cotação, venda transacional, carrinho suspenso, caixa e recebimentos manuais mistos | Impressão periférica e autorização de descontos avançados pendentes | [PR #6](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/6) |
+| M4 — P0 operacional | **Não implementado** | Instalador, impressão, backup/restore, LAN/WAN-off e QA real bloqueiam P0 | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
+| M5 — Gestão P1 | **Planejado** | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
+| M6 — Experiências P2 | **Planejado** | Provador, reserva, online, entregas, kits/gift cards e serviços | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
+| M7 — Inteligência P2 | **Planejado** | Metas, análises, coleções, previsões e regras | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
+| M8 — QA e RC | **Planejado** | E2E global, segurança, hardware, recuperação e release candidate não publicada | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
 **Atenção:** "incorporado à main" significa código integrado e CI verde para os fluxos cobertos, **não** homologação comercial/operacional e **não** release. Nenhuma release foi publicada na incorporação de M0–M3.
 
@@ -22,11 +22,11 @@
 
 | Fase | Referências | Limites dos testes |
 |---|---|---|
-| M1 | [PR #2](../../pull/2) | CI de autenticação, tipos, migração e domínio |
-| M2 API | [PR #3](../../pull/3) | PostgreSQL real, idempotência, isolamento por loja |
-| M2 UI | [PR #4](../../pull/4) | Login, SKU, recebimento; Playwright desktop e mobile |
-| M2 final | [PR #5](../../pull/5), [CI](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44325106196) | Edição, grade, preços, imagem/thumbnail e estoque |
-| M3 final | [PR #6](../../pull/6), [CI final](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44326485213) | **5/5 E2E Playwright PASS** com PostgreSQL: catálogo/estoque, edição/foto, grade, venda caixa/Pix manual+dinheiro/fechamento, suspensão/retomada |
+| M1 | [PR #2](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/2) | CI de autenticação, tipos, migração e domínio |
+| M2 API | [PR #3](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/3) | PostgreSQL real, idempotência, isolamento por loja |
+| M2 UI | [PR #4](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/4) | Login, SKU, recebimento; Playwright desktop e mobile |
+| M2 final | [PR #5](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/5), [CI](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44325106196) | Edição, grade, preços, imagem/thumbnail e estoque |
+| M3 final | [PR #6](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/6), [CI final](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44326485213) | **5/5 E2E Playwright PASS** com PostgreSQL: catálogo/estoque, edição/foto, grade, venda caixa/Pix manual+dinheiro/fechamento, suspensão/retomada |
 
 A CI acima usa banco efêmero e navegador automatizado. **Não confirma** operação em loja real, disponibilidade em rede, compatibilidade de impressoras, segurança de produção ou implantação em clientes.
 
@@ -63,9 +63,8 @@ A CI acima usa banco efêmero e navegador automatizado. **Não confirma** opera�
 
 ## Regras obrigatórias de governança
 
-1. Uma issue por marco: [M4](../../issues/7), [M5](../../issues/8), [M6](../../issues/9), [M7](../../issues/10), [M8](../../issues/11); subdividir por épico, manter vínculo Dnn/EP-nn/QA.
+1. Uma issue por marco: [M4](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7), [M5](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8), [M6](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9), [M7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10), [M8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11); subdividir por épico, manter vínculo Dnn/EP-nn/QA.
 2. Alteração funcional: contrato/OpenAPI, migração versionada, testes de regressão, PR, gates CI, documentação e evidência.
 3. **Merge e release são aprovações separadas.** A incorporação de M0–M3 autorizada em 18/11/2026 não autoriza publicação de release.
 4. Núcleo **R$0**, licença AGPLv3, open source, self-hosted. Infraestrutura/hardware do próprio usuário podem ter custo; serviços comerciais jamais dependências ocultas.
 5. Atualizar **este documento, roadmap-final.md e IMPLEMENTATION_STATUS.md** em cada encerramento de marco, indicando implementado, verificado, pendente e não homologado.
-
