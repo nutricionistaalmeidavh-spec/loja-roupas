@@ -31,6 +31,7 @@ jobs:
           --health-retries 12
     env:
       DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
+      TEST_DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
     steps:
       - uses: actions/checkout@v4
       - name: Node 22

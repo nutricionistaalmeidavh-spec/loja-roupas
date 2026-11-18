@@ -134,6 +134,29 @@ paths:
                 $ref: '#/components/schemas/Availability'
         '404':
           $ref: '#/components/responses/NotFound'
+  /stock/receipts:
+    post:
+      tags: [Estoque]
+      operationId: receiveStock
+      summary: Recebimento manual transacional e idempotente
+      parameters:
+        - $ref: '#/components/parameters/StoreId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockReceiptRequest'
+      responses:
+        '201':
+          description: Movimentação registrada ou retomada pela mesma chave
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockReceipt'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /stock/counts:
     post:
       tags: [Estoque]
@@ -610,32 +633,37 @@ components:
         color: { type: string }
         size: { type: string }
         revision: { type: integer, minimum: 0 }
+        price_cents: { type: integer, minimum: 0 }
+        available: { type: integer, minimum: 0 }
     Product:
       type: object
       required: [id, name, variants]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
+        category: { type: string }
         variants:
           type: array
           items:
             $ref: '#/components/schemas/Variant'
     CreateProduct:
       type: object
-      required: [name, variants]
+      required: [name, category, variants]
       properties:
         name: { type: string, minLength: 1, maxLength: 200 }
+        category: { type: string, minLength: 1, maxLength: 100 }
         variants:
           type: array
           minItems: 1
           items:
             type: object
-            required: [sku, color, size]
+            required: [sku, color, size, price_cents]
             properties:
-              sku: { type: string, minLength: 1 }
-              barcode: { type: string }
+              sku: { type: string, minLength: 1, maxLength: 64 }
+              barcode: { type: [string, 'null'] }
               color: { type: string }
               size: { type: string }
+              price_cents: { type: integer, minimum: 0 }
     ProductPage:
       type: object
       required: [items]
@@ -754,6 +782,23 @@ components:
         expected_revision: { type: integer }
         next_status: { type: string, enum: [reserved, picking, ready_for_pickup, out_for_delivery, fulfilled, cancelled] }
         reason: { type: string }
+    StockReceiptRequest:
+      type: object
+      required: [variant_id, reference_id, quantity]
+      properties:
+        variant_id: { type: string, format: uuid }
+        reference_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        note: { type: string, maxLength: 140 }
+    StockReceipt:
+      type: object
+      required: [movement_id, variant_id, on_hand, reserved, revision]
+      properties:
+        movement_id: { type: string, format: uuid }
+        variant_id: { type: string, format: uuid }
+        on_hand: { type: integer, minimum: 0 }
+        reserved: { type: integer, minimum: 0 }
+        revision: { type: integer, minimum: 1 }
     PurchaseReceipt:
       type: object
       required: [purchase_order_id, lines]

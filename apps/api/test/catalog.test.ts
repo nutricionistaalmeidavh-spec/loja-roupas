@@ -15,7 +15,7 @@ test('catálogo bloqueia acesso sem sessão e filtra por loja no SQL',async()=>{
     }]};
     return {rowCount:0,rows:[]};
   }};
-  const app=buildApp(db as unknown as Pick<Pool,'query'>);
+  const app=buildApp(db as unknown as Pool);
   assert.equal((await app.inject('/v1/catalog/products')).statusCode,401);
   const r=await app.inject({url:'/v1/catalog/products?query=Blusa',headers:{authorization:`Bearer ${token}`,'x-store-id':store}});
   assert.equal(r.statusCode,200);

@@ -25,7 +25,7 @@ function fakeDatabase(passwordHash:string) {
 test('login não armazena token em texto e requer loja autorizada', async()=>{
   const password='Senha longa e local 456!';
   const db=fakeDatabase(await hashPassword(password));
-  const app=buildApp(db as unknown as Pick<Pool,'query'>);
+  const app=buildApp(db as unknown as Pool);
   const login=await app.inject({method:'POST',url:'/v1/auth/sessions',payload:{login:'admin',password}});
   assert.equal(login.statusCode,200);
   const token=login.json().token;
@@ -41,7 +41,7 @@ test('login não armazena token em texto e requer loja autorizada', async()=>{
 });
 test('login inválido não emite token de sessão',async()=>{
   const db=fakeDatabase(await hashPassword('Senha longa e local 456!'));
-  const app=buildApp(db as unknown as Pick<Pool,'query'>);
+  const app=buildApp(db as unknown as Pool);
   const r=await app.inject({method:'POST',url:'/v1/auth/sessions',payload:{login:'admin',password:'invalida'}});
   assert.equal(r.statusCode,401);
   assert.equal(db.state.sessionHash,undefined);

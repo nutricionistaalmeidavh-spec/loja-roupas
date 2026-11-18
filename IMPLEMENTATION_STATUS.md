@@ -35,3 +35,11 @@ Este bootstrap é **somente para desenvolvedores**, não substitui o wizard de i
 - Catalog GET escopado por loja e protegido por RBAC; ainda não cria produtos reais nem dá baixa de estoque.
 - Comandos: sh scripts/bootstrap-dev.sh; pnpm install; exportar env local; pnpm --filter @loja/api migrate; bash scripts/bootstrap-admin.sh; iniciar API.
 - Testes de auth e catálogo foram adicionados para CI. Checkout continua bloqueado.
+
+
+## M2 em desenvolvimento (PR separado)
+- API de escrita autenticada: POST /v1/catalog/products, com variações por SKU e valor em centavos.
+- POST /v1/stock/receipts: entrada manual com reference_id, movimentação única e saldo sob UPSERT transacional.
+- Idempotency-Key persistida no PostgreSQL por loja, ator e operação; fingerprint canônico, retries sem duplicar saldos/produtos.
+- Outbox e audit_logs no mesmo commit; transações ACID e escopo store_id.
+- Teste real com PostgreSQL em CI é obrigatório. Checkout e pagamento continuam desabilitados.
