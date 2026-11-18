@@ -21,7 +21,9 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByRole('button',{name:'Salvar informações'}).click();
  await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
  await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name+' atual'});
- await page.getByRole('combobox',{name:'Variante para preço'}).selectOption({label:new RegExp(sku)});
+ const variantOption=page.getByRole('combobox',{name:'Variante para preço'}).locator('option',{hasText:sku});
+ await expect(variantOption).toBeAttached();
+ await page.getByRole('combobox',{name:'Variante para preço'}).selectOption((await variantOption.getAttribute('value'))!);
  await page.getByLabel('Novo preço (R$)').fill('229,90');
  await page.getByRole('button',{name:'Salvar preço'}).click();
  await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
