@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError, adjustStock, listCatalog, listMovements, patchProduct, patchVariantPrice, uploadPhoto } from './api-client.ts';
+import { ApiError, adjustStock, listCatalog, listMovements, patchProduct, patchVariantPrice, uploadPhoto, addProductVariant, patchVariantAttributes } from './api-client.ts';
 import type { Session, StockMovement } from './api-client.ts';
 import { mapCatalog, reaisToCents } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
@@ -18,6 +18,10 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
  const [category,setCategory]=useState('');
  const [variantId,setVariantId]=useState('');
  const [price,setPrice]=useState('');
+ const [newSku,setNewSku]=useState(''),[newColor,setNewColor]=useState(''),[newSize,setNewSize]=useState('');
+ const [newPrice,setNewPrice]=useState(''),[newBarcode,setNewBarcode]=useState('');
+ const [editSku,setEditSku]=useState(''),[editColor,setEditColor]=useState(''),[editSize,setEditSize]=useState(''),[editBarcode,setEditBarcode]=useState('');
+
  const [photo,setPhoto]=useState<File|null>(null);
  const [pending,setPending]=useState<Pending|null>(null);
  const [busy,setBusy]=useState(false);
@@ -37,6 +41,34 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
  function selectProduct(id:string){
   setProductId(id);setVariantId('');setPending(null);
   const p=products.find(p=>p.id===id);setName(p?.name??'');setCategory(p?.category??'');
+ }
+ async function submitVariant(kind:'add'|'edit',event:FormEvent){
+  event.preventDefault();if(!current||busy)return;
+  setError('');setNotice('');
+  let payload:Record<string,unknown>;
+  try {
+   if(kind==='add'){
+    payload={sku:newSku.trim(),color:newColor.trim(),size:newSize.trim(),
+      price_cents:reaisToCents(newPrice),barcode:newBarcode.trim()||null,
+      expected_product_revision:current.revision};
+   }else{
+    if(!variant)throw new Error('Escolha uma variante para editar.');
+    payload={sku:editSku.trim(),color:editColor.trim(),size:editSize.trim(),
+      barcode:editBarcode.trim()||null,expected_revision:variant.variantRevision};
+   }
+   if(!payload.sku||!payload.color||!payload.size)throw new Error('Preencha SKU, cor e tamanho.');
+  }catch(err){setError(message(err));return;}
+  const signature=kind+':'+current.id+':'+JSON.stringify(payload);
+  if(pending&&pending.payload!==signature){setError('Operação pendente; repita sem alterar os campos.');return;}
+  const key=pending?.key??crypto.randomUUID();setPending({key,payload:signature});setBusy(true);
+  try{
+   if(kind==='add')await addProductVariant(session,current.id,payload as Parameters<typeof addProductVariant>[2],key);
+   else await patchVariantAttributes(session,variant!.id,payload as Parameters<typeof patchVariantAttributes>[2],key);
+   setNotice(kind==='add'?'Variante adicionada.':'Atributos da variante atualizados.');
+   setPending(null);setRefresh(n=>n+1);onSaved();
+   if(kind==='add'){setNewSku('');setNewColor('');setNewSize('');setNewBarcode('');setNewPrice('');}
+  }catch(err){setError(message(err));if(err instanceof ApiError&&err.status>=400&&err.status<500)setPending(null);}
+  finally{setBusy(false);}
  }
  async function submit(keyType:'product'|'price'|'photo',event:FormEvent){
   event.preventDefault();
@@ -91,7 +123,12 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
    <form onSubmit={e=>void submit('price',e)} className="editor-block">
     <h3>Preço por variante</h3>
     <label>Variante para preço<select aria-label="Variante para preço" value={variantId}
-      onChange={e=>{setVariantId(e.target.value);setPrice('');setPending(null);}} disabled={busy}>
+      onChange={e=>{
+        const next=current.variants.find(v=>v.id===e.target.value);
+        setVariantId(e.target.value);setPrice('');setPending(null);
+        setEditSku(next?.sku??'');setEditColor(next?.color??'');
+        setEditSize(next?.size??'');setEditBarcode(next?.barcode??'');
+      }} disabled={busy}>
      <option value="">Selecione</option>
      {current.variants.map(v=><option key={v.id} value={v.id}>{v.sku} · {v.color} · {v.size}</option>)}
     </select></label>
@@ -100,6 +137,27 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
       onChange={e=>setPrice(e.target.value)}/></label>
     <button type="submit" className="light-button" disabled={!variant||busy}>Salvar preço</button>
    </form>
+   <form onSubmit={e=>void submitVariant('add',e)} className="editor-block">
+     <h3>Adicionar variante à grade existente</h3>
+     <div className="variant-fields">
+       <label>SKU novo<input required maxLength={64} value={newSku} onChange={e=>setNewSku(e.target.value)}/></label>
+       <label>Cor nova<input required value={newColor} onChange={e=>setNewColor(e.target.value)}/></label>
+       <label>Tamanho novo<input required value={newSize} onChange={e=>setNewSize(e.target.value)}/></label>
+       <label>Preço novo (R$)<input required inputMode="decimal" value={newPrice} onChange={e=>setNewPrice(e.target.value)}/></label>
+       <label>Código novo (opcional)<input value={newBarcode} onChange={e=>setNewBarcode(e.target.value)}/></label>
+     </div>
+     <button className="light-button" type="submit" disabled={busy}>Adicionar variante</button>
+   </form>
+   {variant&&<form onSubmit={e=>void submitVariant('edit',e)} className="editor-block">
+    <h3>Editar SKU, cor, tamanho e código</h3>
+    <div className="variant-fields">
+      <label>SKU existente<input required value={editSku} onChange={e=>setEditSku(e.target.value)}/></label>
+      <label>Cor existente<input required value={editColor} onChange={e=>setEditColor(e.target.value)}/></label>
+      <label>Tamanho existente<input required value={editSize} onChange={e=>setEditSize(e.target.value)}/></label>
+      <label>Código existente<input value={editBarcode} onChange={e=>setEditBarcode(e.target.value)}/></label>
+    </div>
+    <button className="light-button" type="submit" disabled={busy}>Salvar atributos da variante</button>
+   </form>}
    <form onSubmit={e=>void submit('photo',e)} className="editor-block">
     <h3>Fotografia da peça</h3>
     <p className="muted small">Uma foto principal por produto; PNG, JPEG ou WebP até 2 MiB.</p>

@@ -107,3 +107,17 @@ export async function fetchProductPhoto(session:Session,productId:string,fetchIm
  if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a fotografia');
  return response.blob();
 }
+
+export type VariantAttributes={sku:string;color:string;size:string;barcode?:string|null;expected_revision:number};
+export function addProductVariant(session:Session,id:string,variant:{
+ sku:string;color:string;size:string;barcode?:string|null;price_cents:number;expected_product_revision:number
+},key:string,fetchImpl:typeof fetch=fetch){
+ return jsonRequest<{id:string;revision:number}>('/v1/catalog/products/'+encodeURIComponent(id)+'/variants',{
+  method:'POST',headers:{...headers(session,key),'content-type':'application/json'},body:JSON.stringify(variant)
+ },fetchImpl);
+}
+export function patchVariantAttributes(session:Session,id:string,attributes:VariantAttributes,key:string,fetchImpl:typeof fetch=fetch){
+ return jsonRequest<{id:string;revision:number}>('/v1/catalog/variants/'+encodeURIComponent(id)+'/attributes',{
+  method:'PATCH',headers:{...headers(session,key),'content-type':'application/json'},body:JSON.stringify(attributes)
+ },fetchImpl);
+}
