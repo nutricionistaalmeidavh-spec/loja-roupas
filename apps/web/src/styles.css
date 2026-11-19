@@ -101,3 +101,9 @@
  .mobile-navigation select{max-width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;background:#fff}
 }
 .storefront-photo{display:block;width:100%;height:145px;object-fit:contain;background:#f3f3f3;margin-bottom:10px;border-radius:9px}
+.intelligence-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,135px),1fr));gap:12px;margin:12px 0}
+.intelligence-summary div{border:1px solid #e5e5e5;border-radius:10px;padding:12px}
+.intelligence-summary dd{font-size:1.05rem;font-weight:700;margin:4px 0 0;overflow-wrap:anywhere}
+.commercial-intelligence details{border-top:1px solid #e5e5e5;padding:10px 0;overflow:auto}
+.commercial-intelligence summary{cursor:pointer;font-weight:650}
+.commercial-intelligence fieldset label{display:block}

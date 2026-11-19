@@ -4,6 +4,7 @@ import { ApiError, headers, jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { CashReturnForm } from './CashReturnForm.tsx';
 import { OperationalPanels } from './OperationalPanels.tsx';
+import { CommercialIntelligence } from './CommercialIntelligence.tsx';
 import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
 
@@ -90,6 +91,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     <StockHolds session={session}/>
     <PickupSettings session={session}/>
     <OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/>
+    <CommercialIntelligence session={session}/>
     <p><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
     {status && <p role="status">{status}</p>}
     {error && <p role="alert" className="error">{error}</p>}

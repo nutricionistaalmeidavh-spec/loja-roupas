@@ -25,6 +25,18 @@ jobs:
           curl --fail --silent http://127.0.0.1:8080/v1/auth/sessions \
             -H 'Content-Type: application/json' \
             -d '{"login":"qa-admin","password":"Senha-LAN-Somente-CI"}' | jq -e '.stores[0].store_id'
+      - name: Verificar leituras concorrentes na instalação LAN
+        run: |
+          auth=$(curl --fail --silent http://127.0.0.1:8080/v1/auth/sessions \
+            -H 'Content-Type: application/json' \
+            -d '{"login":"qa-admin","password":"Senha-LAN-Somente-CI"}')
+          token=$(jq -er '.token' <<< "$auth")
+          store=$(jq -er '.stores[0].store_id' <<< "$auth")
+          export token store
+          seq 1 40 | xargs -P 8 -n 1 bash -euo pipefail -c '
+            curl --fail --silent --max-time 10 http://127.0.0.1:8080/v1/management/intelligence \
+              -H "Authorization: Bearer $token" -H "X-Store-Id: $store" | jq -e ".months | length == 12" >/dev/null
+          ' _
       - name: Cifrar, restaurar e comparar dados de teste
         run: |
           export LOJA_BACKUP_PASSPHRASE_FILE="$RUNNER_TEMP/loja-backup-passphrase"
