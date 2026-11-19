@@ -4,6 +4,7 @@ import { requirePermission } from './auth.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 const uuid = {type:'string', pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
+const photoParams = {type:'object', required:['id','productId'], properties:{id:uuid,productId:uuid}};
 const idParams = {type:'object', required:['id'], properties:{id:uuid}};
 
 export function registerStoreOperations(app: FastifyInstance, db: Pool) {
@@ -99,9 +100,13 @@ export function registerStoreOperations(app: FastifyInstance, db: Pool) {
     schema:{params:idParams, querystring:{type:'object', additionalProperties:false, properties:{after:uuid}}},
   }, async (request, reply) => {
     const result = await db.query(`SELECT v.id,p.name,v.color,v.size,v.price_cents::text,
+      CASE WHEN photo.product_id IS NOT NULL
+        THEN '/v1/storefront/' || p.store_id || '/products/' || p.id || '/photo'
+      END AS photo_url,
       coalesce(b.on_hand > b.reserved,false) AS available
       FROM product_variants v JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id
       LEFT JOIN stock_balances b ON b.store_id=v.store_id AND b.variant_id=v.id
+      LEFT JOIN product_photos photo ON photo.store_id=v.store_id AND photo.product_id=v.product_id
       WHERE v.store_id=$1 AND v.storefront_published AND ($2::uuid IS NULL OR v.id>$2)
       ORDER BY v.id LIMIT 51`, [request.params.id, request.query.after ?? null]);
     const store = await db.query<{pickup_enabled:boolean}>('SELECT pickup_enabled FROM stores WHERE id=$1', [request.params.id]);
@@ -109,5 +114,20 @@ export function registerStoreOperations(app: FastifyInstance, db: Pool) {
       items:result.rows.slice(0,50), next:result.rows.length > 50 ? result.rows[49].id : null,
       pickup_enabled:store.rows[0]?.pickup_enabled ?? false,
     });
+  });
+
+  app.get<{Params:{id:string;productId:string}}>('/v1/storefront/:id/products/:productId/photo', {
+    schema:{params:photoParams},
+  }, async (request,reply) => {
+    const {id,productId}=request.params;
+    const photograph=await db.query<{bytes:Buffer;mime:string}>(`SELECT
+      coalesce(p.thumb_bytes,p.image_bytes) AS bytes,coalesce(p.thumb_type,p.content_type) AS mime
+      FROM product_photos p WHERE p.store_id=$1 AND p.product_id=$2 AND EXISTS (
+        SELECT 1 FROM product_variants v
+        WHERE v.store_id=p.store_id AND v.product_id=p.product_id AND v.storefront_published
+      )`,[id,productId]);
+    const image=photograph.rows[0];
+    if(!image)throw new DomainError(404,'PHOTO_NOT_FOUND','Foto indisponível na vitrine');
+    return reply.header('Cache-Control','no-store').header('X-Content-Type-Options','nosniff').type(image.mime).send(image.bytes);
   });
 }

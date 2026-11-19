@@ -26,6 +26,13 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
       payload:{name:'Camisa QA',category:'Camisas',variants:[{sku:'QA-01',size:'M',color:'Preta',price_cents:1234}]}});
     assert.equal(created.statusCode,201,created.body);
     const variantId = created.json().variants[0].id;
+    const productId = created.json().id;
+    const publicPhoto='/v1/storefront/'+store.id+'/products/'+productId+'/photo';
+    const original=Buffer.from('00'.repeat(16),'hex');
+    const thumb=Buffer.from('ab'.repeat(16),'hex');
+    await db.query(`INSERT INTO product_photos (store_id,product_id,content_type,image_bytes,sha256,thumb_bytes,thumb_type)
+      VALUES($1,$2,'image/png',$3,repeat('a',64),$4,'image/webp')`,[store.id,productId,original,thumb]);
+    assert.equal((await app.inject({url:publicPhoto})).statusCode,404);
     const received = await app.inject({method:'POST',url:'/v1/stock/receipts',headers:write(),
       payload:{variant_id:variantId,reference_id:randomUUID(),quantity:1}});
     assert.equal(received.statusCode,201,received.body);
@@ -38,9 +45,13 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const published = await app.inject({method:'PUT',url:publishUrl,headers:write(),payload:{published:true}});
     assert.equal(published.statusCode,200,published.body);
     assert.deepEqual((await storefront()).json().items,[{
-      id:variantId,name:'Camisa QA',color:'Preta',size:'M',price_cents:'1234',available:true,
+      id:variantId,name:'Camisa QA',color:'Preta',size:'M',price_cents:'1234',available:true,photo_url:publicPhoto,
     }]);
     assert.deepEqual((await app.inject({url:'/v1/storefront/'+otherStore.id})).json().items,[]);
+    const publicImage=await app.inject({url:publicPhoto});
+    assert.equal(publicImage.headers['content-type'],'image/webp');
+    assert.deepEqual(publicImage.rawPayload,thumb);
+    assert.equal((await app.inject({url:'/v1/storefront/'+otherStore.id+'/products/'+productId+'/photo'})).statusCode,404);
     const firstKey = randomUUID();
     const keys = [firstKey,randomUUID()];
     const hold = (key:string) => app.inject({method:'POST',url:'/v1/stock/holds',headers:write(key),
@@ -110,6 +121,7 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
 
     const unpublish = await app.inject({method:'PUT',url:publishUrl,headers:write(),payload:{published:false}});
     assert.equal(unpublish.statusCode,200,unpublish.body);
+    assert.equal((await app.inject({url:publicPhoto})).statusCode,404);
     assert.deepEqual((await storefront()).json().items,[]);
 
     const supplierKey = randomUUID();

@@ -242,6 +242,15 @@ export function App() {
           <button className="mobile-logout" onClick={logout}>Sair</button>
         </div>
       </header>
+      <nav className="mobile-navigation" aria-label="Navegação da loja">
+        <label>Página <select value={page} onChange={event=>setCurrentPage(event.target.value as Page)}>
+          <option value="pdv">PDV</option>
+          {manager&&<option value="produtos">Produtos</option>}
+          {canReceive&&<option value="estoque">Estoque</option>}
+          {canCash&&<option value="caixa">Caixa</option>}
+          {manager&&<option value="gestao">Gestão</option>}
+        </select></label>
+      </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">

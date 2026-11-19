@@ -20,6 +20,8 @@ jobs:
         run: |
           printf '\n\nLoja de teste\nqa-admin\nSenha-LAN-Somente-CI\n' | bash scripts/install-lan.sh
           curl --fail --silent http://127.0.0.1:8080/ | grep -F '<div id="root">'
+          curl --fail --silent http://127.0.0.1:8080/manifest.webmanifest | jq -e '.start_url == "/" and (.icons|length == 2)'
+          curl --fail --silent http://127.0.0.1:8080/service-worker.js | grep -F "event.request.mode !== 'navigate'"
           curl --fail --silent http://127.0.0.1:8080/v1/auth/sessions \
             -H 'Content-Type: application/json' \
             -d '{"login":"qa-admin","password":"Senha-LAN-Somente-CI"}' | jq -e '.stores[0].store_id'

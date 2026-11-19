@@ -14,6 +14,11 @@ if [[ ! -f .env.lan ]]; then
   bind=${bind:-127.0.0.1}
   port=${port:-8080}
   [[ $bind =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ && $port =~ ^[0-9]{1,5}$ ]] || exit 2
+  IFS=. read -r first second third fourth <<< "$bind"
+  for octet in "$first" "$second" "$third" "$fourth"; do
+    if ((10#$octet>255)); then printf 'Informe um endereço IPv4 válido.\n' >&2; exit 2; fi
+  done
+  if ((10#$port<1 || 10#$port>65535)); then printf 'Informe uma porta entre 1 e 65535.\n' >&2; exit 2; fi
   password=$(openssl rand -hex 32)
   (set -o noclobber; printf 'POSTGRES_PASSWORD=%s\nLAN_BIND=%s\nLAN_PORT=%s\n' "$password" "$bind" "$port" > .env.lan)
 fi

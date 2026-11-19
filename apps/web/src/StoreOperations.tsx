@@ -11,7 +11,7 @@ const money = (cents:string) => currency.format(Number(cents)/100);
 const message = (error:unknown) => error instanceof Error ? error.message : 'Falha na operação';
 type Day = {day:string; sale_count:number; gross_cents:string; refunded_cents:string};
 type Supplier = {id:string; name:string};
-type Item = {id:string; name:string; color:string; size:string; price_cents:string; available:boolean};
+type Item = {id:string; name:string; color:string; size:string; price_cents:string; available:boolean; photo_url:string|null};
 
 export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
   const [refresh,setRefresh] = useState(0);
@@ -88,7 +88,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     }}/>
     <StockHolds session={session}/>
     <PickupSettings session={session}/>
-    <p><a href={storefront}>Abrir vitrine da loja</a></p>
+    <p><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
     {status && <p role="status">{status}</p>}
     {error && <p role="alert" className="error">{error}</p>}
   </div>;
@@ -153,7 +153,9 @@ export function Storefront({storeId}:{storeId:string}) {
   }, [storeId,page,retry]);
   return <main className="operation-panel storefront">
     <h1>Vitrine</h1>
-    <ul>{items.map(item => <li key={item.id}><strong>{item.name}</strong>
+    <ul>{items.map(item => <li key={item.id}>
+      {item.photo_url && <img className="storefront-photo" src={item.photo_url} loading="lazy" alt=""/>}
+      <strong>{item.name}</strong>
       <div>{item.color} · {item.size}</div><div>{money(item.price_cents)}</div>
       <small>{item.available ? 'Disponível' : 'Esgotado'}</small>
       {pickupEnabled && item.available && !pickup.order && <label className="pickup-quantity">

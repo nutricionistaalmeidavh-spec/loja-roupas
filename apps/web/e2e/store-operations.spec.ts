@@ -91,4 +91,10 @@ test('gestão, publicação e reserva chegam à vitrine', async ({page,request})
   await storefront.reload();
   await expect(item.getByText('Disponível')).toBeVisible();
 
+  await page.setViewportSize({width:390,height:844});
+  await page.getByLabel('Página',{exact:true}).selectOption('pdv');
+  await expect(page.getByRole('heading',{name:'Nova venda',exact:true})).toBeVisible();
+  await page.getByLabel('Página',{exact:true}).selectOption('gestao');
+  await expect(page.getByRole('heading',{name:'Vendas e devoluções nos últimos 30 dias'})).toBeVisible();
+
 });

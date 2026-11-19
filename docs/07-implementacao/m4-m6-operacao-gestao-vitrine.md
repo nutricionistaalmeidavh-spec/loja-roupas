@@ -12,6 +12,8 @@ bash scripts/install-lan.sh
 
 O assistente pede IP de escuta, porta, nome da loja e credenciais iniciais. O padrão é `127.0.0.1:8080`. Para abrir nos terminais em uma LAN confiável, informe o IP fixo do servidor na interface da rede local. Em cada terminal, abra `http://IP_DO_SERVIDOR:8080`. Para redes compartilhadas ou acesso externo, configure HTTPS com certificado confiável e restrinja o acesso administrativo no proxy ou na VPN. Servir a vitrine externamente exige uma configuração própria para rotear apenas a página, seus assets e as rotas públicas de vitrine e pedidos de retirada.
 
+O menu compacto dá acesso a Produtos, Estoque, Caixa e Gestão no celular conforme as permissões. Em uma origem segura (HTTPS ou localhost), use a opção do navegador para instalar a PWA. Se o servidor ficar inacessível, a PWA mostra uma tela de reconexão. Dados comerciais e gravações dependem da API LAN.
+
 O endpoint `/v1/ready` testa a conexão real ao banco. Consulte serviços e logs no diretório do projeto.
 
 ```bash
@@ -40,7 +42,7 @@ O dump inclui todas as tabelas, fotos, miniaturas, vendas e auditoria. O backup 
 ## Usar gestão e vitrine
 
 - Em **Gestão**, o gerente confere vendas e devoluções por dia e cadastra fornecedores. O resumo usa o fuso da loja e apresenta valor bruto e devoluções separadamente. O cadastro ainda não gera pedidos de compra.
-- Em **Produtos**, selecione uma variante e clique em **Publicar na vitrine**. Cada variante é privada até que seja publicada. A página pública exibe o preço atual e a disponibilidade, sem revelar quantidades.
+- Em **Produtos**, selecione uma variante e clique em **Publicar na vitrine**. Cada variante é privada até que seja publicada. A página pública exibe a foto, o preço atual e a disponibilidade, sem revelar quantidades.
 - Em **Produtos**, **Reservar estoque** separa unidades para atendimento interno. Em **Gestão**, **Liberar reserva** devolve as unidades ao saldo disponível. A reserva permanece ativa até a liberação manual. O PDV continua consultando o mesmo estoque.
 
 - Em **Gestão**, o gerente localiza a venda pelo número e registra a devolução integral de compras pagas somente em dinheiro. As peças voltam ao estoque apto à venda e o valor sai do caixa aberto. Confira as peças, confirme o registro e entregue o valor exibido.
@@ -48,6 +50,6 @@ O dump inclui todas as tabelas, fotos, miniaturas, vendas e auditoria. O backup 
 
 | Marco | Entregue | Pendente para encerrar |
 |---|---|---|
-| M4 | Instalação guiada no terminal, Web em LAN, cliente portátil, recibo auditado, etiqueta e scripts de recuperação | Installer nativo, spooler, PIN/dispositivos, PWA instalável, homologação WAN-off/LAN-off, testes em impressoras/scanners e procedimentos de retenção automática |
+| M4 | Instalação guiada no terminal, Web em LAN, PWA em origem segura, cliente portátil, recibo auditado, etiqueta e scripts de recuperação | Installer nativo, spooler, PIN/dispositivos, homologação PWA em aparelhos e WAN-off/LAN-off, testes em impressoras/scanners e procedimentos de retenção automática |
 | M5 | Fornecedores, resumo de vendas e devolução integral em dinheiro | Trocas, devoluções parciais ou de pagamentos externos, crediário, contas e DRE, fluxo de compras, contagem colaborativa, comissões, CRM/LGPD e importação |
 | M6 | Vitrine pública opt-in, reservas internas e pedido para retirada pago no caixa | Provador, pré-vendas, pagamento online e entregas, logística, gift cards, kits, campanhas e serviços |

@@ -357,6 +357,7 @@ components:
       required: [cash_session_id, lines, payments]
       properties:
         cash_session_id: { type: string, format: uuid }
+        pickup_order_id: { type: string, format: uuid }
         lines:
           type: array
           minItems: 1
@@ -373,7 +374,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         sale_number: { type: integer, minimum: 1 }
-        status: { type: string, enum: [confirmed] }
+        status: { type: string, enum: [confirmed, returned] }
         total_cents: { type: integer, minimum: 0 }
         tendered_cents: { type: integer, minimum: 0 }
         change_cents: { type: integer, minimum: 0 }

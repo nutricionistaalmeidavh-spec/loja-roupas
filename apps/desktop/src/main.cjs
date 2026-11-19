@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, shell } = require('electron');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 
@@ -24,7 +24,14 @@ function openWindow() {
     width: 1440, height: 900, minWidth: 760, minHeight: 560,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
   });
-  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.setWindowOpenHandler(({url:target}) => {
+    const next = new URL(target);
+    if (next.origin === url.origin && /^\/vitrine\/[0-9a-f-]{36}$/i.test(next.pathname)
+        && !next.username && !next.password && !next.search && !next.hash) {
+      void shell.openExternal(next.href).catch(error => dialog.showErrorBox('Abrir vitrine',error.message));
+    }
+    return {action:'deny'};
+  });
   for (const eventName of ['will-navigate', 'will-redirect']) {
     window.webContents.on(eventName, (event, next) => {
       if (new URL(next).origin !== url.origin) event.preventDefault();

@@ -26,7 +26,7 @@ async function pendingOrder(db:Queryable, storeId:string, id:string, lock=false)
 export async function validatePickupSale(db:PoolClient, storeId:string, id:string, sold:readonly Line[]) {
   const order = await pendingOrder(db,storeId,id,true);
   const quantities = new Map(sold.map(line => [line.variant_id.toLowerCase(),line.quantity]));
-  if (order.lines.length !== quantities.size || order.lines.some(line => quantities.get(line.variant_id) !== line.quantity))
+  if (sold.length !== quantities.size || order.lines.length !== quantities.size || order.lines.some(line => quantities.get(line.variant_id) !== line.quantity))
     throw new DomainError(409,'ORDER_ITEMS_CHANGED','Os itens da venda devem corresponder ao pedido de retirada');
 }
 

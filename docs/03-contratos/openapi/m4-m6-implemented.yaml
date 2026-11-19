@@ -135,6 +135,20 @@ paths:
                         size: { type: string }
                         price_cents: { type: string, pattern: '^[0-9]+$' }
                         available: { type: boolean }
+                        photo_url: { type: [string, 'null'] }
+  /v1/storefront/{id}/products/{productId}/photo:
+    get:
+      security: []
+      summary: Obter miniatura ou imagem de um produto publicado
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: productId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Imagem, com preferência pela miniatura WebP }
+        '404': { description: Foto indisponível para a vitrine }
   /v1/stock/holds:
     get:
       summary: Ler até 100 reservas ativas da loja por ordem de criação
