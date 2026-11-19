@@ -13,6 +13,7 @@ on:
 jobs:
   m1:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     services:
@@ -66,6 +67,7 @@ jobs:
       - name: Testes API/RBAC/catálogo
         run: pnpm --filter @loja/api test
       - name: Instalar Chromium open source para Playwright
+        timeout-minutes: 6
         run: pnpm --filter @loja/web exec playwright install --with-deps chromium
       - name: E2E Web real (login → cadastro → estoque → carrinho)
         run: pnpm --filter @loja/web test:e2e

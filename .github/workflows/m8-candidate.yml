@@ -1,0 +1,47 @@
+name: M8 - candidata a distribuição
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/m8-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências fixadas
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+      - name: Compilar e empacotar cliente portátil
+        run: |
+          pnpm --filter @loja/web build
+          pnpm --filter @loja/desktop build
+          test -x dist/desktop-linux-x64/electron
+          test -s dist/desktop-linux-x64/resources/app/main.cjs
+      - name: Gerar pacote e verificar checksum
+        run: |
+          cd dist
+          tar -czf loja-roupas-candidata-linux-x64.tar.gz desktop-linux-x64
+          sha256sum loja-roupas-candidata-linux-x64.tar.gz > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Guardar pacote para revisão
+        uses: actions/upload-artifact@v4
+        with:
+          name: m8-candidata-linux-x64
+          path: |
+            dist/loja-roupas-candidata-linux-x64.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7

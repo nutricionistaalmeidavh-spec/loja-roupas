@@ -174,6 +174,28 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.equal((await receive(randomUUID())).statusCode,409);
     const updated=await db.query('SELECT on_hand FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[store.id,variantId]);
     assert.equal(updated.rows[0].on_hand,'5');
+    const intelligence='/v1/management/intelligence';
+    const prefs={target_cents:20000,low_stock_limit:5,widgets:['seasonality','collections','suppliers','stock']};
+    const prefsKey=randomUUID();
+    const savePrefs=()=>app.inject({method:'PUT',url:intelligence,headers:write(prefsKey),payload:prefs});
+    assert.equal((await savePrefs()).statusCode,200);
+    assert.deepEqual((await savePrefs()).json(),prefs);
+    const collection=await app.inject({method:'PUT',url:intelligence+'/products/'+productId+'/collection',
+      headers:write(),payload:{collection:'Verão QA'}});
+    assert.equal(collection.statusCode,200,collection.body);
+    const dashboard=await app.inject({url:intelligence,headers});
+    assert.equal(dashboard.statusCode,200,dashboard.body);
+    const analytics=dashboard.json();
+    assert.deepEqual(analytics.preferences,prefs);
+    assert.equal(analytics.months.length,12);
+    assert.equal(analytics.daily.length,29);
+    assert.equal(analytics.months.at(-1).gross_cents,'1234');
+    assert.equal(analytics.months.at(-1).refunded_cents,'1234');
+    assert.equal(analytics.forecast.estimate_cents,null);
+    assert.equal(analytics.low_stock[0].available,'5');
+    assert.equal(analytics.suppliers[0].received,1);
+    assert.equal(analytics.suppliers[0].average_days,null);
+    assert.equal((await app.inject({url:intelligence,headers:{...headers,'x-store-id':otherStore.id}})).statusCode,401);
     const isolated = await app.inject({url:'/v1/management/suppliers',headers:{...headers,'x-store-id':otherStore.id}});
     assert.equal(isolated.statusCode,401,isolated.body);
   } finally {

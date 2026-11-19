@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Inteligência comercial
+  version: 0.1.0
+security:
+  - Session: []
+    Store: []
+paths:
+  /v1/management/intelligence:
+    get:
+      summary: Consultar metas, sazonalidade, projeção e evidências da loja
+      responses:
+        '200':
+          description: Valores monetários em centavos decimais e janelas no fuso da loja
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [preferences, daily, months, forecast, collections, suppliers, low_stock]
+                properties:
+                  preferences: { $ref: '#/components/schemas/Preferences' }
+                  daily: { type: array, items: { $ref: '#/components/schemas/Period' } }
+                  months: { type: array, items: { $ref: '#/components/schemas/Period' } }
+                  forecast: { type: object }
+                  collections: { type: array, items: { type: object } }
+                  suppliers: { type: array, items: { type: object } }
+                  low_stock: { type: array, items: { type: object } }
+    put:
+      summary: Salvar meta padrão mensal, janela de estoque e widgets da loja
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Preferences' }
+      responses:
+        '200': { description: Preferências auditadas }
+  /v1/management/intelligence/products/{id}/collection:
+    put:
+      summary: Atribuir ou limpar o nome da coleção atual de um produto
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collection]
+              properties:
+                collection: { type: string, maxLength: 80 }
+      responses:
+        '200': { description: Coleção atualizada e auditada }
+        '404': { description: Produto indisponível na loja }
+components:
+  parameters:
+    WriteKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string }
+  securitySchemes:
+    Session: { type: http, scheme: bearer }
+    Store: { type: apiKey, in: header, name: X-Store-Id }
+  schemas:
+    Preferences:
+      type: object
+      required: [target_cents, low_stock_limit, widgets]
+      additionalProperties: false
+      properties:
+        target_cents: { type: integer, minimum: 0, maximum: 100000000000 }
+        low_stock_limit: { type: integer, minimum: 0, maximum: 999 }
+        widgets:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items: { enum: [seasonality, collections, suppliers, stock] }
+    Period:
+      type: object
+      required: [period, gross_cents, refunded_cents]
+      properties:
+        period: { type: string, format: date }
+        gross_cents: { type: string }
+        refunded_cents: { type: string }

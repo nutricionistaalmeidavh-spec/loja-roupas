@@ -12,6 +12,7 @@ import { DomainError } from './transactions.ts';
 import { registerStoreOperations } from './store-operations.ts';
 import { registerPickupOrders } from './pickup-orders.ts';
 import { registerOperationalCompletion } from './operational-completion.ts';
+import { registerIntelligence } from './intelligence.ts';
 import { registerStockHolds } from './stock-holds.ts';
 
 export function buildApp(db: Pool) {
@@ -37,6 +38,7 @@ export function buildApp(db: Pool) {
   registerStockHolds(app, db);
   registerPickupOrders(app, db);
   registerOperationalCompletion(app, db);
+  registerIntelligence(app, db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });
