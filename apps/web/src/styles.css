@@ -134,3 +134,14 @@
  .checkout-modal{max-height:calc(100dvh - 16px);padding:16px}
  .checkout-buttons{position:sticky;bottom:-16px;background:white;padding:12px 0 16px;border-top:1px solid #e9e9e9}
 }
+
+/* P2: navegação operacional legível e estados de foco consistentes. */
+.icon-rail button{font-family:inherit;font-size:11px;font-weight:750;letter-spacing:.02em}
+.icon-rail button span{display:block;line-height:1.2}
+.icon-rail button:focus-visible,.checkout-modal button:focus-visible,.checkout-modal input:focus-visible,
+.checkout-modal select:focus-visible,.mobile-navigation select:focus-visible{outline:3px solid #9c7950;outline-offset:3px}
+.checkout-modal:focus{outline:none}
+.checkout-header{position:sticky;top:-25px;background:white;z-index:2;padding:8px 0;border-bottom:1px solid #ededed}
+.checkout-totals{position:relative;background:#f7f5f1;border-color:#e5dfd5}
+.product-card:focus-within{outline:2px solid #a68b67;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.checkout-modal,.product-card,.management-jump a{animation:none!important;transition:none!important}}
