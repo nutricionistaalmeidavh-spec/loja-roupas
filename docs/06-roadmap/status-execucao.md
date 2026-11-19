@@ -14,7 +14,7 @@
 | M5 — Gestão P1 | Parcial na `main` via PR #13 · fornecedores, devolução integral em dinheiro e resumo por dia | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
 | M6 — Experiências P2 | Parcial na `main` via PR #13 · vitrine, reserva interna e retirada paga no caixa | Provador, pagamento online, entregas, kits/gift cards e serviços | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
 | M7 — Inteligência P2 | Painel, meta mensal, coleções, previsão e regras de exibição em PR | Score completo de fornecedores, sazonalidade plurianual e campos personalizados pendentes | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
-| M8 — QA e RC | Esteira de QA e candidata Linux em PR | Homologação física, revisão geral de segurança, portas e distribuição nativa pendentes | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
+| M8 — QA e RC | Esteira de QA e candidatas Linux e Windows em PR | Homologação física, revisão geral de segurança, portas e distribuição nativa pendentes | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
 **Atenção:** "incorporado à main" significa código integrado e CI verde para os fluxos cobertos, **não** homologação comercial/operacional e **não** release. Nenhuma release foi publicada na incorporação de M0–M3.
 

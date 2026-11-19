@@ -1,6 +1,6 @@
 CREATE TABLE commercial_preferences (
   store_id uuid PRIMARY KEY REFERENCES stores(id),
-  target_cents bigint NOT NULL CHECK (target_cents BETWEEN 0 AND 100000000000),
+  target_cents bigint NOT NULL CHECK (target_cents BETWEEN 0 AND 9999999999),
   low_stock_limit integer NOT NULL CHECK (low_stock_limit BETWEEN 0 AND 999),
   widgets text[] NOT NULL CHECK (widgets <@ ARRAY['seasonality','collections','suppliers','stock']::text[])
 );

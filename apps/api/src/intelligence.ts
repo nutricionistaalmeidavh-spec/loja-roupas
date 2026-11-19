@@ -83,7 +83,7 @@ export function registerIntelligence(app:FastifyInstance,db:Pool) {
 
   app.put<{Body:Preferences}>('/v1/management/intelligence',{
     schema:{body:{type:'object',additionalProperties:false,required:['target_cents','low_stock_limit','widgets'],properties:{
-      target_cents:{type:'integer',minimum:0,maximum:100000000000},
+      target_cents:{type:'integer',minimum:0,maximum:9999999999},
       low_stock_limit:{type:'integer',minimum:0,maximum:999},
       widgets:{type:'array',maxItems:4,uniqueItems:true,items:{type:'string',enum:widgetNames}},
     }}},

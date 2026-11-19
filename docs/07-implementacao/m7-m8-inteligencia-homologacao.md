@@ -22,6 +22,6 @@ O painel agrega os lançamentos de devolução disponíveis no sistema. Hoje ele
 | Contratos, domínio, API e Web | Tipos, build, comportamento de previsão, teste de isolamento por loja e transações de estoque e caixa com banco real. |
 | Interface | Playwright percorre compras, retirada, devolução e configuração de um painel. O cenário do painel verifica navegação e captura sete larguras entre 320 e 1440 px. |
 | Operação LAN | Smoke test Docker Compose com 40 leituras autenticadas e oito concorrentes, interrupção e recuperação do PostgreSQL, backup criptografado e comparação dos dados restaurados. |
-| Candidata Linux x64 | Pacote Electron portátil acompanhado de SHA-256 como artefato de CI por sete dias. O cliente usa um servidor Loja de Roupas disponível em LAN. |
+| Candidatas Linux e Windows x64 | Pacotes Electron portáteis acompanhados de SHA-256 como artefatos de CI por sete dias. O cliente usa um servidor Loja de Roupas disponível em LAN. |
 
 A homologação geral inclui operação física sem WAN, impressoras e scanners reais, PWA em aparelhos, carga representativa da loja, auditoria completa de acessibilidade, revisão geral de segurança e instaladores nativos. A publicação de uma release segue o fluxo de aprovação do projeto.
