@@ -53,3 +53,11 @@ O dump inclui todas as tabelas, fotos, miniaturas, vendas e auditoria. O backup 
 | M4 | Instalação guiada no terminal, Web em LAN, PWA em origem segura, cliente portátil, recibo auditado, etiqueta e scripts de recuperação | Installer nativo, spooler, PIN/dispositivos, homologação PWA em aparelhos e WAN-off/LAN-off, testes em impressoras/scanners e procedimentos de retenção automática |
 | M5 | Fornecedores, resumo de vendas e devolução integral em dinheiro | Trocas, devoluções parciais ou de pagamentos externos, crediário, contas e DRE, fluxo de compras, contagem colaborativa, comissões, CRM/LGPD e importação |
 | M6 | Vitrine pública opt-in, reservas internas e pedido para retirada pago no caixa | Provador, pré-vendas, pagamento online e entregas, logística, gift cards, kits, campanhas e serviços |
+
+## Fila, compras e acompanhamento da retirada
+
+- **M4.** Em Gestão, abra um comprovante pendente na fila central, imprima no terminal escolhido e confirme a saída do papel. A confirmação registra usuário e horário. A fila exige confirmação manual.
+- **M5.** Em Gestão, crie um pedido de compra com fornecedor, SKU, quantidade e custo unitário. O recebimento integral atualiza o estoque canônico em uma transação e grava a entrada no histórico. A mesma solicitação pode ser repetida sem duplicar saldo. Cada pedido contém um SKU.
+- **M6.** A equipe pode consultar e cancelar pedidos de retirada pendentes em Gestão. Clientes acompanham a situação pelo código na vitrine. O cancelamento bloqueia a finalização no caixa. A consulta pública mostra somente o estado do pedido.
+
+A homologação em hardware continua aberta. Compras com múltiplos itens e recebimento parcial, contas e DRE, trocas, CRM, provador, pagamentos online e entrega permanecem no roadmap.

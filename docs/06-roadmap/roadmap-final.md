@@ -15,9 +15,9 @@ Core **R$ 0, open source (AGPLv3 prevista) e self-hosted**; integrações pagas 
 | M1 — Fundação | Código integrado via PR #2 | Hardening, PIN/dispositivos e distribuição M4 |
 | M2 — Catálogo/estoque | Código e testes integrados via PRs #3–#5 | Inventário colaborativo, hardware e carga |
 | M3 — PDV/caixa | Código integrado via PR #6; [5 E2E PASS](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44326485213) | Impressoras, LAN/backup, descontos avançados |
-| **M4 — P0 operacional** | **Parcial em PR** | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7): instalador, impressão, resiliência, QA LAN |
-| M5 — Gestão P1 | Parcial em PR | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
-| M6 — Experiências P2 | Parcial em PR | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
+| **M4 — P0 operacional** | **Parcial na `main` via PR #13** | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7): instalador, impressão, resiliência, QA LAN |
+| M5 — Gestão P1 | Parcial na `main` via PR #13 | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
+| M6 — Experiências P2 | Parcial na `main` via PR #13 | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
 | M7 — Inteligência P2 | Planejado | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
 | M8 — QA global e RC | Planejado | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
