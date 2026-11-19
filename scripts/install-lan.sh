@@ -17,17 +17,17 @@ if [[ ! -f .env.lan ]]; then
   password=$(openssl rand -hex 32)
   (set -o noclobber; printf 'POSTGRES_PASSWORD=%s\nLAN_BIND=%s\nLAN_PORT=%s\n' "$password" "$bind" "$port" > .env.lan)
 fi
-lan up -d --wait postgres
-lan build api web
-lan run --rm --no-deps api pnpm --filter @loja/api migrate
-has_users=$(lan exec -T postgres psql -XAtq -v ON_ERROR_STOP=1 -U loja -d loja -c 'SELECT EXISTS(SELECT 1 FROM users)')
+lan up -d --wait postgres < /dev/null
+lan build api web < /dev/null
+lan run --rm --no-deps -T api node --experimental-strip-types apps/api/src/migrate.ts < /dev/null
+has_users=$(lan exec -T postgres psql -XAtq -v ON_ERROR_STOP=1 -U loja -d loja -c 'SELECT EXISTS(SELECT 1 FROM users)' < /dev/null)
 if [[ $has_users == f ]]; then
   read -rp 'Nome da loja: ' BOOTSTRAP_STORE
   read -rp 'Login do administrador: ' BOOTSTRAP_ADMIN_LOGIN
   read -rsp 'Senha do administrador (mínimo de 12 caracteres): ' BOOTSTRAP_ADMIN_PASSWORD
   printf '\n'
   export BOOTSTRAP_STORE BOOTSTRAP_ADMIN_LOGIN BOOTSTRAP_ADMIN_PASSWORD
-  lan run --rm --no-deps -e BOOTSTRAP_STORE -e BOOTSTRAP_ADMIN_LOGIN -e BOOTSTRAP_ADMIN_PASSWORD api pnpm --filter @loja/api bootstrap
+  lan run --rm --no-deps -T -e BOOTSTRAP_STORE -e BOOTSTRAP_ADMIN_LOGIN -e BOOTSTRAP_ADMIN_PASSWORD api node --experimental-strip-types apps/api/src/bootstrap.ts < /dev/null
   unset BOOTSTRAP_ADMIN_PASSWORD
 fi
 lan up -d api web

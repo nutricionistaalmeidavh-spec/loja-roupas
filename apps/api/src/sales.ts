@@ -2,13 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool,PoolClient } from 'pg';
 import { requirePermission } from './auth.ts';
 import type { AuthContext } from './auth.ts';
+import { validatePickupSale } from './pickup-orders.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 const uid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
 type Line={variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number};
 type QuoteLine={variant_id:string;quantity:number};
 type Pay={method:'cash'|'pix_manual'|'card_external';amount_cents:number;confirmed:boolean;external_reference?:string};
-type Commit={cash_session_id:string;lines:Line[];payments:Pay[]};
+type Commit={cash_session_id:string;pickup_order_id?:string;lines:Line[];payments:Pay[]};
 type VariantRow={id:string;price_cents:string;revision:string;sku:string;color:string;size:string;name:string;available:string};
 type SaleRow={id:string;store_id:string;sale_number:string;status:string;total_cents:string;tendered_cents:string;
  change_cents:string;created_at:Date;cash_session_id:string};
@@ -100,7 +101,7 @@ export function registerSales(app:FastifyInstance,db:Pool){
  });
  app.post<{Body:Commit}>('/v1/sales',{
   schema:{body:{type:'object',additionalProperties:false,required:['cash_session_id','lines','payments'],properties:{
-   cash_session_id:{type:'string',pattern:uid},
+   cash_session_id:{type:'string',pattern:uid},pickup_order_id:{type:'string',pattern:uid},
    lines:{type:'array',minItems:1,maxItems:100,items:{
     type:'object',additionalProperties:false,required:['variant_id','quantity','expected_price_cents','expected_price_revision'],
     properties:{variant_id:{type:'string',pattern:uid},quantity:{type:'integer',minimum:1,maximum:10000},
@@ -124,6 +125,7 @@ export function registerSales(app:FastifyInstance,db:Pool){
    if(!cash.rowCount||cash.rows[0].closed_at)
     throw new DomainError(409,'CASH_CLOSED','Abra o caixa antes de confirmar a venda');
    validateCashOwner(auth,cash.rows[0].opened_by);
+   if(body.pickup_order_id)await validatePickupSale(client,auth.storeId,body.pickup_order_id,body.lines);
    const sorted=[...body.lines].sort((a,b)=>a.variant_id.localeCompare(b.variant_id));
    const priced:{line:Line;row:VariantRow;price:number;subtotal:number}[]=[];
    let total=0;
@@ -151,6 +153,8 @@ export function registerSales(app:FastifyInstance,db:Pool){
     VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text,created_at`,
     [auth.storeId,number,body.cash_session_id,auth.userId,total,tendered,change]);
    const saleId=created.rows[0].id;
+   if(body.pickup_order_id)await client.query('UPDATE pickup_orders SET sale_id=$3 WHERE store_id=$1 AND id=$2',
+     [auth.storeId,body.pickup_order_id,saleId]);
    for(const x of priced){
     await client.query(`INSERT INTO sale_lines(store_id,sale_id,variant_id,product_name,sku,color,size,
       quantity,unit_price_cents,line_total_cents)
@@ -175,7 +179,7 @@ export function registerSales(app:FastifyInstance,db:Pool){
    }
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
      VALUES($1,$2,'sales.confirm',$3,$4::jsonb)`,
-    [auth.storeId,auth.userId,saleId,JSON.stringify({number,total,change,cash_session_id:body.cash_session_id})]);
+    [auth.storeId,auth.userId,saleId,JSON.stringify({number,total,change,cash_session_id:body.cash_session_id,pickup_order_id:body.pickup_order_id})]);
    await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
      VALUES($1,'sales.sale.confirmed.v1',$2,1,$3::jsonb)`,
     [auth.storeId,saleId,JSON.stringify({sale_number:number,total_cents:total})]);
@@ -200,6 +204,7 @@ export function registerSales(app:FastifyInstance,db:Pool){
     'LOJA DE ROUPAS','COMPROVANTE NÃO FISCAL','Não substitui documento fiscal quando exigido.',
     '--------------------------------',
     'Venda Nº '+sale.sale_number,
+    ...(sale.status==='returned'?['VENDA DEVOLVIDA']:[]),
     'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
     ...sale.lines.map(l=>l.quantity+' × '+l.product_name+' ('+l.color+'/'+l.size+') '+money(l.line_total_cents)),
     '--------------------------------','TOTAL '+money(sale.total_cents),

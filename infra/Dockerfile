@@ -9,7 +9,7 @@ RUN pnpm --filter @loja/api... --filter @loja/web... install --frozen-lockfile
 
 FROM workspace AS api
 USER node
-CMD ["pnpm", "--filter", "@loja/api", "start"]
+CMD ["node", "--experimental-strip-types", "apps/api/src/main.ts"]
 
 FROM workspace AS web-build
 RUN pnpm --filter @loja/web build

@@ -57,6 +57,57 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const balances = await db.query('SELECT on_hand,reserved FROM stock_balances WHERE store_id=$1 AND variant_id=$2',
       [store.id,variantId]);
     assert.deepEqual(balances.rows,[{on_hand:'1',reserved:'0'}]);
+    const submission = {request_id:randomUUID(),lines:[{variant_id:variantId,quantity:1}]};
+    const submit = () => app.inject({method:'POST',url:'/v1/storefront/'+store.id+'/pickup-orders',payload:submission});
+    assert.equal((await submit()).statusCode,404);
+    const enable = await app.inject({method:'PUT',url:'/v1/management/storefront/pickup',headers:write(),payload:{enabled:true}});
+    assert.equal(enable.statusCode,200,enable.body);
+    const requested = await submit();
+    assert.equal(requested.statusCode,201,requested.body);
+    assert.deepEqual((await submit()).json(),requested.json());
+    assert.equal((await storefront()).json().items[0].available,true);
+    const idOrder = requested.json().id;
+    const pickup = await app.inject({url:'/v1/pickup-orders/'+idOrder,headers});
+    assert.equal(pickup.statusCode,200,pickup.body);
+    assert.deepEqual(pickup.json().lines,submission.lines);
+    assert.equal((await app.inject({url:'/v1/pickup-orders/'+idOrder})).statusCode,401);
+    const opened = await app.inject({method:'POST',url:'/v1/cash-sessions',headers:write(),
+      payload:{terminal_code:'RETIRADA-01',opening_cents:0}});
+    assert.equal(opened.statusCode,201,opened.body);
+    const saleBody = {cash_session_id:opened.json().id,pickup_order_id:idOrder,
+      lines:[{...submission.lines[0],expected_price_cents:1234,expected_price_revision:1}],
+      payments:[{method:'cash',amount_cents:1234,confirmed:true}]};
+    const sell = (key:string) => app.inject({method:'POST',url:'/v1/sales',headers:write(key),payload:saleBody});
+    const saleKey = randomUUID();
+    const sold = await sell(saleKey);
+    assert.equal(sold.statusCode,201,sold.body);
+    assert.deepEqual((await sell(saleKey)).json(),sold.json());
+    const duplicateSale = await sell(randomUUID());
+    assert.equal(duplicateSale.statusCode,409);
+    assert.equal(duplicateSale.json().code,'ORDER_SOLD');
+    assert.equal((await storefront()).json().items[0].available,false);
+
+    const salePath = '/v1/management/sales/by-number/'+sold.json().sale_number;
+    const saleForReturn = await app.inject({url:salePath,headers});
+    assert.equal(saleForReturn.statusCode,200,saleForReturn.body);
+    assert.equal(saleForReturn.json().cash_only,true);
+    const refundKey = randomUUID();
+    const refund = (key:string) => app.inject({method:'POST',url:salePath+'/cash-return',headers:write(key),
+      payload:{cash_session_id:opened.json().id,reason:'Cliente devolveu a peça em condição de venda'}});
+    const refunded = await refund(refundKey);
+    assert.equal(refunded.statusCode,201,refunded.body);
+    assert.equal(refunded.json().expected_cash_cents,0);
+    assert.equal(refunded.json().refunded_cents,1234);
+    assert.deepEqual((await refund(refundKey)).json(),refunded.json());
+    assert.equal((await refund(randomUUID())).statusCode,409);
+    assert.equal((await storefront()).json().items[0].available,true);
+    const summary = await app.inject({url:'/v1/management/sales-summary',headers});
+    assert.equal(summary.statusCode,200,summary.body);
+    assert.equal(summary.json().days[0].refunded_cents,'1234');
+    assert.equal(summary.json().days[0].gross_cents,'1234');
+    const returnedSale = await app.inject({url:'/v1/sales/'+sold.json().id,headers});
+    assert.equal(returnedSale.json().status,'returned');
+
     const unpublish = await app.inject({method:'PUT',url:publishUrl,headers:write(),payload:{published:false}});
     assert.equal(unpublish.statusCode,200,unpublish.body);
     assert.deepEqual((await storefront()).json().items,[]);

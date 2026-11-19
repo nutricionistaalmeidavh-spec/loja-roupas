@@ -11,6 +11,8 @@ import { LoginScreen } from './LoginScreen.tsx';
 import { CreateProductForm, ReceiveStockForm } from './Management.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
 import { M2CatalogEditor, M2StockAdjustment } from './M2Admin.tsx';
+import { PickupLookup } from './PickupOrders.tsx';
+import type { PickupOrder } from './PickupOrders.tsx';
 import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
 import { CashPanel } from './CashPanel.tsx';
 import { CheckoutDrawer } from './PosCheckout.tsx';
@@ -38,6 +40,7 @@ export function App() {
   const [stockSearch,setStockSearch] = useState('');
   const [cashState,setCashState] = useState<CashState|null>(null);
   const [cashRefresh,setCashRefresh] = useState(0);
+  const [pickup,setPickup] = useState<PickupOrder>();
   const [checkoutOpen,setCheckoutOpen] = useState(false);
   const [lastSale,setLastSale] = useState<Sale|null>(null);
   const [receipt,setReceipt] = useState('');
@@ -154,7 +157,8 @@ export function App() {
   }
   function cashUpdated(){setCashRefresh(n=>n+1);setDraftRefresh(n=>n+1);}
   function saleConfirmed(sale:Sale){
-    setDraft([]);setSelected({});setCheckoutOpen(false);setCartOpen(false);
+    if(!pickup){setDraft([]);setSelected({});}
+    setPickup(undefined);setCheckoutOpen(false);setCartOpen(false);
     setLastSale(sale);setReceipt('');setReceiptError('');setRefetch(n=>n+1);
     if(session)void receiptText(session,sale.id).then(setReceipt).catch(error=>{
       setReceiptError(error instanceof Error?error.message:'Não foi possível obter o comprovante');
@@ -165,7 +169,7 @@ export function App() {
   }
   function logout(){
     const active=session;
-    setSession(null);setDraft([]);setSelected({});setProducts([]);setAllProducts([]);setSearch('');setPage('pdv');setCashState(null);setLastSale(null);setReceipt('');setSavedDrafts([]);setSuspendPending(null);
+    setPickup(undefined);setCheckoutOpen(false);setSession(null);setDraft([]);setSelected({});setProducts([]);setAllProducts([]);setSearch('');setPage('pdv');setCashState(null);setLastSale(null);setReceipt('');setSavedDrafts([]);setSuspendPending(null);
     if(active)void revokeSession(active).catch(()=>{/* logout local é imediato; sessão remota expira conforme servidor */});
   }
   function selectVariant(product:Product,color:string,size:string){
@@ -245,6 +249,7 @@ export function App() {
           {savedDrafts.map(item=><button key={item.id} className="light-button"
             onClick={()=>void resumeCurrent(item)}>Retomar venda · {item.lines.length} itens</button>)}
         </section>}
+        {cashId&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
         <div className="search-row"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
           <input id="search" value={search} autoComplete="off" onChange={e=>setSearch(e.target.value)} onKeyDown={keySearch} placeholder="Pesquisar produto, SKU ou código…"/>
           <button type="button" className="scan-button" disabled={scanBusy||!search.trim()} onClick={()=>void scan()}>{scanBusy?'Consultando…':'Confirmar código'}</button>
@@ -288,7 +293,7 @@ export function App() {
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
-      {page==='gestao'&&manager&&<StoreOperations session={session}/>}
+      {page==='gestao'&&manager&&<StoreOperations session={session} cashId={cashId} onReturned={refreshed}/>}
       {page==='produtos'&&manager&&<><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></>}
       {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
       {page==='estoque'&&canReceive&&<>
@@ -305,7 +310,7 @@ export function App() {
     </main>
     {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
-      draft={draft} onClose={()=>setCheckoutOpen(false)} onConfirmed={saleConfirmed}/>}
+      draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
     {lastSale&&<div className="checkout-overlay" role="presentation">
       <section className="checkout-modal" role="dialog" aria-modal="true" aria-label="Venda confirmada">
         <h2>Venda #{lastSale.sale_number} confirmada</h2>

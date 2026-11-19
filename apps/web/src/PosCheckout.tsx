@@ -6,6 +6,7 @@ import { ApiError } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { reaisToCents } from './catalog-model.ts';
 import { commitSale,quoteSale } from './pos-client.ts';
+import type { PickupOrder } from './PickupOrders.tsx';
 import type { PaymentInput,Sale,SaleQuote } from './pos-client.ts';
 
 const brl=(cents:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
@@ -14,8 +15,8 @@ type Tender={key:string;method:'cash'|'pix_manual'|'card_external';amount:string
 function newTender(method:Tender['method']='cash',amount=''):Tender {
  return {key:requestId(),method,amount,confirmed:false,reference:''};
 }
-export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}:{
- session:Session;cashSessionId:string;draft:readonly DraftLine[];onClose:()=>void;onConfirmed:(sale:Sale)=>void
+export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onConfirmed}:{
+ session:Session;cashSessionId:string;draft:readonly DraftLine[];pickup?:PickupOrder;onClose:()=>void;onConfirmed:(sale:Sale)=>void
 }){
  const [quote,setQuote]=useState<SaleQuote|null>(null);
  const [loading,setLoading]=useState(true);
@@ -28,14 +29,14 @@ export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}
  useEffect(()=>{
   let cancelled=false;
   setLoading(true);setError('');
-  void quoteSale(session,draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity}))).then(result=>{
+  void quoteSale(session,pickup?.lines ?? draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity}))).then(result=>{
    if(cancelled)return;
    setQuote(result);setTenders([newTender('cash',editMoney(result.total_cents))]);
    setPending(null);setUncertain(false);
   }).catch(err=>{if(!cancelled){setQuote(null);setError(err instanceof Error?err.message:'Não foi possível cotar a venda');}})
    .finally(()=>{if(!cancelled)setLoading(false);});
   return ()=>{cancelled=true;};
- },[session,draft,refresh]);
+ },[session,draft,pickup,refresh]);
  const tendered=useMemo(()=>{
   try{return tenders.reduce((sum,x)=>sum+reaisToCents(x.amount),0);}
   catch{return 0;}
@@ -67,7 +68,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}
    variant_id:line.variant_id,quantity:line.quantity,
    expected_price_cents:line.price_cents,expected_price_revision:line.price_revision
   }));
-  const body=JSON.stringify({cashSessionId,lines,payments});
+  const body=JSON.stringify({cashSessionId,lines,payments,pickupOrderId:pickup?.id});
   if(pending&&pending.body!==body){
    setError('Há uma venda com resultado pendente. Repita exatamente a mesma operação.');return;
   }
@@ -75,13 +76,13 @@ export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}
   setPending({key,body});
   setBusy(true);
   try{
-   const sold=await commitSale(session,cashSessionId,lines,payments,key);
+   const sold=await commitSale(session,cashSessionId,lines,payments,key,fetch,pickup?.id);
    setPending(null);setUncertain(false);onConfirmed(sold);
   }catch(err){
    setError(err instanceof Error?err.message:'Falha ao confirmar venda');
    if(err instanceof ApiError && err.status>=400 && err.status<500){
     setPending(null);setUncertain(false);
-    if(err.status===409)setError('O estoque, preço ou caixa mudou. Revise a cotação antes de tentar novamente.');
+    if(err.status===409&&!err.code.startsWith('ORDER_'))setError('O estoque, preço ou caixa mudou. Revise a cotação antes de tentar novamente.');
    }else setUncertain(true);
   }finally{setBusy(false);}
  }
@@ -90,6 +91,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}
     onMouseDown={e=>e.stopPropagation()}>
    <header className="checkout-header"><h2>Revisar e finalizar venda</h2>
     <button type="button" className="light-button" disabled={busy||uncertain} onClick={onClose}>Fechar</button></header>
+   {pickup&&<p className="notice">Pedido para retirada · Cotação na vitrine {brl(Number(pickup.quoted_total_cents))}</p>}
    {loading&&<p role="status">Verificando preços e saldos com PostgreSQL…</p>}
    {quote&&!loading&&<form className="checkout-form" onSubmit={event=>void submit(event)}>
     <div className="editor-block"><h3>Itens confirmados na cotação</h3>

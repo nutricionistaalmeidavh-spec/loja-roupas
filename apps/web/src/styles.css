@@ -91,3 +91,7 @@
  [data-print-label] .barcode-label{position:absolute;left:0;top:0;overflow:visible}
  [data-print-label] .receipt-print{display:none}
 }
+.pickup-quantity{display:block;margin-top:10px}
+.pickup-quantity input{width:4.5rem;margin-left:6px}
+.pickup-lookup{margin:12px 0}
+.pickup-code{overflow-wrap:anywhere;user-select:all}

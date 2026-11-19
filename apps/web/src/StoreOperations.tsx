@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, headers, jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
+import { CashReturnForm } from './CashReturnForm.tsx';
+import { PickupSettings, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
 const message = (error:unknown) => error instanceof Error ? error.message : 'Falha na operação';
-type Day = {day:string; sale_count:number; gross_cents:string};
+type Day = {day:string; sale_count:number; gross_cents:string; refunded_cents:string};
 type Supplier = {id:string; name:string};
 type Item = {id:string; name:string; color:string; size:string; price_cents:string; available:boolean};
 
-export function StoreOperations({session}:{session:Session}) {
+export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
+  const [refresh,setRefresh] = useState(0);
   const [days, setDays] = useState<Day[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [name, setName] = useState('');
@@ -35,7 +38,7 @@ export function StoreOperations({session}:{session:Session}) {
       setReady(true);
     }).catch(error => { if (!controller.signal.aborted) setError(message(error)); });
     return () => controller.abort();
-  }, [session]);
+  }, [session,refresh]);
 
   async function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,10 +68,10 @@ export function StoreOperations({session}:{session:Session}) {
 
   return <div className="operation-panel">
     <section>
-      <h2>Vendas confirmadas nos últimos 30 dias</h2>
-      {ready && (days.length ? <table><thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th></tr></thead>
+      <h2>Vendas e devoluções nos últimos 30 dias</h2>
+      {ready && (days.length ? <table><thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th><th>Devoluções</th></tr></thead>
         <tbody>{days.map(day => <tr key={day.day}><td>{day.day.split('-').reverse().join('/')}</td>
-          <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td></tr>)}</tbody></table> : <p>Sem vendas no período.</p>)}
+          <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td><td>{money(day.refunded_cents)}</td></tr>)}</tbody></table> : <p>Sem vendas no período.</p>)}
     </section>
     <section>
       <h2>Fornecedores</h2>
@@ -79,7 +82,12 @@ export function StoreOperations({session}:{session:Session}) {
       </form>
       <ul>{suppliers.map(supplier => <li key={supplier.id}>{supplier.name}</li>)}</ul>
     </section>
+    <CashReturnForm session={session} cashId={cashId} onReturned={()=>{
+      setRefresh(value=>value+1);
+      onReturned();
+    }}/>
     <StockHolds session={session}/>
+    <PickupSettings session={session}/>
     <p><a href={storefront}>Abrir vitrine da loja</a></p>
     {status && <p role="status">{status}</p>}
     {error && <p role="alert" className="error">{error}</p>}
@@ -118,6 +126,10 @@ export function PublishVariant({session,id}:{session:Session;id:string}) {
 
 export function Storefront({storeId}:{storeId:string}) {
   const [items, setItems] = useState<Item[]>([]);
+  const [pickupEnabled,setPickupEnabled] = useState(false);
+  const [basket,setBasket] = useState<Record<string,number>>({});
+  const pickup = usePickupSubmission(storeId);
+  const selected = items.filter(item => basket[item.id] > 0);
   const [cursor, setCursor] = useState<string|null>(null);
   const [page, setPage] = useState<string|null>(null);
   const [retry, setRetry] = useState(0);
@@ -126,11 +138,12 @@ export function Storefront({storeId}:{storeId:string}) {
   useEffect(() => {
     const controller = new AbortController();
     const query = page ? '?after=' + encodeURIComponent(page) : '';
-    void jsonRequest<{items:Item[];next:string|null}>('/v1/storefront/' + storeId + query,
+    void jsonRequest<{items:Item[];next:string|null;pickup_enabled:boolean}>('/v1/storefront/' + storeId + query,
       {signal:controller.signal}, fetch).then(result => {
         if (controller.signal.aborted) return;
         setItems(current => page ? [...current, ...result.items] : result.items);
         setCursor(result.next);
+        setPickupEnabled(result.pickup_enabled);
       }).catch(error => {
         if (!controller.signal.aborted) setError(message(error));
       }).finally(() => {
@@ -142,7 +155,33 @@ export function Storefront({storeId}:{storeId:string}) {
     <h1>Vitrine</h1>
     <ul>{items.map(item => <li key={item.id}><strong>{item.name}</strong>
       <div>{item.color} · {item.size}</div><div>{money(item.price_cents)}</div>
-      <small>{item.available ? 'Disponível' : 'Esgotado'}</small></li>)}</ul>
+      <small>{item.available ? 'Disponível' : 'Esgotado'}</small>
+      {pickupEnabled && item.available && !pickup.order && <label className="pickup-quantity">
+        Quantidade <input aria-label={'Quantidade de '+item.name+' '+item.color+' '+item.size}
+          type="number" min={0} max={10} value={basket[item.id]??0} disabled={pickup.submitting}
+          onChange={event => {
+            const value = Math.min(10,Math.max(0,Math.trunc(Number(event.target.value) || 0)));
+            setBasket(current => ({...current,[item.id]:value}));
+          }}/>
+      </label>}
+    </li>)}</ul>
+    {pickupEnabled && !pickup.order && selected.length>0 && <section>
+      <h2>Pedido para retirada</h2>
+      <p>Pagamento na loja. Preço e disponibilidade são conferidos no caixa.</p>
+      <ul>{selected.map(item=><li key={item.id}>{basket[item.id]} × {item.name} · {item.color}/{item.size}</li>)}</ul>
+      {selected.length>10 && <p role="alert">Envie até 10 variantes por pedido.</p>}
+      <button className="primary-action" disabled={pickup.submitting || selected.length>10}
+        onClick={()=>void pickup.submit(selected.map(item=>({variant_id:item.id,quantity:basket[item.id]})))}>
+        Enviar pedido para retirada
+      </button>
+    </section>}
+    {pickup.error && <p role="alert">{pickup.error}</p>}
+    {pickup.order && <section role="status">
+      <h2>Pedido recebido</h2>
+      <p>Apresente este código em até 48 horas para consultar o pedido na loja.</p>
+      <code className="pickup-code">{pickup.order.id}</code>
+      <p>Total cotado {money(pickup.order.quoted_total_cents)}. O envio não separa as peças.</p>
+    </section>}
     {busy && <p role="status">Carregando vitrine…</p>}
     {!busy && !error && !items.length && <p>Nenhuma peça publicada.</p>}
     {error && <p role="alert">{error}</p>}

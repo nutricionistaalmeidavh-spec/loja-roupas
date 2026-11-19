@@ -49,6 +49,7 @@ paths:
                         day: { type: string, format: date }
                         sale_count: { type: integer }
                         gross_cents: { type: string, pattern: '^[0-9]+$' }
+                        refunded_cents: { type: string, pattern: '^[0-9]+$' }
   /v1/management/suppliers:
     get:
       summary: Listar fornecedores cadastrados na loja
@@ -122,6 +123,7 @@ paths:
                 type: object
                 properties:
                   next: { type: [string, 'null'], format: uuid }
+                  pickup_enabled: { type: boolean }
                   items:
                     type: array
                     items:
@@ -193,8 +195,115 @@ paths:
                   id: { type: string, format: uuid }
                   released: { const: true }
         '404': { description: Reserva ativa indisponível nesta loja }
+  /v1/management/storefront/pickup:
+    put:
+      summary: Ativar ou pausar a entrada de pedidos para retirada
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { description: Preferência atualizada }
+  /v1/storefront/{id}/pickup-orders:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      security: []
+      summary: Receber um pedido para retirada pago posteriormente na loja
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request_id, lines]
+              properties:
+                request_id: { type: string, format: uuid }
+                lines:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items: { $ref: '#/components/schemas/PickupLine' }
+      responses:
+        '201':
+          description: Pedido recebido com código de retirada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  quoted_total_cents: { type: string }
+        '404': { description: Recebimento de pedidos desativado }
+        '409': { description: Estoque indisponível ou chave reutilizada em outro pedido }
+        '429': { description: Limite temporário de submissões atingido }
+  /v1/pickup-orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      summary: Consultar as linhas de um pedido pendente no PDV
+      responses:
+        '200':
+          description: Pedido recuperado para cotação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  quoted_total_cents: { type: string }
+                  lines:
+                    type: array
+                    items: { $ref: '#/components/schemas/PickupLine' }
+        '404': { description: Pedido não encontrado na loja }
+        '409': { description: Pedido já vendido ou expirado }
+  /v1/management/sales/by-number/{number}:
+    parameters:
+      - $ref: '#/components/parameters/SaleNumber'
+    get:
+      summary: Consultar uma venda pelo número para atendimento de devolução
+      responses:
+        '200': { description: Venda encontrada com total e indicador de pagamento exclusivo em dinheiro }
+        '404': { description: Venda não encontrada na loja }
+  /v1/management/sales/by-number/{number}/cash-return:
+    parameters:
+      - $ref: '#/components/parameters/SaleNumber'
+    post:
+      summary: Registrar integralmente a devolução de uma venda paga em dinheiro
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [cash_session_id, reason]
+              properties:
+                cash_session_id: { type: string, format: uuid }
+                reason: { type: string, minLength: 8, maxLength: 250 }
+      responses:
+        '201': { description: Devolução registrada com saldo esperado de caixa }
+        '409': { description: Venda indisponível, caixa fechado ou saldo insuficiente }
+        '422': { description: Forma de pagamento inelegível ou justificativa inválida }
+
 components:
   parameters:
+    SaleNumber:
+      name: number
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[1-9][0-9]{0,15}$' }
     Id:
       name: id
       in: path
@@ -206,6 +315,13 @@ components:
       required: true
       schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
   schemas:
+    PickupLine:
+      type: object
+      required: [variant_id, quantity]
+      additionalProperties: false
+      properties:
+        variant_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 10 }
     IdResult:
       type: object
       properties:

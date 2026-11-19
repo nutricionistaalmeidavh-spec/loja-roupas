@@ -33,13 +33,20 @@ export function registerStoreOperations(app: FastifyInstance, db: Pool) {
 
   app.get('/v1/management/sales-summary', async (request, reply) => {
     if (requirePermission(request, reply, 'finance.read')) return reply;
-    const result = await db.query(`SELECT (s.created_at AT TIME ZONE st.timezone)::date::text AS day,
-      count(*)::integer AS sale_count, sum(s.total_cents)::text AS gross_cents
-      FROM sales s JOIN stores st ON st.id=s.store_id
-      WHERE s.store_id=$1 AND s.status='confirmed'
-        AND s.created_at >= (date_trunc('day', now() AT TIME ZONE st.timezone) - interval '29 days')
-          AT TIME ZONE st.timezone
-      GROUP BY 1 ORDER BY 1 DESC`, [request.authContext!.storeId]);
+    const result = await db.query(`WITH store AS (
+        SELECT id,timezone,(date_trunc('day',now() AT TIME ZONE timezone)-interval '29 days') AT TIME ZONE timezone AS since
+        FROM stores WHERE id=$1
+      ), movements AS (
+        SELECT (s.created_at AT TIME ZONE st.timezone)::date AS day,
+          1 AS sale_count,s.total_cents AS gross_cents,0::bigint AS refunded_cents
+        FROM sales s JOIN store st ON st.id=s.store_id WHERE s.created_at>=st.since AND s.status<>'cancelled'
+        UNION ALL
+        SELECT (r.created_at AT TIME ZONE st.timezone)::date,0,0,r.amount_cents
+        FROM cash_sale_returns r JOIN store st ON st.id=r.store_id WHERE r.created_at>=st.since
+      )
+      SELECT day::text,sum(sale_count)::integer AS sale_count,sum(gross_cents)::text AS gross_cents,
+        sum(refunded_cents)::text AS refunded_cents
+      FROM movements GROUP BY day ORDER BY day DESC`,[request.authContext!.storeId]);
     return {days:result.rows};
   });
 
@@ -97,8 +104,10 @@ export function registerStoreOperations(app: FastifyInstance, db: Pool) {
       LEFT JOIN stock_balances b ON b.store_id=v.store_id AND b.variant_id=v.id
       WHERE v.store_id=$1 AND v.storefront_published AND ($2::uuid IS NULL OR v.id>$2)
       ORDER BY v.id LIMIT 51`, [request.params.id, request.query.after ?? null]);
+    const store = await db.query<{pickup_enabled:boolean}>('SELECT pickup_enabled FROM stores WHERE id=$1', [request.params.id]);
     return reply.header('Cache-Control','no-store').send({
       items:result.rows.slice(0,50), next:result.rows.length > 50 ? result.rows[49].id : null,
+      pickup_enabled:store.rows[0]?.pickup_enabled ?? false,
     });
   });
 }
