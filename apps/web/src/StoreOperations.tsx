@@ -69,13 +69,14 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
   }
 
   return <div className="operation-panel">
-    <section>
+    <nav className="management-jump" aria-label="Atalhos da gestão"><a href="#gestao-vendas">Vendas</a><a href="#gestao-fornecedores">Fornecedores</a><a href="#gestao-posvenda">Pós-venda</a><a href="#gestao-operacoes">Operações</a><a href="#gestao-inteligencia">Inteligência</a><a href="#gestao-vitrine">Vitrine</a></nav>
+    <section id="gestao-vendas" className="management-section">
       <h2>Vendas e devoluções nos últimos 30 dias</h2>
-      {ready && (days.length ? <table><thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th><th>Devoluções</th></tr></thead>
+      {ready && (days.length ? <div className="management-table-scroll" role="region" aria-label="Histórico de vendas" tabIndex={0}><table><thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th><th>Devoluções</th></tr></thead>
         <tbody>{days.map(day => <tr key={day.day}><td>{day.day.split('-').reverse().join('/')}</td>
-          <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td><td>{money(day.refunded_cents)}</td></tr>)}</tbody></table> : <p>Sem vendas no período.</p>)}
+          <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td><td>{money(day.refunded_cents)}</td></tr>)}</tbody></table></div> : <p>Sem vendas no período.</p>)}
     </section>
-    <section>
+    <section id="gestao-fornecedores" className="management-section">
       <h2>Fornecedores</h2>
       <form onSubmit={event => void submit(event)}>
         <label>Nome <input required maxLength={120} value={name} disabled={busy}
@@ -84,15 +85,15 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
       </form>
       <ul>{suppliers.map(supplier => <li key={supplier.id}>{supplier.name}</li>)}</ul>
     </section>
-    <CashReturnForm session={session} cashId={cashId} onReturned={()=>{
+    <div id="gestao-posvenda" className="management-section"><CashReturnForm session={session} cashId={cashId} onReturned={()=>{
       setRefresh(value=>value+1);
       onReturned();
-    }}/>
+    }}/></div>
     <StockHolds session={session}/>
     <PickupSettings session={session}/>
-    <OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/>
-    <CommercialIntelligence session={session}/>
-    <p><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
+    <div id="gestao-operacoes" className="management-section"><OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/></div>
+    <div id="gestao-inteligencia" className="management-section"><CommercialIntelligence session={session}/></div>
+    <p id="gestao-vitrine" className="management-section"><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
     {status && <p role="status">{status}</p>}
     {error && <p role="alert" className="error">{error}</p>}
   </div>;
