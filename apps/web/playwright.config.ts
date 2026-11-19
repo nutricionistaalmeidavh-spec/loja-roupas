@@ -20,7 +20,7 @@ export default defineConfig({
       timeout: 75_000,
     },
     {
-      command: 'pnpm --filter @loja/web dev',
+      command: process.env.LOJA_E2E_BUILT === '1' ? 'pnpm --filter @loja/web preview' : 'pnpm --filter @loja/web dev',
       url: 'http://127.0.0.1:5173',
       reuseExistingServer: !process.env.CI,
       timeout: 75_000,

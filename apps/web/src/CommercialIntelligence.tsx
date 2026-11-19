@@ -11,7 +11,7 @@ type Widget=keyof typeof widgets;
 type Preferences={target_cents:number;low_stock_limit:number;widgets:Widget[]};
 type Period={period:string;gross_cents:string;refunded_cents:string};
 type Dashboard={
-  preferences:Preferences;months:Period[];
+  preferences:Preferences;months:Period[];historical_months:Period[];
   forecast:{active_days:number;estimate_cents:string|null;low_cents:string|null;high_cents:string|null};
   collections:Array<{name:string;units:string;revenue_cents:string}>;
   suppliers:Array<{id:string;name:string;orders:number;received:number;average_days:string|null}>;
@@ -114,9 +114,10 @@ export function CommercialIntelligence({session}:{session:Session}) {
         </form>
       </details>
       {prefs.widgets.includes('seasonality')&&<details>
-        <summary>Sazonalidade mensal</summary>
+        <summary>Sazonalidade mensal · 36 meses</summary>
+        <p>Totais por mês no fuso da loja. O mês atual ainda está em andamento.</p>
         <table><thead><tr><th scope="col">Mês</th><th scope="col">Vendas</th><th scope="col">Devoluções</th><th scope="col">Líquido</th></tr></thead>
-          <tbody>{data.months.map(period=><tr key={period.period}><td>{period.period.slice(0,7).split('-').reverse().join('/')}</td>
+          <tbody>{data.historical_months.map(period=><tr key={period.period}><td>{period.period.slice(0,7).split('-').reverse().join('/')}</td>
             <td>{money(period.gross_cents)}</td><td>{money(period.refunded_cents)}</td><td>{money(getNet(period))}</td></tr>)}</tbody>
         </table>
       </details>}

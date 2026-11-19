@@ -21,6 +21,7 @@ paths:
                   preferences: { $ref: '#/components/schemas/Preferences' }
                   daily: { type: array, items: { $ref: '#/components/schemas/Period' } }
                   months: { type: array, items: { $ref: '#/components/schemas/Period' } }
+                  historical_months: { type: array, items: { $ref: '#/components/schemas/Period' } }
                   forecast: { type: object }
                   collections: { type: array, items: { type: object } }
                   suppliers: { type: array, items: { type: object } }

@@ -7,7 +7,7 @@ export function BarcodeLabel({sku}:{sku:string}) {
   useEffect(() => {
     if (!svg.current) return;
     try {
-      JsBarcode(svg.current, sku, {format:'CODE128',height:42,margin:8,fontSize:12});
+      JsBarcode(svg.current, sku, {format:'CODE128',height:42,margin:22,fontSize:12});
       setValid(true);
     } catch {
       setValid(false);

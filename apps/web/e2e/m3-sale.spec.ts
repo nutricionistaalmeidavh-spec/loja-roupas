@@ -1,7 +1,14 @@
 import { test,expect } from '@playwright/test';
 
-test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → fechamento',async({page})=>{
+test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → fechamento',async({page},testInfo)=>{
  const sku='POS-QA-'+Math.random().toString(36).slice(2,10).toUpperCase();
+ const productName='Jaqueta PDV QA '+sku;
+ await page.addInitScript(()=>{
+   window.print=()=>{
+     document.documentElement.dataset.qaPrint = document.documentElement.dataset.receiptPaper ??
+       (document.documentElement.dataset.printLabel ? 'label' : 'unknown');
+   };
+ });
  await page.goto('/');
  await page.getByLabel('Usuário').fill('qa-admin');
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
@@ -17,13 +24,26 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  }
 
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
- await page.getByLabel('Nome da peça').fill('Jaqueta PDV QA');
+ await page.getByLabel('Nome da peça').fill(productName);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Preto');
  await page.getByLabel('Tamanho').fill('M');
  await page.getByLabel('Preço (R$)').fill('149,90');
+ const barcode='7'+String(Math.floor(Math.random()*10**11)).padStart(11,'0');
+ await page.getByLabel('Código de barras (opcional)').fill(barcode);
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
+ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:productName});
+ const variantOption=page.getByRole('combobox',{name:'Variante para preço',exact:true}).locator('option',{hasText:sku});
+ await expect(variantOption).toBeAttached();
+ await page.getByRole('combobox',{name:'Variante para preço',exact:true}).selectOption((await variantOption.getAttribute('value'))!);
+ await expect(page.getByRole('img',{name:'Code 128 para '+sku})).toBeVisible();
+ await page.getByRole('button',{name:'Imprimir etiqueta'}).click();
+ await expect(page.locator('html')).toHaveAttribute('data-qa-print','label');
+ await page.locator('.barcode-label svg').screenshot({path:testInfo.outputPath('code128.png')});
+ await page.evaluate(()=>document.documentElement.dataset.printLabel='true');
+ await page.pdf({path:testInfo.outputPath('etiqueta.pdf'),width:'105mm',height:'45mm',printBackground:true});
+ await page.evaluate(()=>delete document.documentElement.dataset.printLabel);
 
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
@@ -35,10 +55,11 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await expect(page.getByText(/Novo saldo em mãos: 5/)).toBeVisible();
 
  await page.getByRole('button',{name:'PDV'}).click();
- await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
- const card=page.locator('.product-card').filter({hasText:'Jaqueta PDV QA'});
- await expect(card).toBeVisible();
- await card.getByRole('button',{name:'Adicionar Jaqueta PDV QA'}).click();
+ const scannerInput=page.getByLabel('Buscar nome, SKU ou código');
+ await scannerInput.focus();
+ await scannerInput.pressSequentially(barcode);
+ await scannerInput.press('Enter');
+ await expect(page.getByText('1 peça adicionada')).toBeVisible();
  await page.getByRole('button',{name:'Revisar e pagar'}).click();
  const dialog=page.getByRole('dialog',{name:'Revisar e finalizar venda'});
  await expect(dialog.getByText('R$ 149,90').first()).toBeVisible();
@@ -56,6 +77,14 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await expect(confirmation).toBeVisible();
  await expect(confirmation.locator('pre.receipt-print')).toContainText('COMPROVANTE NÃO FISCAL');
  await expect(confirmation.getByText(/Troco: R\$\s?10,00/)).toBeVisible();
+ for(const paper of [58,80]){
+   await confirmation.getByRole('combobox').selectOption(String(paper));
+   await confirmation.getByRole('button',{name:'Imprimir comprovante não fiscal'}).click();
+   await expect(page.locator('html')).toHaveAttribute('data-qa-print',String(paper));
+   await page.evaluate(value=>document.documentElement.dataset.receiptPaper=String(value),paper);
+   await page.pdf({path:testInfo.outputPath('comprovante-'+paper+'.pdf'),width:paper+'mm',height:'180mm'});
+   await page.evaluate(()=>delete document.documentElement.dataset.receiptPaper);
+ }
  await confirmation.getByRole('button',{name:'Nova venda'}).click();
 
  await page.getByRole('button',{name:'Caixa',exact:true}).click();

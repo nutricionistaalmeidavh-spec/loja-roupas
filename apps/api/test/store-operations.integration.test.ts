@@ -188,6 +188,7 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const analytics=dashboard.json();
     assert.deepEqual(analytics.preferences,prefs);
     assert.equal(analytics.months.length,12);
+    assert.equal(analytics.historical_months.length,36);
     assert.equal(analytics.daily.length,29);
     assert.equal(analytics.months.at(-1).gross_cents,'1234');
     assert.equal(analytics.months.at(-1).refunded_cents,'1234');
