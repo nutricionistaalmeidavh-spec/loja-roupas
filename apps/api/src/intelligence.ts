@@ -29,15 +29,15 @@ const seriesSql=`WITH config AS (
   SELECT id,timezone,(now() AT TIME ZONE timezone)::date AS today FROM stores WHERE id=$1
 ), calendar AS (
   SELECT day::date FROM config,generate_series(
-    date_trunc('month', today)-interval '11 months',today::timestamp,interval '1 day') AS day
+    date_trunc('month', today::timestamp)-interval '11 months',today::timestamp,interval '1 day') AS day
 ), movements AS (
   SELECT (s.created_at AT TIME ZONE c.timezone)::date AS day,s.total_cents AS gross,0::bigint AS refunded
   FROM sales s JOIN config c ON c.id=s.store_id
-  WHERE s.status<>'cancelled' AND s.created_at >= (date_trunc('month', c.today)-interval '11 months') AT TIME ZONE c.timezone
+  WHERE s.status<>'cancelled' AND s.created_at >= (date_trunc('month', c.today::timestamp)-interval '11 months') AT TIME ZONE c.timezone
   UNION ALL
   SELECT (r.created_at AT TIME ZONE c.timezone)::date,0,r.amount_cents
   FROM cash_sale_returns r JOIN config c ON c.id=r.store_id
-  WHERE r.created_at >= (date_trunc('month', c.today)-interval '11 months') AT TIME ZONE c.timezone
+  WHERE r.created_at >= (date_trunc('month', c.today::timestamp)-interval '11 months') AT TIME ZONE c.timezone
 )
 SELECT d.day::text AS period,coalesce(sum(m.gross),0)::text AS gross_cents,coalesce(sum(m.refunded),0)::text AS refunded_cents
 FROM calendar d LEFT JOIN movements m ON m.day=d.day GROUP BY d.day ORDER BY d.day`;

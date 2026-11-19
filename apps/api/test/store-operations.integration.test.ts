@@ -196,6 +196,14 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.equal(analytics.suppliers[0].received,1);
     assert.equal(analytics.suppliers[0].average_days,null);
     assert.equal((await app.inject({url:intelligence,headers:{...headers,'x-store-id':otherStore.id}})).statusCode,401);
+    await db.query("UPDATE stores SET timezone='Asia/Tokyo' WHERE id=$1",[store.id]);
+    await db.query(`INSERT INTO sales(store_id,sale_number,cash_session_id,cashier_id,total_cents,tendered_cents,change_cents,created_at)
+      SELECT $1,999999,$2,$3,500,500,0,
+        (date_trunc('month',now() AT TIME ZONE 'Asia/Tokyo')-interval '11 months'+interval '1 minute') AT TIME ZONE 'Asia/Tokyo'`,
+      [store.id,opened.json().id,user.id]);
+    const firstLocalMonth=await app.inject({url:intelligence,headers});
+    assert.equal(firstLocalMonth.statusCode,200,firstLocalMonth.body);
+    assert.equal(firstLocalMonth.json().months[0].gross_cents,'500');
     const isolated = await app.inject({url:'/v1/management/suppliers',headers:{...headers,'x-store-id':otherStore.id}});
     assert.equal(isolated.statusCode,401,isolated.body);
   } finally {
