@@ -27,7 +27,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
   await page.getByLabel('Nome',{exact:true}).fill(supplier);
   await page.getByRole('button',{name:'Cadastrar',exact:true}).click();
-  await expect(page.getByText(supplier,{exact:true})).toBeVisible();
+  await expect(page.getByRole('listitem').filter({hasText:supplier})).toBeVisible();
 
   await page.getByRole('button',{name:'Cadastrar produtos'}).click();
   await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:name});
