@@ -54,6 +54,7 @@ export function App() {
   const [category,setCategory] = useState('Todos');
   const [selected,setSelected] = useState<Record<string,{color:string;size:string}>>({});
   const [draft,setDraft] = useState<DraftLine[]>([]);
+  const [recoverable,setRecoverable] = useState<Array<{id:string;quantity:number}>>([]);
   const [message,setMessage] = useState('');
   const [catalogError,setCatalogError] = useState('');
   const [loading,setLoading] = useState(false);
@@ -69,6 +70,35 @@ export function App() {
   const filtered = useMemo(()=>products.filter(p=>category==='Todos'||p.category===category),[products,category]);
   const total = draftTotalCents(draft);
   const quantity = draft.reduce((sum,line)=>sum+line.quantity,0);
+  const draftKey = session&&cashId ? 'loja:rascunho:'+session.storeId+':'+cashId : null;
+  useEffect(()=>{
+    if(!draftKey){setRecoverable([]);return;}
+    try{
+      const stored=JSON.parse(sessionStorage.getItem(draftKey)||'[]') as Array<{id:string;quantity:number}>;
+      setRecoverable(Array.isArray(stored)?stored.filter(x=>typeof x.id==='string'&&Number.isSafeInteger(x.quantity)&&x.quantity>0):[]);
+    }catch{setRecoverable([]);}
+  },[draftKey]);
+  useEffect(()=>{
+    if(!draftKey)return;
+    if(draft.length){sessionStorage.setItem(draftKey,JSON.stringify(draft.map(x=>({id:x.variant.id,quantity:x.quantity}))));}
+    else if(!recoverable.length){sessionStorage.removeItem(draftKey);}
+  },[draft,draftKey,recoverable.length]);
+  useEffect(()=>{
+    if(!draft.length)return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);
+    return ()=>window.removeEventListener('beforeunload',warn);
+  },[draft.length]);
+  function recoverDraft(){
+    if(!draftKey||draft.length)return;
+    const variants=products.flatMap(p=>p.variants);
+    const recovered=recoverable.flatMap(line=>{
+      const variant=variants.find(v=>v.id===line.id);
+      return variant?[{variant,quantity:line.quantity}]:[];
+    });
+    if(recovered.length!==recoverable.length){setMessage('Algumas peças não estão no catálogo carregado. Pesquise-as antes de recuperar.');return;}
+    setDraft(recovered);setRecoverable([]);setMessage('Carrinho recuperado. Preço e estoque serão conferidos no checkout.');
+  }
 
   useEffect(()=>{
     const timer=setTimeout(()=>setDebouncedSearch(search),250);
@@ -254,6 +284,7 @@ export function App() {
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
+        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" onClick={recoverDraft}>Recuperar carrinho</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
           <strong>Vendas suspensas ({savedDrafts.length})</strong>
           {savedDrafts.map(item=><button key={item.id} className="light-button"
