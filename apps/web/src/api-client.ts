@@ -55,6 +55,10 @@ export function listCatalog(session: Session, query = '', fetchImpl: typeof fetc
     (category ? '&category=' + encodeURIComponent(category) : '');
   return jsonRequest<CatalogPage>(path, {method:'GET',headers:headers(session),signal}, fetchImpl);
 }
+export function scanCatalog(session:Session,code:string,fetchImpl:typeof fetch=fetch): Promise<CatalogPage> {
+  const path='/v1/catalog/products?exact=true&limit=2&query='+encodeURIComponent(code.trim());
+  return jsonRequest<CatalogPage>(path,{method:'GET',headers:headers(session)},fetchImpl);
+}
 export function createProduct(session: Session, payload: ProductPayload, key: string, fetchImpl: typeof fetch = fetch) {
   return jsonRequest<{id:string;name:string;category:string}>('/v1/catalog/products',{
     method:'POST',headers:{...headers(session,key),'content-type':'application/json'},

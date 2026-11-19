@@ -174,6 +174,12 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.equal((await receive(randomUUID())).statusCode,409);
     const updated=await db.query('SELECT on_hand FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[store.id,variantId]);
     assert.equal(updated.rows[0].on_hand,'5');
+    const byCode=await app.inject({url:'/v1/catalog/products?exact=true&query=qa-01',headers});
+    assert.equal(byCode.statusCode,200,byCode.body);
+    assert.equal(byCode.json().items[0].id,productId);
+    const prefixOnly=await app.inject({url:'/v1/catalog/products?exact=true&query=qa-',headers});
+    assert.equal(prefixOnly.statusCode,200,prefixOnly.body);
+    assert.deepEqual(prefixOnly.json().items,[]);
     const intelligence='/v1/management/intelligence';
     const prefs={target_cents:20000,low_stock_limit:5,widgets:['seasonality','collections','suppliers','stock']};
     const prefsKey=randomUUID();

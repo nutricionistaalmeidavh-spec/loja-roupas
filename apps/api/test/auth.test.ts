@@ -28,6 +28,7 @@ test('login não armazena token em texto e requer loja autorizada', async()=>{
   const app=buildApp(db as unknown as Pool);
   const login=await app.inject({method:'POST',url:'/v1/auth/sessions',payload:{login:'admin',password}});
   assert.equal(login.statusCode,200);
+  assert.equal(login.headers['cache-control'],'no-store');
   const token=login.json().token;
   assert.equal(db.state.sessionHash,hashSessionToken(token));
   const noAuth=await app.inject({url:'/v1/auth/me',headers:{'x-store-id':storeId}});
@@ -46,4 +47,16 @@ test('login inválido não emite token de sessão',async()=>{
   assert.equal(r.statusCode,401);
   assert.equal(db.state.sessionHash,undefined);
   await app.close();
+});
+
+test('limite de autenticação também contabiliza solicitações simultâneas',async()=>{
+  const db=fakeDatabase(await hashPassword('Senha longa e local 456!'));
+  const app=buildApp(db as unknown as Pool);
+  try{
+    const attempts=Array.from({length:7},()=>app.inject({method:'POST',url:'/v1/auth/sessions',
+      payload:{login:'admin',password:'invalida'}}));
+    const responses=await Promise.all(attempts);
+    assert.deepEqual(responses.map(response=>response.statusCode).sort(),[401,401,401,401,401,429,429]);
+    assert.equal(db.calls.filter(call=>call.sql.includes('password_hash FROM users')).length,5);
+  }finally{await app.close();}
 });

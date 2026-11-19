@@ -11,6 +11,10 @@
 
 [**CI final de M3: PASS, 5/5 E2E**](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/actions/runs/44326485213) com PostgreSQL e Playwright. Isso **não** é homologação para produção.
 
+## Operação e homologação em revisão
+
+A primeira entrega M4–M6 está na `main` via PR #13. Compras, acompanhamento da retirada e fila de impressão estão no PR #14. Inteligência e esteira de QA estão no PR #15. O PR #16 acrescenta o histórico de 36 meses, score auditável, campos de produto, instaladores e testes de periféricos. O [guia de homologação](docs/07-implementacao/m7-m8-inteligencia-homologacao.md) documenta os cenários automatizados e as verificações que exigem equipamentos da loja.
+
 ## Testar o desenvolvimento local
 
 Pré-requisitos: Node >=22.12, pnpm 10, Docker Compose e OpenSSL. Na pasta do repositório:

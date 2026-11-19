@@ -21,14 +21,14 @@ function decodeCursor(raw:string|undefined):Cursor|null {
 }
 function encodeCursor(name:string,id:string){return Buffer.from(JSON.stringify({name,id})).toString('base64url');}
 export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
- app.get<{Querystring:{query?:string;limit?:number;cursor?:string;category?:string}}>('/v1/catalog/products',{
-  schema:{querystring:{type:'object',additionalProperties:false,properties:{
+ app.get<{Querystring:{query?:string;limit?:number;cursor?:string;category?:string;exact?:boolean}}>('/v1/catalog/products',{
+  schema:{querystring:{type:'object',additionalProperties:false,properties:{exact:{type:'boolean'},
    query:{type:'string',maxLength:100},limit:{type:'integer',minimum:1,maximum:50,default:30},
    cursor:{type:'string',maxLength:512},category:{type:'string',maxLength:100}
   }}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.read'))return reply;
-  const {query='',limit=30,cursor,category=''}=request.query;
+  const {query='',limit=30,cursor,category='',exact=false}=request.query;
   const after=decodeCursor(cursor);
   const rows=await db.query<Row>(`SELECT p.id::text AS product_id,p.name,p.category,p.revision::text AS product_revision,
     (img.product_id IS NOT NULL) AS has_photo,
@@ -39,8 +39,10 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
       SELECT DISTINCT p0.id,p0.name,p0.category,p0.revision
       FROM products p0
       JOIN product_variants v0 ON v0.product_id=p0.id AND v0.store_id=p0.store_id
-      WHERE p0.store_id=$1 AND ($2='' OR p0.name ILIKE '%'||$2||'%'
-        OR v0.sku ILIKE '%'||$2||'%' OR v0.barcode=$2)
+      WHERE p0.store_id=$1 AND (
+        ($7 AND (upper(v0.sku)=upper($2) OR upper(v0.barcode)=upper($2))) OR
+        (NOT $7 AND ($2='' OR p0.name ILIKE '%'||$2||'%' OR v0.sku ILIKE '%'||$2||'%' OR v0.barcode=$2))
+      )
       AND ($4::text IS NULL OR (p0.name,p0.id) > ($4::text,$5::uuid))
       AND ($6='' OR p0.category=$6)
       ORDER BY p0.name,p0.id LIMIT $3
@@ -49,7 +51,7 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
     LEFT JOIN stock_balances s ON s.variant_id=v.id AND s.store_id=v.store_id
     LEFT JOIN product_photos img ON img.product_id=p.id AND img.store_id=$1
     ORDER BY p.name,p.id,v.sku`,[
-      request.authContext!.storeId,query.trim(),limit+1,after?.name??null,after?.id??null,category.trim()
+      request.authContext!.storeId,query.trim(),limit+1,after?.name??null,after?.id??null,category.trim(),exact
     ]);
   type Variant={id:string;product_id:string;sku:string;barcode:string|null;color:string;size:string;price_cents:number;available:number;revision:number;variant_revision:number};
   const byId=new Map<string,{id:string;name:string;category:string;revision:number;has_photo:boolean;variants:Variant[]}>();

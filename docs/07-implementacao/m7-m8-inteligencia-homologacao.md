@@ -37,6 +37,15 @@ A homologação geral inclui operação física sem WAN, impressoras e scanners 
 | Comprovantes térmicos | O navegador exercita a solicitação auditada, gera PDFs com largura de 58 e 80 mm e verifica largura e texto com Poppler. | Driver, margem, corte e impressão efetiva nos dois formatos. |
 | PWA sem rede | Chromium testa o bundle de produção, controlador do service worker, erro offline e recuperação. | Instalação e retomada em aparelhos Android e iOS. |
 | Operação sem WAN | A stack é iniciada a partir de imagens locais em rede Docker interna. Autenticação e leitura do catálogo passam pelo proxy usando a base existente. | Repetir com servidor e terminal em equipamentos separados na LAN da loja, com o enlace da internet desligado. |
-| Distribuição nativa | O CI compila e exercita instalação e desinstalação do pacote Debian amd64 e do setup Windows x64. Checksum acompanha os artefatos. | Validação em máquinas-alvo com os drivers e políticas locais. O cliente continua usando o servidor LAN. |
+| Distribuição nativa | O CI compila e exercita instalação e desinstalação do pacote Debian amd64 e do setup Windows x64. O executável é iniciado no runner e abre um servidor local de teste com sandbox ativa. Checksum acompanha os artefatos. | Validação em máquinas-alvo com os drivers e políticas locais. O cliente continua usando o servidor LAN. |
 
 A tabela de sazonalidade agora contém 36 meses civis. O contrato mantém a janela original de 12 meses em `months` e fornece o histórico estendido em `historical_months`.
+
+
+## Verificação em loja
+
+Use uma base de teste e uma estação secundária da LAN. Confirme que o servidor e o terminal continuam comunicando pela rede local após desligar a WAN. Faça login, leia uma etiqueta real e finalize uma venda com recibo não fiscal. Consulte a baixa no PostgreSQL após reconexão.
+
+Em cada impressora, registre modelo, conexão, driver e papel. Imprima os comprovantes de 58 e 80 mm com escala de 100%, verifique margem e corte e escaneie a etiqueta Code 128 impressa. Registre foto ou vídeo da saída, resultado da leitura e ambiente. Em Android e iOS, instale a PWA em origem segura, feche e reabra o aplicativo. Teste perda e retorno da LAN e confirme que o sistema exige conexão para gravar. O ensaio pode usar os PDFs e capturas do CI como referência.
+
+A revisão defensiva desta etapa cobre limites concorrentes de autenticação, expiração de contadores, ausência de cache para sessão e respostas privadas, isolamento entre lojas e preferências da janela Electron. Revisão independente, provisionamento de dispositivos e verificação de drivers seguem fora desse ensaio automatizado.

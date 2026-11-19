@@ -1,6 +1,6 @@
 # Acompanhamento de execução — Loja de Roupas
 
-**Atualizado em:** 2026-11-18 · **Fonte de verdade:** `main` + [roadmap final](roadmap-final.md) + [backlog EP-01..EP-30](backlog.md) + [decisões D01–D65](../00-visao-geral/decisoes-001-065.md).
+**Atualizado em:** 2026-11-19 · **Fonte de verdade:** `main` + [roadmap final](roadmap-final.md) + [backlog EP-01..EP-30](backlog.md) + [decisões D01–D65](../00-visao-geral/decisoes-001-065.md).
 
 ## Estado por marco
 
@@ -13,8 +13,8 @@
 | M4 — P0 operacional | Parcial na `main` via PR #13 · instalação LAN, cliente portátil, impressão e backup | Homologação física, modos de rede, PWA em aparelhos, spool e hardening pendentes | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
 | M5 — Gestão P1 | Parcial na `main` via PR #13 · fornecedores, devolução integral em dinheiro e resumo por dia | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
 | M6 — Experiências P2 | Parcial na `main` via PR #13 · vitrine, reserva interna e retirada paga no caixa | Provador, pagamento online, entregas, kits/gift cards e serviços | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
-| M7 — Inteligência P2 | Painel, meta mensal, coleções, previsão e regras de exibição em PR | Score completo de fornecedores, sazonalidade plurianual e campos personalizados pendentes | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
-| M8 — QA e RC | Esteira de QA e candidatas Linux e Windows em PR | Homologação física, revisão geral de segurança, portas e distribuição nativa pendentes | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
+| M7 — Inteligência P2 | Painel, metas, coleções, previsão, regras, score de fornecedores, 36 meses e campos de produto em PR | Validação comercial com histórico da loja pendente | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
+| M8 — QA e RC | Esteira de QA, instaladores Debian e Windows e testes de periféricos em PR | Homologação física, compatibilidade de campo e revisão geral de segurança pendentes | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
 **Atenção:** "incorporado à main" significa código integrado e CI verde para os fluxos cobertos, **não** homologação comercial/operacional e **não** release. Nenhuma release foi publicada na incorporação de M0–M3.
 
@@ -60,7 +60,7 @@ A CI acima usa banco efêmero e navegador automatizado. **Não confirma** opera�
 - O comprovante de venda é **NÃO FISCAL**; não substitui NFC-e/NF-e ou obrigação fiscal aplicável. Fiscalização e parametrização exigem revisão profissional/local.
 - Scanner por teclado/SKU já tem fluxo Web, mas integração periférica e impressão física são gates M4.
 - Trocas, descontos com alçada complexa, parcelamento/crediário, CRM e financeiro avançado pertencem a M5/P1 ou módulos posteriores; não registrar como concluídos.
-- O desktop Electron tem empacotamento portátil e ainda precisa de instalador final. O backend precisa do PostgreSQL local/LAN. A aplicação não deve confirmar venda isolada offline.
+- O desktop Electron tem pacotes portáteis e instaladores Debian amd64 e Windows x64 em validação no PR #16. O backend precisa do PostgreSQL local/LAN. A aplicação não deve confirmar venda isolada offline.
 - A suíte de CI automatizada não equivale a homologação de uma instalação no cliente.
 
 ## Regras obrigatórias de governança

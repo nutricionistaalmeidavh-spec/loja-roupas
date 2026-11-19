@@ -16,6 +16,13 @@ test('M2: ampliar grade existente e atualizar SKU, cor e tamanho',async({page})=
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
  await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
+ const fieldName='Composição '+suffix;
+ await page.getByText('Campos personalizados',{exact:true}).click();
+ await page.getByLabel('Nome do campo',{exact:true}).fill(fieldName);
+ await page.getByRole('button',{name:'Adicionar campo'}).click();
+ await page.getByLabel(fieldName,{exact:true}).fill('Algodão');
+ await page.getByRole('button',{name:'Salvar '+fieldName}).click();
+ await expect(page.getByText('Valor do campo salvo.')).toBeVisible();
  await page.getByLabel('SKU novo').fill(second);
  await page.getByLabel('Cor nova').fill('Bege');
  await page.getByLabel('Tamanho novo').fill('G');
