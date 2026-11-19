@@ -205,6 +205,36 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const firstLocalMonth=await app.inject({url:intelligence,headers});
     assert.equal(firstLocalMonth.statusCode,200,firstLocalMonth.body);
     assert.equal(firstLocalMonth.json().months[0].gross_cents,'500');
+    const newField=await app.inject({method:'POST',url:'/v1/management/product-fields',headers:write(),payload:{label:'Composição'}});
+    assert.equal(newField.statusCode,201,newField.body);
+    const fieldPath='/v1/management/products/'+productId+'/fields';
+    const fieldId=newField.json().id;
+    const saveField=(id:string,value:string)=>app.inject({method:'PUT',url:fieldPath+'/'+id,
+      headers:write(),payload:{value}});
+    assert.equal((await saveField(randomUUID(),'Valor inválido')).statusCode,404);
+    assert.equal((await saveField(fieldId,'Algodão')).statusCode,200);
+    assert.equal((await app.inject({url:fieldPath,headers})).json().fields[0].value,'Algodão');
+    assert.equal((await app.inject({url:fieldPath,headers:{...headers,'x-store-id':otherStore.id}})).statusCode,401);
+    assert.equal((await saveField(fieldId,'')).statusCode,200);
+    assert.equal((await app.inject({url:fieldPath,headers})).json().fields[0].value,null);
+
+    const qualityUrl='/v1/management/purchases/'+purchase.json().id+'/quality';
+    assert.equal((await app.inject({method:'PUT',url:qualityUrl,headers:write(),payload:{accepted_quantity:5}})).statusCode,409);
+    assert.equal((await app.inject({method:'PUT',url:qualityUrl,headers:write(),payload:{accepted_quantity:3}})).statusCode,200);
+    const datedPurchase=await app.inject({method:'POST',url:'/v1/management/purchases',headers:write(),
+      payload:{supplier_id:supplier.json().id,variant_id:variantId,quantity:2,unit_cost_cents:500,promised_on:'2030-01-01'}});
+    assert.equal(datedPurchase.statusCode,201,datedPurchase.body);
+    const peer=await db.query("INSERT INTO suppliers(store_id,name) VALUES($1,'Outro fornecedor') RETURNING id",[store.id]);
+    await db.query(`INSERT INTO purchase_orders
+      (store_id,supplier_id,variant_id,quantity,unit_cost_cents,created_at,received_at,promised_on,accepted_quantity)
+      SELECT $1,e.supplier_id,$2,4,e.cost,now()-interval '2 days',now()-interval '1 day',current_date+1,3
+      FROM (VALUES($3::uuid,625),($4::uuid,500)) AS e(supplier_id,cost) CROSS JOIN generate_series(1,3)`,
+      [store.id,variantId,supplier.json().id,peer.rows[0].id]);
+    const scored=await app.inject({url:intelligence,headers});
+    assert.equal(scored.statusCode,200,scored.body);
+    const score=scored.json().suppliers.find((row:{id:string})=>row.id===supplier.json().id);
+    assert.equal(score.score,'85.0');
+    assert.equal(score.scored_orders,3);
     const isolated = await app.inject({url:'/v1/management/suppliers',headers:{...headers,'x-store-id':otherStore.id}});
     assert.equal(isolated.statusCode,401,isolated.body);
   } finally {

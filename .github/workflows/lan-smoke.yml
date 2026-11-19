@@ -49,6 +49,8 @@ jobs:
           )
           INSERT INTO product_photos(product_id,store_id,content_type,image_bytes,sha256)
           SELECT id,store_id,'image/png',decode(repeat('cafe',8),'hex'),repeat('a',64) FROM product;
+          INSERT INTO product_variants(store_id,product_id,sku,color,size,price_cents)
+          SELECT store_id,id,'SKU-QA-OFFLINE','Preto','M',1000 FROM products WHERE name='Produto QA';
           SQL
           scripts/backup-lan.sh "$RUNNER_TEMP/loja.gpg"
           scripts/restore-lan.sh "$RUNNER_TEMP/loja.gpg" loja_restore_smoke

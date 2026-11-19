@@ -1,3 +1,4 @@
+import { ProductFields } from './ProductFields.tsx';
 import { BarcodeLabel } from './BarcodeLabel.tsx';
 import { PublishVariant, StockHolds } from './StoreOperations.tsx';
 import { requestId } from './request-id.ts';
@@ -115,6 +116,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
     <option value="">Selecione</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
   </select></label>
   {current&&<>
+   <ProductFields key={current.id} session={session} productId={current.id}/>
    <form onSubmit={e=>void submit('product',e)} className="editor-block">
      <h3>Informações</h3>
      <div className="fields-two"><label>Nome do produto<input required maxLength={200} value={name} disabled={busy||Boolean(pending)}

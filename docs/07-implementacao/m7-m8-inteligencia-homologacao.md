@@ -13,7 +13,9 @@ A área Inteligência comercial usa as vendas, devoluções, variantes e compras
 | Fornecedores | Contagem de pedidos e recebimentos dos últimos 90 dias. O prazo médio é exibido a partir de três pedidos recebidos. |
 | Estoque baixo | Até 30 SKUs com disponibilidade igual ou inferior ao limite. As unidades reservadas são descontadas. |
 
-O painel agrega os lançamentos de devolução disponíveis no sistema. Hoje eles correspondem à devolução integral em dinheiro. A projeção e o alerta de estoque são informativos. O cadastro de compras ainda carece de evidências de prazo prometido e qualidade para um score completo. Campos personalizados continuam pendentes.
+O painel agrega os lançamentos de devolução disponíveis no sistema. Hoje eles correspondem à devolução integral em dinheiro. A projeção e o alerta de estoque são informativos. O score usa três critérios com pesos iguais. Entrega no prazo usa a data prometida e a data local de recebimento. Qualidade usa a proporção de unidades aprovadas na inspeção. Preço compara o custo unitário com a média de pelo menos três compras recebidas do mesmo SKU em outros fornecedores, limitando a pontuação a 100. A nota só aparece após três pedidos com os três critérios observados em 90 dias.
+
+No editor de produtos, o gerente pode criar até 12 campos de texto por loja e salvar ou limpar os valores por produto. Os campos são privados e as alterações são auditadas.
 
 ## M8 · Esteira e candidata
 

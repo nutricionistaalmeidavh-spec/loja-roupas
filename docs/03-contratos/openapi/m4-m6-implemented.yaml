@@ -347,6 +347,7 @@ paths:
                 supplier_id: { type: string, format: uuid }
                 variant_id: { type: string, format: uuid }
                 quantity: { type: integer, minimum: 1, maximum: 100000 }
+                promised_on: { type: string, format: date }
                 unit_cost_cents: { type: integer, minimum: 0, maximum: 100000000 }
       responses:
         '201': { description: Pedido de compra registrado }
