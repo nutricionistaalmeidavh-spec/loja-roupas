@@ -311,6 +311,93 @@ paths:
         '409': { description: Venda indisponível, caixa fechado ou saldo insuficiente }
         '422': { description: Forma de pagamento inelegível ou justificativa inválida }
 
+  /v1/management/print-queue:
+    get:
+      summary: Listar até 100 comprovantes pendentes da loja, do mais antigo ao mais novo
+      responses:
+        '200': { description: Lista de jobs pendentes com número da venda e largura do papel }
+  /v1/management/print-queue/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Registrar confirmação do operador após impressão
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      responses:
+        '200': { description: Confirmação registrada }
+        '409': { description: Comprovante concluído ou indisponível }
+  /v1/management/purchases:
+    get:
+      summary: Listar até 100 pedidos de compra da loja
+      responses:
+        '200': { description: Pedidos de compra com custos e status de recebimento }
+    post:
+      summary: Criar pedido de compra por SKU
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [supplier_id, variant_id, quantity, unit_cost_cents]
+              properties:
+                supplier_id: { type: string, format: uuid }
+                variant_id: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1, maximum: 100000 }
+                unit_cost_cents: { type: integer, minimum: 0, maximum: 100000000 }
+      responses:
+        '201': { description: Pedido de compra registrado }
+        '409': { description: Fornecedor ou variante indisponível para a loja ou conflito de chave }
+  /v1/management/purchases/{id}/receive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Receber o pedido integralmente e registrar entrada de estoque
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      responses:
+        '200': { description: Recebimento registrado }
+        '409': { description: Compra recebida ou indisponível }
+  /v1/management/pickup-orders:
+    get:
+      summary: Listar até 100 pedidos de retirada pendentes da loja
+      responses:
+        '200': { description: Pedidos pendentes dentro do prazo de retirada }
+  /v1/management/pickup-orders/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Cancelar pedido de retirada pendente
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      responses:
+        '200': { description: Cancelamento registrado }
+        '409': { description: Pedido indisponível para cancelamento }
+  /v1/storefront/{id}/pickup-orders/{orderId}/status:
+    get:
+      security: []
+      summary: Consultar somente a situação do pedido pelo código de retirada
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Situação atual
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { enum: [pending, complete, expired, cancelled] }
+        '404': { description: Código indisponível nesta vitrine }
+
 components:
   parameters:
     SaleNumber:
