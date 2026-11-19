@@ -1,3 +1,6 @@
+import { BarcodeLabel } from './BarcodeLabel.tsx';
+import { PublishVariant, StockHolds } from './StoreOperations.tsx';
+import { requestId } from './request-id.ts';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, adjustStock, listCatalog, listMovements, patchProduct, patchVariantPrice, uploadPhoto, addProductVariant, patchVariantAttributes } from './api-client.ts';
@@ -60,7 +63,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
   }catch(err){setError(message(err));return;}
   const signature=kind+':'+current.id+':'+JSON.stringify(payload);
   if(pending&&pending.payload!==signature){setError('Operação pendente; repita sem alterar os campos.');return;}
-  const key=pending?.key??crypto.randomUUID();setPending({key,payload:signature});setBusy(true);
+  const key=pending?.key??requestId();setPending({key,payload:signature});setBusy(true);
   try{
    if(kind==='add')await addProductVariant(session,current.id,payload as Parameters<typeof addProductVariant>[2],key);
    else await patchVariantAttributes(session,variant!.id,payload as Parameters<typeof patchVariantAttributes>[2],key);
@@ -88,7 +91,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
   if(pending&&pending.payload!==scope+':'+body){
    setError('Há uma resposta pendente. Repita o mesmo envio antes de mudar os campos.');return;
   }
-  const key=pending?.key??crypto.randomUUID();
+  const key=pending?.key??requestId();
   setPending({key,payload:scope+':'+body});setBusy(true);
   try {
    if(keyType==='product')await patchProduct(session,current.id,JSON.parse(body),key);
@@ -137,6 +140,9 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
       onChange={e=>setPrice(e.target.value)}/></label>
     <button type="submit" className="light-button" disabled={!variant||busy}>Salvar preço</button>
    </form>
+   {variant&&<BarcodeLabel key={variant.id} sku={variant.sku}/>}
+   {variant&&<PublishVariant key={variant.id} session={session} id={variant.id}/>}
+   {variant&&<StockHolds key={variant.id} session={session} variant={variant} onChanged={onSaved}/>}
    <form onSubmit={e=>void submitVariant('add',e)} className="editor-block">
      <h3>Adicionar variante à grade existente</h3>
      <div className="variant-fields">
@@ -176,7 +182,7 @@ export function M2StockAdjustment({session,onSaved,refreshKey}:{session:Session;
  const [movements,setMovements]=useState<StockMovement[]>([]);
  const [status,setStatus]=useState('');const [error,setError]=useState('');
  const [pending,setPending]=useState<Pending|null>(null);
- const [reference,setReference]=useState(()=>crypto.randomUUID());
+ const [reference,setReference]=useState(()=>requestId());
  const [busy,setBusy]=useState(false);const [refresh,setRefresh]=useState(0);
  const variants=products.flatMap(p=>p.variants.map(v=>({...v,name:p.name})));
  const selected=variants.find(v=>v.id===variantId);
@@ -199,11 +205,11 @@ export function M2StockAdjustment({session,onSaved,refreshKey}:{session:Session;
   const payload={variant_id:selected.id,reference_id:reference,counted_on_hand:qty,expected_revision:selected.stockRevision,reason:reason.trim()};
   const body=JSON.stringify(payload);
   if(pending&&pending.payload!==body){setError('Envio pendente: mantenha os dados para repetir');return;}
-  const key=pending?.key??crypto.randomUUID();setPending({key,payload:body});setBusy(true);
+  const key=pending?.key??requestId();setPending({key,payload:body});setBusy(true);
   try{
     const result=await adjustStock(session,payload,key);
     setStatus('Ajuste registrado. Saldo total em mãos: '+result.on_hand);
-    setPending(null);setReference(crypto.randomUUID());setCount('');setReason('');
+    setPending(null);setReference(requestId());setCount('');setReason('');
     setRefresh(x=>x+1);onSaved();
   }catch(err){setError(message(err));if(err instanceof ApiError&&err.status>=400&&err.status<500)setPending(null);}
   finally{setBusy(false);}

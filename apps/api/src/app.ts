@@ -8,6 +8,8 @@ import { registerCash } from './cash.ts';
 import { registerSales } from './sales.ts';
 import { registerSuspendedSales } from './suspended-sales.ts';
 import { DomainError } from './transactions.ts';
+import { registerStoreOperations } from './store-operations.ts';
+import { registerStockHolds } from './stock-holds.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -27,6 +29,8 @@ export function buildApp(db: Pool) {
   registerCash(app, db);
   registerSales(app, db);
   registerSuspendedSales(app, db);
+  registerStoreOperations(app, db);
+  registerStockHolds(app, db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

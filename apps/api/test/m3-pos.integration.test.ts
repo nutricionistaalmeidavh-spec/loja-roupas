@@ -86,6 +86,17 @@ test('M3: caixa, cotação, venda ACID, split, troco, recibo e fechamento idempo
   assert.equal(nonFiscal.statusCode,200,nonFiscal.body);
   assert.match(nonFiscal.body,/COMPROVANTE NÃO FISCAL/);
   assert.match(nonFiscal.body,/Camisa QA M3/);
+  const printKey=randomUUID();
+  const print=()=>app.inject({method:'POST',url:'/v1/sales/'+sold.json().id+'/print-requests',
+    headers:write(printKey),payload:{paper_mm:58}});
+  const printed=await print();
+  assert.equal(printed.statusCode,201,printed.body);
+  assert.equal((await print()).json().id,printed.json().id);
+  const audit=await db.query("SELECT count(*)::text AS count FROM audit_logs WHERE store_id=$1 AND action='receipt.print.request'",[storeId]);
+  assert.equal(audit.rows[0].count,'1');
+  const summary=await app.inject({url:'/v1/management/sales-summary',headers});
+  assert.equal(summary.statusCode,200,summary.body);
+  assert.equal(summary.json().days[0].gross_cents,'29980');
   const closing=await app.inject({method:'POST',url:'/v1/cash-sessions/'+cashId+'/close',headers:write(),
     payload:{counted_cash_cents:29990}});
   assert.equal(closing.statusCode,200,closing.body);

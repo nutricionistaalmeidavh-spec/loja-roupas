@@ -72,3 +72,22 @@
 .suspended-bar strong{font-size:13px}
 .suspended-bar .light-button{font-size:12px}
 .cart-footer>.light-button{display:block;width:100%;margin-bottom:9px;text-align:center}
+.operation-panel{padding:clamp(16px,4vw,40px);display:grid;gap:24px;align-content:start}
+.operation-panel section,.storefront li{padding:16px;background:#fff;border:1px solid #eaeaea;border-radius:12px}
+.operation-panel table{border-collapse:collapse;width:100%}
+.operation-panel th,.operation-panel td{text-align:left;padding:8px;border-bottom:1px solid #eaeaea}
+.operation-panel form,.publication-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.operation-panel input,.publication-actions select{padding:8px;border:1px solid #aaa;border-radius:7px}
+.storefront{max-width:1050px;margin:auto}
+.storefront ul{padding:0;list-style:none;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+@media print{
+ .receipt-print{box-sizing:border-box;padding:2mm;font-size:9pt;overflow-wrap:anywhere}
+ [data-receipt-paper="58"] .receipt-print{width:54mm}
+ [data-receipt-paper="80"] .receipt-print{width:76mm}
+}
+.barcode-label{overflow:auto}
+@media print{
+ [data-print-label] .barcode-label,[data-print-label] .barcode-label *{visibility:visible!important}
+ [data-print-label] .barcode-label{position:absolute;left:0;top:0;overflow:visible}
+ [data-print-label] .receipt-print{display:none}
+}

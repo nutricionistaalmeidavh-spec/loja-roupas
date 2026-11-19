@@ -1,3 +1,4 @@
+import { requestId } from './request-id.ts';
 import { useEffect,useMemo,useState } from 'react';
 import type { FormEvent } from 'react';
 import type { DraftLine } from '@loja/domain';
@@ -11,7 +12,7 @@ const brl=(cents:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',curren
 const editMoney=(cents:number)=>(cents/100).toFixed(2).replace('.',',');
 type Tender={key:string;method:'cash'|'pix_manual'|'card_external';amount:string;confirmed:boolean;reference:string};
 function newTender(method:Tender['method']='cash',amount=''):Tender {
- return {key:crypto.randomUUID(),method,amount,confirmed:false,reference:''};
+ return {key:requestId(),method,amount,confirmed:false,reference:''};
 }
 export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}:{
  session:Session;cashSessionId:string;draft:readonly DraftLine[];onClose:()=>void;onConfirmed:(sale:Sale)=>void
@@ -70,7 +71,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,onClose,onConfirmed}
   if(pending&&pending.body!==body){
    setError('Há uma venda com resultado pendente. Repita exatamente a mesma operação.');return;
   }
-  const key=pending?.key??crypto.randomUUID();
+  const key=pending?.key??requestId();
   setPending({key,body});
   setBusy(true);
   try{

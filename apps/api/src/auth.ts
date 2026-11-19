@@ -14,6 +14,7 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
   app.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const path = request.url.split('?')[0];
     if (publicPaths.has(path)) return;
+    if (request.method === 'GET' && request.routeOptions.url === '/v1/storefront/:id') return;
     const header = request.headers.authorization;
     const storeHeader = request.headers['x-store-id'];
     if (typeof header !== 'string' || !/^Bearer [A-Za-z0-9_-]{43}$/.test(header)) {

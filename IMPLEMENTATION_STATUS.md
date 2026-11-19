@@ -44,3 +44,7 @@ Abrir http://127.0.0.1:5173 no computador de desenvolvimento. O Vite proxy atend
 - Demais módulos M5–M8 continuam no escopo original e estão rastreados nas [issues #8–#11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues).
 
 **Core R$0 / AGPLv3 / open source / self-hosted.** Merge e publicação de release exigem comandos independentes.
+
+## M4–M6 em desenvolvimento
+
+[Instalação LAN, impressão, backup, gestão e vitrine](docs/07-implementacao/m4-m6-operacao-gestao-vitrine.md) descreve o escopo entregue e os gates pendentes de cada marco.

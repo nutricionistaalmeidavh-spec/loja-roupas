@@ -43,7 +43,7 @@ jobs:
           corepack enable
           corepack prepare pnpm@10.12.1 --activate
       - name: Instalar pacotes OSS
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Typecheck de domínio, API e Web
         run: |
           pnpm --filter @loja/domain typecheck

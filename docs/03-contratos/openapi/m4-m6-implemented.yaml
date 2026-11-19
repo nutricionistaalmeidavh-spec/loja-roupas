@@ -1,0 +1,226 @@
+openapi: 3.1.0
+info:
+  title: Loja de Roupas — operação, gestão e vitrine
+  version: 0.1.0
+security:
+  - bearer: []
+    store: []
+paths:
+  /v1/sales/{id}/print-requests:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Registrar a solicitação de impressão do comprovante não fiscal
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paper_mm]
+              additionalProperties: false
+              properties:
+                paper_mm: { type: integer, enum: [58, 80] }
+      responses:
+        '201':
+          description: Solicitação registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdResult' }
+        '404': { description: Venda indisponível para o operador }
+  /v1/management/sales-summary:
+    get:
+      summary: Consultar vendas confirmadas por dia no fuso da loja
+      responses:
+        '200':
+          description: Resumo dos últimos 30 dias
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  days:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: { type: string, format: date }
+                        sale_count: { type: integer }
+                        gross_cents: { type: string, pattern: '^[0-9]+$' }
+  /v1/management/suppliers:
+    get:
+      summary: Listar fornecedores cadastrados na loja
+      responses:
+        '200':
+          description: Fornecedores
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suppliers:
+                    type: array
+                    items: { $ref: '#/components/schemas/Supplier' }
+    post:
+      summary: Cadastrar fornecedor
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120, pattern: '\S' }
+      responses:
+        '201':
+          description: Fornecedor registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Supplier' }
+        '409': { description: Nome duplicado ou conflito de idempotência }
+  /v1/management/storefront/variants/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      summary: Alterar a publicação de uma variante
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Publication' }
+      responses:
+        '200':
+          description: Visibilidade registrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Publication' }
+        '404': { description: Variante indisponível nesta loja }
+  /v1/storefront/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      security: []
+      summary: Ler uma página pública de variantes publicadas pelo ID da loja
+      parameters:
+        - name: after
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Até 50 variantes e cursor para a próxima página
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  next: { type: [string, 'null'], format: uuid }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                        color: { type: string }
+                        size: { type: string }
+                        price_cents: { type: string, pattern: '^[0-9]+$' }
+                        available: { type: boolean }
+  /v1/stock/holds:
+    get:
+      summary: Ler até 100 reservas ativas da loja por ordem de criação
+      responses:
+        '200':
+          description: Reservas ativas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  holds:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        sku: { type: string }
+                        quantity: { type: integer }
+                        created_at: { type: string, format: date-time }
+    post:
+      summary: Reservar unidades disponíveis para atendimento interno
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [variant_id, quantity]
+              properties:
+                variant_id: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1, maximum: 999 }
+      responses:
+        '201':
+          description: Reserva criada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdResult' }
+        '409': { description: Saldo insuficiente ou conflito de idempotência }
+  /v1/stock/holds/{id}/release:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      summary: Liberar as unidades de uma reserva interna
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      responses:
+        '200':
+          description: Reserva liberada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  released: { const: true }
+        '404': { description: Reserva ativa indisponível nesta loja }
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WriteKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,128}$' }
+  schemas:
+    IdResult:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+    Supplier:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    Publication:
+      type: object
+      required: [published]
+      additionalProperties: false
+      properties:
+        published: { type: boolean }
+  securitySchemes:
+    bearer: { type: http, scheme: bearer }
+    store: { type: apiKey, in: header, name: X-Store-Id }

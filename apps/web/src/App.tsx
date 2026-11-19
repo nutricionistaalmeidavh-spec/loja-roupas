@@ -1,3 +1,4 @@
+import { requestId } from './request-id.ts';
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
@@ -10,6 +11,7 @@ import { LoginScreen } from './LoginScreen.tsx';
 import { CreateProductForm, ReceiveStockForm } from './Management.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
 import { M2CatalogEditor, M2StockAdjustment } from './M2Admin.tsx';
+import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
 import { CashPanel } from './CashPanel.tsx';
 import { CheckoutDrawer } from './PosCheckout.tsx';
 import { currentCash, receiptText, suspendSale, suspendedSales, resumeSale } from './pos-client.ts';
@@ -25,7 +27,7 @@ function Garment({kind}:{kind:Product['kind']}) {
     <path d="M37 13L10 37l14 24 13-10v57h46V51l13 10 14-24-27-24-12-4Q60 27 49 9z" fill="currentColor"/>}
   </svg>;
 }
-type Page = 'pdv'|'produtos'|'estoque'|'caixa';
+type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao';
 export function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [page,setPage] = useState<Page>('pdv');
@@ -130,7 +132,7 @@ export function App() {
     const lines=draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity}));
     const signature=JSON.stringify({cashId,lines});
     if(suspendPending&&suspendPending.body!==signature){setMessage('Suspensão pendente: repita com o carrinho anterior');return;}
-    const key=suspendPending?.key??crypto.randomUUID();
+    const key=suspendPending?.key??requestId();
     setSuspendPending({key,body:signature});setSuspendBusy(true);setMessage('');
     try{
       await suspendSale(session,cashId,lines,key);
@@ -145,7 +147,7 @@ export function App() {
     if(!session||!cashId||item.cash_session_id!==cashId)return;
     if(draft.length){setMessage('Limpe ou suspenda o carrinho atual antes de retomar outro.');return;}
     try{
-      const resumed=await resumeSale(session,item.id,crypto.randomUUID());
+      const resumed=await resumeSale(session,item.id,requestId());
       setDraft(resumed.lines.map(l=>({variant:l.variant,quantity:l.quantity})));
       setSavedDrafts(x=>x.filter(d=>d.id!==item.id));setMessage('Carrinho retomado. Preço e estoque serão revalidados antes de cobrar.');
     }catch(err){setMessage(err instanceof Error?err.message:'Não foi possível retomar');}
@@ -223,11 +225,12 @@ export function App() {
       {manager&&<button className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos">▤</button>}
       {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque">▧</button>}
       {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa">▣</button>}
+      {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão">≡</button>}
       <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}>⇥</button>
     </nav>
     <main className="workspace">
       <header className="topbar">
-        <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':'Estoque'}</h1>
+        <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':'Estoque'}</h1>
           <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
@@ -285,6 +288,7 @@ export function App() {
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
+      {page==='gestao'&&manager&&<StoreOperations session={session}/>}
       {page==='produtos'&&manager&&<><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></>}
       {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
       {page==='estoque'&&canReceive&&<>
@@ -310,7 +314,7 @@ export function App() {
         {receipt&&<pre className="receipt-print">{receipt}</pre>}
         {receiptError&&<p role="alert" className="error">{receiptError}</p>}
         <div className="checkout-buttons">
-          <button className="light-button" disabled={!receipt} onClick={()=>window.print()}>Imprimir comprovante não fiscal</button>
+          <PrintReceipt key={lastSale.id} id={lastSale.id} session={session} ready={Boolean(receipt)}/>
           <button className="primary-action" onClick={()=>{setLastSale(null);setReceipt('');}}>Nova venda</button>
         </div>
       </section>
