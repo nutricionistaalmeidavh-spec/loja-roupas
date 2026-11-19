@@ -27,13 +27,19 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
  const [pending,setPending]=useState<{key:string;body:string}|null>(null);
  const [uncertain,setUncertain]=useState(false);
  const modalRef=useRef<HTMLElement>(null);
+ const closeRef=useRef(onClose);
+ const busyRef=useRef(busy);
+ const uncertainRef=useRef(uncertain);
+ closeRef.current=onClose;
+ busyRef.current=busy;
+ uncertainRef.current=uncertain;
  useEffect(()=>{
   const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
   const modal=modalRef.current;
   modal?.focus();
   function keydown(event:globalThis.KeyboardEvent){
     if(event.key==='Escape'){
-      if(!busy&&!uncertain)onClose();
+      if(!busyRef.current&&!uncertainRef.current)closeRef.current();
       return;
     }
     if(event.key!=='Tab'||!modal)return;
@@ -45,7 +51,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   }
   document.addEventListener('keydown',keydown);
   return ()=>{document.removeEventListener('keydown',keydown);previous?.focus();};
- },[busy,uncertain,onClose]);
+ },[]);
 
  useEffect(()=>{
   let cancelled=false;
