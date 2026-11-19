@@ -119,6 +119,35 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const returnedSale = await app.inject({url:'/v1/sales/'+sold.json().id,headers});
     assert.equal(returnedSale.json().status,'returned');
 
+    const print = await app.inject({method:'POST',url:'/v1/sales/'+sold.json().id+'/print-requests',
+      headers:write(),payload:{paper_mm:80}});
+    assert.equal(print.statusCode,201,print.body);
+    const findPrint = () => app.inject({url:'/v1/management/print-queue',headers});
+    assert.equal((await findPrint()).json().jobs[0].id,print.json().id);
+    const completeKey = randomUUID();
+    const complete = () => app.inject({method:'POST',url:'/v1/management/print-queue/'+print.json().id+'/complete',
+      headers:write(completeKey)});
+    assert.equal((await complete()).statusCode,200);
+    assert.equal((await complete()).statusCode,200);
+    assert.deepEqual((await findPrint()).json().jobs,[]);
+
+    const pendingPickup = await app.inject({method:'POST',url:'/v1/storefront/'+store.id+'/pickup-orders',
+      payload:{...submission,request_id:randomUUID()}});
+    assert.equal(pendingPickup.statusCode,201,pendingPickup.body);
+    const cancelledId = pendingPickup.json().id;
+    const publicStatus = () => app.inject({url:'/v1/storefront/'+store.id+'/pickup-orders/'+cancelledId+'/status'});
+    assert.deepEqual((await publicStatus()).json(),{status:'pending'});
+    const listOrders = () => app.inject({url:'/v1/management/pickup-orders',headers});
+    assert.deepEqual((await listOrders()).json().orders.map((row:{id:string})=>row.id),[cancelledId]);
+    const cancelled = await app.inject({method:'POST',url:'/v1/management/pickup-orders/'+cancelledId+'/cancel',headers:write()});
+    assert.equal(cancelled.statusCode,200,cancelled.body);
+    assert.deepEqual((await publicStatus()).json(),{status:'cancelled'});
+    assert.deepEqual((await listOrders()).json().orders,[]);
+    const blockedSale = await app.inject({method:'POST',url:'/v1/sales',headers:write(),
+      payload:{...saleBody,pickup_order_id:cancelledId}});
+    assert.equal(blockedSale.statusCode,409);
+    assert.equal(blockedSale.json().code,'ORDER_CANCELLED');
+
     const unpublish = await app.inject({method:'PUT',url:publishUrl,headers:write(),payload:{published:false}});
     assert.equal(unpublish.statusCode,200,unpublish.body);
     assert.equal((await app.inject({url:publicPhoto})).statusCode,404);
@@ -133,6 +162,18 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.deepEqual(replay.json(),supplier.json());
     const suppliers = await app.inject({url:'/v1/management/suppliers',headers});
     assert.deepEqual(suppliers.json().suppliers,[supplier.json()]);
+    const purchase=await app.inject({method:'POST',url:'/v1/management/purchases',headers:write(),
+      payload:{supplier_id:supplier.json().id,variant_id:variantId,quantity:4,unit_cost_cents:500}});
+    assert.equal(purchase.statusCode,201,purchase.body);
+    const receive=(key:string)=>app.inject({method:'POST',url:'/v1/management/purchases/'+purchase.json().id+'/receive',
+      headers:write(key)});
+    const receiveKey=randomUUID();
+    const outcomes=await Promise.all([receive(receiveKey),receive(receiveKey)]);
+    assert.deepEqual(outcomes.map(result=>result.statusCode),[200,200]);
+    assert.deepEqual(outcomes[0].json(),outcomes[1].json());
+    assert.equal((await receive(randomUUID())).statusCode,409);
+    const updated=await db.query('SELECT on_hand FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[store.id,variantId]);
+    assert.equal(updated.rows[0].on_hand,'5');
     const isolated = await app.inject({url:'/v1/management/suppliers',headers:{...headers,'x-store-id':otherStore.id}});
     assert.equal(isolated.statusCode,401,isolated.body);
   } finally {

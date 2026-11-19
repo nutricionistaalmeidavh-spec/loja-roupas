@@ -18,6 +18,7 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
     if (request.method === 'GET' &&
         (route === '/v1/storefront/:id' || route === '/v1/storefront/:id/products/:productId/photo')) return;
     if (request.method === 'POST' && route === '/v1/storefront/:id/pickup-orders') return;
+    if (request.method === 'GET' && route === '/v1/storefront/:id/pickup-orders/:orderId/status') return;
     const header = request.headers.authorization;
     const storeHeader = request.headers['x-store-id'];
     if (typeof header !== 'string' || !/^Bearer [A-Za-z0-9_-]{43}$/.test(header)) {

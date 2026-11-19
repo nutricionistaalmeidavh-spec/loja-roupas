@@ -99,3 +99,42 @@ export function usePickupSubmission(storeId:string) {
 
   return {submitting,order,error,submit};
 }
+
+const pickupStatuses = {
+  pending:'Pedido recebido. Apresente o código no caixa dentro do prazo de retirada.',
+  cancelled:'Pedido cancelado pela loja.',
+  complete:'Pedido concluído no caixa.',
+  expired:'Prazo de retirada encerrado.',
+};
+
+export function PickupTracking({storeId,orderId}:{storeId:string;orderId?:string}) {
+  const [code,setCode]=useState(orderId??'');
+  const [feedback,setFeedback]=useState('');
+  const [busy,setBusy]=useState(false);
+
+  async function track(event:FormEvent) {
+    event.preventDefault();
+    const id=code.trim();
+    if(busy)return;
+    if(!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)){
+      setFeedback('Informe o código completo de retirada.');
+      return;
+    }
+    setBusy(true);setFeedback('');
+    try{
+      const result=await jsonRequest<{status:keyof typeof pickupStatuses}>(
+        '/v1/storefront/'+storeId+'/pickup-orders/'+id+'/status',{},fetch);
+      setFeedback(pickupStatuses[result.status]);
+    }catch(error){setFeedback(message(error));}
+    finally{setBusy(false);}
+  }
+
+  return <section>
+    <h2>Acompanhar retirada</h2>
+    <form onSubmit={event=>void track(event)}>
+      <label>Código do pedido <input required value={code} onChange={event=>setCode(event.target.value)} disabled={busy}/></label>
+      <button className="light-button" disabled={busy}>Consultar pedido</button>
+    </form>
+    {feedback&&<p role="status">{feedback}</p>}
+  </section>;
+}

@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 
-test('gestão, publicação e reserva chegam à vitrine', async ({page,request}) => {
+test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({page,request}) => {
   const login = {login:'qa-admin',password:'Senha-QA-Somente-CI-2026'};
   const response = await request.post('/v1/auth/sessions',{data:login});
   expect(response.ok()).toBeTruthy();
@@ -27,7 +27,7 @@ test('gestão, publicação e reserva chegam à vitrine', async ({page,request})
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
   await page.getByLabel('Nome',{exact:true}).fill(supplier);
   await page.getByRole('button',{name:'Cadastrar',exact:true}).click();
-  await expect(page.getByText(supplier,{exact:true})).toBeVisible();
+  await expect(page.getByRole('listitem').filter({hasText:supplier})).toBeVisible();
 
   await page.getByRole('button',{name:'Cadastrar produtos'}).click();
   await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:name});
@@ -90,6 +90,29 @@ test('gestão, publicação e reserva chegam à vitrine', async ({page,request})
   await expect(page.getByText(/Devolução registrada/)).toBeVisible();
   await storefront.reload();
   await expect(item.getByText('Disponível')).toBeVisible();
+
+  await page.getByRole('combobox',{name:'Fornecedor da compra',exact:true}).selectOption({label:supplier});
+  await page.getByLabel('Buscar SKU para compra').fill(sku);
+  await page.getByRole('combobox',{name:'Variante da compra',exact:true}).selectOption(variant);
+  await page.getByLabel('Quantidade da compra').fill('1');
+  await page.getByLabel('Custo unitário (R$)').fill('30,00');
+  await page.getByRole('button',{name:'Registrar pedido de compra'}).click();
+  const purchase=page.getByRole('listitem').filter({hasText:supplier}).filter({hasText:new RegExp(sku,'i')});
+  await purchase.getByRole('button',{name:'Receber compra'}).click();
+  await expect(purchase.getByText('Recebido',{exact:true})).toBeVisible();
+
+  await storefront.getByLabel('Quantidade de '+name+' Azul M').fill('1');
+  await storefront.getByRole('button',{name:'Enviar pedido para retirada'}).click();
+  await expect(code).toBeVisible();
+  const pendingCode=(await code.textContent())!;
+  await storefront.getByRole('button',{name:'Consultar pedido'}).click();
+  await expect(storefront.getByText(/Apresente o código no caixa/)).toBeVisible();
+  await page.getByRole('button',{name:'Atualizar filas'}).click();
+  await page.getByRole('listitem').filter({hasText:pendingCode})
+    .getByRole('button',{name:'Cancelar pedido'}).click();
+  await expect(page.getByText('Pedido de retirada cancelado.')).toBeVisible();
+  await storefront.getByRole('button',{name:'Consultar pedido'}).click();
+  await expect(storefront.getByText('Pedido cancelado pela loja.')).toBeVisible();
 
   await page.setViewportSize({width:390,height:844});
   await page.getByLabel('Página',{exact:true}).selectOption('pdv');

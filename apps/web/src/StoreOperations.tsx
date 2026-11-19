@@ -3,7 +3,8 @@ import type { FormEvent } from 'react';
 import { ApiError, headers, jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { CashReturnForm } from './CashReturnForm.tsx';
-import { PickupSettings, usePickupSubmission } from './PickupOrders.tsx';
+import { OperationalPanels } from './OperationalPanels.tsx';
+import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
@@ -88,6 +89,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     }}/>
     <StockHolds session={session}/>
     <PickupSettings session={session}/>
+    <OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/>
     <p><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
     {status && <p role="status">{status}</p>}
     {error && <p role="alert" className="error">{error}</p>}
@@ -184,6 +186,7 @@ export function Storefront({storeId}:{storeId:string}) {
       <code className="pickup-code">{pickup.order.id}</code>
       <p>Total cotado {money(pickup.order.quoted_total_cents)}. O envio não separa as peças.</p>
     </section>}
+    <PickupTracking key={pickup.order?.id ?? storeId} storeId={storeId} orderId={pickup.order?.id}/>
     {busy && <p role="status">Carregando vitrine…</p>}
     {!busy && !error && !items.length && <p>Nenhuma peça publicada.</p>}
     {error && <p role="alert">{error}</p>}
