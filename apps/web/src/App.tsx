@@ -255,12 +255,12 @@ export function App() {
   return <div className="shell">
     <nav className="icon-rail" aria-label="Navegação principal">
       <div className="logo">L</div>
-      <button className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')} aria-label="PDV" title="PDV">▦</button>
-      {manager&&<button className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos">▤</button>}
-      {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque">▧</button>}
-      {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa">▣</button>}
-      {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão">≡</button>}
-      <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}>⇥</button>
+      <button className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')} aria-label="PDV" title="PDV"><span aria-hidden="true">PDV</span></button>
+      {manager&&<button className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos"><span aria-hidden="true">PRD</span></button>}
+      {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque"><span aria-hidden="true">EST</span></button>}
+      {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa"><span aria-hidden="true">CX</span></button>}
+      {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão"><span aria-hidden="true">GES</span></button>}
+      <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><span aria-hidden="true">Sair</span></button>
     </nav>
     <main className="workspace">
       <header className="topbar">
