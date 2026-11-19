@@ -1,0 +1,61 @@
+name: Instalação LAN e restauração
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'packages/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - 'pnpm-*.yaml'
+      - '.github/workflows/lan-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar e abrir Web e API na mesma origem
+        run: |
+          printf '\n\nLoja de teste\nqa-admin\nSenha-LAN-Somente-CI\n' | bash scripts/install-lan.sh
+          curl --fail --silent http://127.0.0.1:8080/ | grep -F '<div id="root">'
+          curl --fail --silent http://127.0.0.1:8080/manifest.webmanifest | jq -e '.start_url == "/" and (.icons|length == 2)'
+          curl --fail --silent http://127.0.0.1:8080/service-worker.js | grep -F "event.request.mode !== 'navigate'"
+          curl --fail --silent http://127.0.0.1:8080/v1/auth/sessions \
+            -H 'Content-Type: application/json' \
+            -d '{"login":"qa-admin","password":"Senha-LAN-Somente-CI"}' | jq -e '.stores[0].store_id'
+      - name: Cifrar, restaurar e comparar dados de teste
+        run: |
+          export LOJA_BACKUP_PASSPHRASE_FILE="$RUNNER_TEMP/loja-backup-passphrase"
+          (umask 077 && openssl rand -hex 32 > "$LOJA_BACKUP_PASSPHRASE_FILE")
+          source scripts/lan-common.sh
+          lan exec -T postgres psql -X -v ON_ERROR_STOP=1 -U loja -d loja <<'SQL'
+          WITH product AS (
+            INSERT INTO products(store_id,name,category)
+            SELECT id,'Produto QA','QA' FROM stores RETURNING id,store_id
+          )
+          INSERT INTO product_photos(product_id,store_id,content_type,image_bytes,sha256)
+          SELECT id,store_id,'image/png',decode(repeat('cafe',8),'hex'),repeat('a',64) FROM product;
+          SQL
+          scripts/backup-lan.sh "$RUNNER_TEMP/loja.gpg"
+          scripts/restore-lan.sh "$RUNNER_TEMP/loja.gpg" loja_restore_smoke
+          for database in loja loja_restore_smoke; do
+            lan exec -T postgres psql -XAt -U loja -d "$database" \
+              -c "SELECT u.login, encode(p.image_bytes,'hex') FROM users u CROSS JOIN product_photos p" > "$RUNNER_TEMP/$database.txt"
+          done
+          cmp "$RUNNER_TEMP/loja.txt" "$RUNNER_TEMP/loja_restore_smoke.txt"
+          grep -Fx 'qa-admin|cafecafecafecafecafecafecafecafe' "$RUNNER_TEMP/loja_restore_smoke.txt"
+      - name: Verificar perda e recuperação do banco
+        run: |
+          source scripts/lan-common.sh
+          lan stop postgres
+          code=$(curl --silent --max-time 10 -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/v1/ready)
+          test "$code" = 503
+          lan up -d --wait postgres
+          curl --fail --silent --retry 10 --retry-all-errors --retry-delay 1 http://127.0.0.1:8080/v1/ready
+      - name: Diagnóstico
+        if: failure()
+        run: |
+          source scripts/lan-common.sh
+          if [ -f .env.lan ]; then lan logs --tail 80; fi

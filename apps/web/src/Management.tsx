@@ -1,3 +1,4 @@
+import { requestId } from './request-id.ts';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, createProduct, receiveStock } from './api-client.ts';
@@ -50,7 +51,7 @@ export function CreateProductForm({ session, onSaved }: { session: Session; onSa
       setError('Há uma resposta pendente. Repita a operação sem alterar os campos.');
       return;
     }
-    const key = pending?.body === body ? pending.key : crypto.randomUUID();
+    const key = pending?.body === body ? pending.key : requestId();
     setPending({key,body});
     setBusy(true);
     try {
@@ -101,7 +102,7 @@ export function ReceiveStockForm({ session, products, onSaved }: { session: Sess
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
-  const [referenceId,setReferenceId] = useState(()=>crypto.randomUUID());
+  const [referenceId,setReferenceId] = useState(()=>requestId());
   const [notice,setNotice] = useState('');
   const [error,setError] = useState('');
   const variants = products.flatMap(p=>p.variants.map(v=>({label:`${p.name} · ${v.color} · ${v.size} · ${v.sku} (saldo ${v.available})`,id:v.id})));
@@ -121,13 +122,13 @@ export function ReceiveStockForm({ session, products, onSaved }: { session: Sess
       setError('Há uma entrada pendente. Repita sem alterar os dados.');
       return;
     }
-    const key=pending?.body===body?pending.key:crypto.randomUUID();
+    const key=pending?.body===body?pending.key:requestId();
     setPending({key,body});
     setBusy(true);
     try {
       const result=await receiveStock(session,payload,key);
       setNotice(`Entrada registrada. Novo saldo em mãos: ${result.on_hand} unidades.`);
-      setPending(null);setUncertain(false);setReferenceId(crypto.randomUUID());
+      setPending(null);setUncertain(false);setReferenceId(requestId());
       setNote('');setQuantity('1');onSaved();
     } catch(err) {
       setError(mutationError(err));

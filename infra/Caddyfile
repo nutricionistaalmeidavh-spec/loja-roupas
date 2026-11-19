@@ -1,0 +1,11 @@
+:8080 {
+	handle /v1/* {
+		reverse_proxy api:3000
+	}
+	header /service-worker.js Cache-Control "no-cache"
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

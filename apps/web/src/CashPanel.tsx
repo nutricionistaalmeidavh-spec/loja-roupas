@@ -1,3 +1,4 @@
+import { requestId } from './request-id.ts';
 import { useEffect,useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError } from './api-client.ts';
@@ -35,7 +36,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
    if(action!=='open'&&!active)throw new Error('Caixa ainda não foi aberto');
   }catch(err){setError(String(err));return;}
   if(key&&pendingSignature!==signature){setError('Existe uma operação pendente. Repita sem alterar os campos.');return;}
-  const nextKey=key??crypto.randomUUID();setKey(nextKey);setPendingSignature(signature);setBusy(true);
+  const nextKey=key??requestId();setKey(nextKey);setPendingSignature(signature);setBusy(true);
   try{
    if(action==='open')await openCash(session,reaisToCents(opening),'CAIXA-01',nextKey);
    if(action==='close')await closeCash(session,active!.id,reaisToCents(counted),reason,nextKey);

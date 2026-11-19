@@ -36,9 +36,9 @@ export function quoteSale(session:Session,lines:Array<{variant_id:string;quantit
   headers:{...headers(session),'content-type':'application/json'},body:JSON.stringify({lines})},fetchImpl);
 }
 export function commitSale(session:Session,cash_session_id:string,lines:SaleLineInput[],
- payments:PaymentInput[],key:string,fetchImpl:typeof fetch=fetch){
+ payments:PaymentInput[],key:string,fetchImpl:typeof fetch=fetch,pickupOrderId?:string){
  return jsonRequest<Sale>('/v1/sales',{method:'POST',headers:write(session,key),
-  body:JSON.stringify({cash_session_id,lines,payments})},fetchImpl);
+  body:JSON.stringify({cash_session_id,lines,payments,...(pickupOrderId ? {pickup_order_id:pickupOrderId} : {})})},fetchImpl);
 }
 export function saleDetail(session:Session,id:string,fetchImpl:typeof fetch=fetch){
  return jsonRequest<SaleDetail>('/v1/sales/'+encodeURIComponent(id),{

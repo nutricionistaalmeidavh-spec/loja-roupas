@@ -13,3 +13,5 @@ runtime/
 # Evidências Playwright geradas localmente
 apps/web/test-results/
 apps/web/playwright-report/
+
+*.tsbuildinfo

@@ -14,6 +14,10 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
   app.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const path = request.url.split('?')[0];
     if (publicPaths.has(path)) return;
+    const route = request.routeOptions.url;
+    if (request.method === 'GET' &&
+        (route === '/v1/storefront/:id' || route === '/v1/storefront/:id/products/:productId/photo')) return;
+    if (request.method === 'POST' && route === '/v1/storefront/:id/pickup-orders') return;
     const header = request.headers.authorization;
     const storeHeader = request.headers['x-store-id'];
     if (typeof header !== 'string' || !/^Bearer [A-Za-z0-9_-]{43}$/.test(header)) {

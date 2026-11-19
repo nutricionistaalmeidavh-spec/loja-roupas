@@ -4,10 +4,14 @@ import { registerAuth } from './auth.ts';
 import { registerCatalog } from './catalog.ts';
 import { registerMutations } from './mutations.ts';
 import { registerCatalogAdmin } from './catalog-admin.ts';
+import { registerCashReturns } from './cash-returns.ts';
 import { registerCash } from './cash.ts';
 import { registerSales } from './sales.ts';
 import { registerSuspendedSales } from './suspended-sales.ts';
 import { DomainError } from './transactions.ts';
+import { registerStoreOperations } from './store-operations.ts';
+import { registerPickupOrders } from './pickup-orders.ts';
+import { registerStockHolds } from './stock-holds.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -25,8 +29,12 @@ export function buildApp(db: Pool) {
   registerMutations(app, db);
   registerCatalogAdmin(app, db);
   registerCash(app, db);
+  registerCashReturns(app, db);
   registerSales(app, db);
   registerSuspendedSales(app, db);
+  registerStoreOperations(app, db);
+  registerStockHolds(app, db);
+  registerPickupOrders(app, db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

@@ -3,8 +3,9 @@ import { buildApp } from './app.ts';
 import { readConfig } from './config.ts';
 
 const config = readConfig();
-const pool = new Pool({ connectionString: config.databaseUrl, max: 10 });
+const pool = new Pool({ connectionString: config.databaseUrl, max: 10, connectionTimeoutMillis: 3500 });
 const app = buildApp(pool);
+pool.on('error', (error) => app.log.warn({err:error}, 'Conexão ociosa com PostgreSQL foi encerrada'));
 const shutdown = async () => { await app.close(); await pool.end(); };
 process.once('SIGINT', () => { void shutdown(); });
 process.once('SIGTERM', () => { void shutdown(); });

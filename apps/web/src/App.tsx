@@ -1,3 +1,4 @@
+import { requestId } from './request-id.ts';
 import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
@@ -10,6 +11,9 @@ import { LoginScreen } from './LoginScreen.tsx';
 import { CreateProductForm, ReceiveStockForm } from './Management.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
 import { M2CatalogEditor, M2StockAdjustment } from './M2Admin.tsx';
+import { PickupLookup } from './PickupOrders.tsx';
+import type { PickupOrder } from './PickupOrders.tsx';
+import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
 import { CashPanel } from './CashPanel.tsx';
 import { CheckoutDrawer } from './PosCheckout.tsx';
 import { currentCash, receiptText, suspendSale, suspendedSales, resumeSale } from './pos-client.ts';
@@ -25,7 +29,7 @@ function Garment({kind}:{kind:Product['kind']}) {
     <path d="M37 13L10 37l14 24 13-10v57h46V51l13 10 14-24-27-24-12-4Q60 27 49 9z" fill="currentColor"/>}
   </svg>;
 }
-type Page = 'pdv'|'produtos'|'estoque'|'caixa';
+type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao';
 export function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [page,setPage] = useState<Page>('pdv');
@@ -36,6 +40,7 @@ export function App() {
   const [stockSearch,setStockSearch] = useState('');
   const [cashState,setCashState] = useState<CashState|null>(null);
   const [cashRefresh,setCashRefresh] = useState(0);
+  const [pickup,setPickup] = useState<PickupOrder>();
   const [checkoutOpen,setCheckoutOpen] = useState(false);
   const [lastSale,setLastSale] = useState<Sale|null>(null);
   const [receipt,setReceipt] = useState('');
@@ -130,7 +135,7 @@ export function App() {
     const lines=draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity}));
     const signature=JSON.stringify({cashId,lines});
     if(suspendPending&&suspendPending.body!==signature){setMessage('Suspensão pendente: repita com o carrinho anterior');return;}
-    const key=suspendPending?.key??crypto.randomUUID();
+    const key=suspendPending?.key??requestId();
     setSuspendPending({key,body:signature});setSuspendBusy(true);setMessage('');
     try{
       await suspendSale(session,cashId,lines,key);
@@ -145,14 +150,15 @@ export function App() {
     if(!session||!cashId||item.cash_session_id!==cashId)return;
     if(draft.length){setMessage('Limpe ou suspenda o carrinho atual antes de retomar outro.');return;}
     try{
-      const resumed=await resumeSale(session,item.id,crypto.randomUUID());
+      const resumed=await resumeSale(session,item.id,requestId());
       setDraft(resumed.lines.map(l=>({variant:l.variant,quantity:l.quantity})));
       setSavedDrafts(x=>x.filter(d=>d.id!==item.id));setMessage('Carrinho retomado. Preço e estoque serão revalidados antes de cobrar.');
     }catch(err){setMessage(err instanceof Error?err.message:'Não foi possível retomar');}
   }
   function cashUpdated(){setCashRefresh(n=>n+1);setDraftRefresh(n=>n+1);}
   function saleConfirmed(sale:Sale){
-    setDraft([]);setSelected({});setCheckoutOpen(false);setCartOpen(false);
+    if(!pickup){setDraft([]);setSelected({});}
+    setPickup(undefined);setCheckoutOpen(false);setCartOpen(false);
     setLastSale(sale);setReceipt('');setReceiptError('');setRefetch(n=>n+1);
     if(session)void receiptText(session,sale.id).then(setReceipt).catch(error=>{
       setReceiptError(error instanceof Error?error.message:'Não foi possível obter o comprovante');
@@ -163,7 +169,7 @@ export function App() {
   }
   function logout(){
     const active=session;
-    setSession(null);setDraft([]);setSelected({});setProducts([]);setAllProducts([]);setSearch('');setPage('pdv');setCashState(null);setLastSale(null);setReceipt('');setSavedDrafts([]);setSuspendPending(null);
+    setPickup(undefined);setCheckoutOpen(false);setSession(null);setDraft([]);setSelected({});setProducts([]);setAllProducts([]);setSearch('');setPage('pdv');setCashState(null);setLastSale(null);setReceipt('');setSavedDrafts([]);setSuspendPending(null);
     if(active)void revokeSession(active).catch(()=>{/* logout local é imediato; sessão remota expira conforme servidor */});
   }
   function selectVariant(product:Product,color:string,size:string){
@@ -223,11 +229,12 @@ export function App() {
       {manager&&<button className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos">▤</button>}
       {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque">▧</button>}
       {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa">▣</button>}
+      {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão">≡</button>}
       <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}>⇥</button>
     </nav>
     <main className="workspace">
       <header className="topbar">
-        <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':'Estoque'}</h1>
+        <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':'Estoque'}</h1>
           <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
@@ -235,6 +242,16 @@ export function App() {
           <button className="mobile-logout" onClick={logout}>Sair</button>
         </div>
       </header>
+      <nav className="mobile-navigation" aria-label="Navegação da loja">
+        <label htmlFor="mobile-page">Página</label>
+        <select id="mobile-page" value={page} onChange={event=>setCurrentPage(event.target.value as Page)}>
+          <option value="pdv">PDV</option>
+          {manager&&<option value="produtos">Produtos</option>}
+          {canReceive&&<option value="estoque">Estoque</option>}
+          {canCash&&<option value="caixa">Caixa</option>}
+          {manager&&<option value="gestao">Gestão</option>}
+        </select>
+      </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
@@ -242,6 +259,7 @@ export function App() {
           {savedDrafts.map(item=><button key={item.id} className="light-button"
             onClick={()=>void resumeCurrent(item)}>Retomar venda · {item.lines.length} itens</button>)}
         </section>}
+        {cashId&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
         <div className="search-row"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
           <input id="search" value={search} autoComplete="off" onChange={e=>setSearch(e.target.value)} onKeyDown={keySearch} placeholder="Pesquisar produto, SKU ou código…"/>
           <button type="button" className="scan-button" disabled={scanBusy||!search.trim()} onClick={()=>void scan()}>{scanBusy?'Consultando…':'Confirmar código'}</button>
@@ -285,6 +303,7 @@ export function App() {
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
+      {page==='gestao'&&manager&&<StoreOperations session={session} cashId={cashId} onReturned={refreshed}/>}
       {page==='produtos'&&manager&&<><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></>}
       {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
       {page==='estoque'&&canReceive&&<>
@@ -301,7 +320,7 @@ export function App() {
     </main>
     {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
-      draft={draft} onClose={()=>setCheckoutOpen(false)} onConfirmed={saleConfirmed}/>}
+      draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
     {lastSale&&<div className="checkout-overlay" role="presentation">
       <section className="checkout-modal" role="dialog" aria-modal="true" aria-label="Venda confirmada">
         <h2>Venda #{lastSale.sale_number} confirmada</h2>
@@ -310,7 +329,7 @@ export function App() {
         {receipt&&<pre className="receipt-print">{receipt}</pre>}
         {receiptError&&<p role="alert" className="error">{receiptError}</p>}
         <div className="checkout-buttons">
-          <button className="light-button" disabled={!receipt} onClick={()=>window.print()}>Imprimir comprovante não fiscal</button>
+          <PrintReceipt key={lastSale.id} id={lastSale.id} session={session} ready={Boolean(receipt)}/>
           <button className="primary-action" onClick={()=>{setLastSale(null);setReceipt('');}}>Nova venda</button>
         </div>
       </section>

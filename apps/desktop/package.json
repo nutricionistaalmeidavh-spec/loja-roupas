@@ -6,7 +6,7 @@
   "main": "src/main.cjs",
   "scripts": {
     "dev": "electron .",
-    "build": "echo 'Empacotamento nao autorizado nesta etapa'"
+    "build": "cd ../.. && node scripts/package-desktop.mjs"
   },
   "devDependencies": {
     "electron": "^37.0.0"

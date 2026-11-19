@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: loja
+      POSTGRES_DB: loja
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Execute scripts/install-lan.sh}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "loja", "-d", "loja"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://loja:${POSTGRES_PASSWORD}@postgres:5432/loja
+      HOST: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: web
+    restart: unless-stopped
+    ports:
+      - "${LAN_BIND:-127.0.0.1}:${LAN_PORT:-8080}:8080"
+    depends_on:
+      - api
+volumes:
+  postgres:

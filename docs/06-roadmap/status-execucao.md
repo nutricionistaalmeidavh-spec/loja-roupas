@@ -10,13 +10,15 @@
 | M1 — Fundação | Incorporada à `main`; monorepo, PostgreSQL, migrações, autenticação inicial e RBAC | PIN, dispositivos, hardening e empacotamento pendentes | [PR #2](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/2) |
 | M2 — Catálogo/estoque | Incorporada à `main`; grades/SKUs, preços, fotos + thumbnails, estoque, edição, auditoria, paginação | Operação em hardware, cenários de carga e inventário colaborativo pendentes | [PRs #3–#5](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/5) |
 | M3 — PDV/caixa | Incorporada à `main`; cotação, venda transacional, carrinho suspenso, caixa e recebimentos manuais mistos | Impressão periférica e autorização de descontos avançados pendentes | [PR #6](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/6) |
-| M4 — P0 operacional | **Não implementado** | Instalador, impressão, backup/restore, LAN/WAN-off e QA real bloqueiam P0 | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
-| M5 — Gestão P1 | **Planejado** | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
-| M6 — Experiências P2 | **Planejado** | Provador, reserva, online, entregas, kits/gift cards e serviços | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
+| M4 — P0 operacional | **Parcial em PR** · instalação LAN, cliente portátil, impressão e backup | Homologação física, modos de rede, PWA em aparelhos, spool e hardening pendentes | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
+| M5 — Gestão P1 | **Parcial em PR** · fornecedores, devolução integral em dinheiro e resumo por dia | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
+| M6 — Experiências P2 | **Parcial em PR** · vitrine, reserva interna e retirada paga no caixa | Provador, pagamento online, entregas, kits/gift cards e serviços | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
 | M7 — Inteligência P2 | **Planejado** | Metas, análises, coleções, previsões e regras | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
 | M8 — QA e RC | **Planejado** | E2E global, segurança, hardware, recuperação e release candidate não publicada | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
 **Atenção:** "incorporado à main" significa código integrado e CI verde para os fluxos cobertos, **não** homologação comercial/operacional e **não** release. Nenhuma release foi publicada na incorporação de M0–M3.
+
+[Detalhes da entrega parcial, instalação e pendências](../07-implementacao/m4-m6-operacao-gestao-vitrine.md).
 
 ## Evidências de integração
 
@@ -58,7 +60,7 @@ A CI acima usa banco efêmero e navegador automatizado. **Não confirma** opera�
 - O comprovante de venda é **NÃO FISCAL**; não substitui NFC-e/NF-e ou obrigação fiscal aplicável. Fiscalização e parametrização exigem revisão profissional/local.
 - Scanner por teclado/SKU já tem fluxo Web, mas integração periférica e impressão física são gates M4.
 - Trocas, descontos com alçada complexa, parcelamento/crediário, CRM e financeiro avançado pertencem a M5/P1 ou módulos posteriores; não registrar como concluídos.
-- O desktop Electron atualmente serve como casca de desenvolvimento e **não possui instalador final**. O backend precisa do PostgreSQL local/LAN. A aplicação não deve confirmar venda isolada offline.
+- O desktop Electron tem empacotamento portátil e ainda precisa de instalador final. O backend precisa do PostgreSQL local/LAN. A aplicação não deve confirmar venda isolada offline.
 - A suíte de CI automatizada não equivale a homologação de uma instalação no cliente.
 
 ## Regras obrigatórias de governança
