@@ -9,6 +9,7 @@ trap 'rm -rf -- "$stage"' EXIT
 mkdir -p "$stage/DEBIAN" "$stage/opt/loja-roupas" "$stage/usr/bin" "$stage/usr/share/applications"
 chmod 755 "$stage"
 cp -a "$source_dir/." "$stage/opt/loja-roupas"
+chmod 4755 "$stage/opt/loja-roupas/chrome-sandbox"
 cat > "$stage/DEBIAN/control" <<CONTROL
 Package: loja-roupas
 Version: $version

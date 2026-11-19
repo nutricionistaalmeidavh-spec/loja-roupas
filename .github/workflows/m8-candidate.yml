@@ -33,9 +33,10 @@ jobs:
       - name: Instalar e remover a candidata Debian
         run: |
           bash scripts/package-debian.sh
-          sudo apt-get install --yes ./dist/loja-roupas_*_amd64.deb
+          sudo apt-get install --yes xvfb ./dist/loja-roupas_*_amd64.deb
           test -x /usr/bin/loja-roupas
           test -s /opt/loja-roupas/resources/app/main.cjs
+          xvfb-run -a node scripts/smoke-installed-desktop.mjs /opt/loja-roupas/electron
           sudo dpkg --remove loja-roupas
           test ! -e /usr/bin/loja-roupas
       - name: Gerar pacote e verificar checksum
@@ -92,6 +93,8 @@ jobs:
           $install = Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas'
           $process = Start-Process $setup -ArgumentList '/S' -Wait -PassThru
           if ($process.ExitCode -ne 0 -or !(Test-Path "$install/app/electron.exe")) { throw 'Instalação falhou' }
+          node scripts/smoke-installed-desktop.mjs "$install/app/electron.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Cliente instalado falhou no smoke test' }
           $process = Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Remoção falhou' }
           $deadline = (Get-Date).AddSeconds(30)
