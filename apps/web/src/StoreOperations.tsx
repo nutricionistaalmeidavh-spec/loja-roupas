@@ -186,7 +186,7 @@ export function Storefront({storeId}:{storeId:string}) {
       <code className="pickup-code">{pickup.order.id}</code>
       <p>Total cotado {money(pickup.order.quoted_total_cents)}. O envio não separa as peças.</p>
     </section>}
-    {(pickupEnabled || pickup.order) && <PickupTracking key={pickup.order?.id ?? storeId} storeId={storeId} orderId={pickup.order?.id}/>}
+    <PickupTracking key={pickup.order?.id ?? storeId} storeId={storeId} orderId={pickup.order?.id}/>
     {busy && <p role="status">Carregando vitrine…</p>}
     {!busy && !error && !items.length && <p>Nenhuma peça publicada.</p>}
     {error && <p role="alert">{error}</p>}

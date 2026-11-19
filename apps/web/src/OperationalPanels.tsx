@@ -113,11 +113,11 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
     <section>
       <h2>Pedidos de compra</h2>
       <form onSubmit={event=>void createPurchase(event)}>
-        <label>Fornecedor da compra <select name="supplier" required defaultValue="">
+        <label>Fornecedor da compra <select aria-label="Fornecedor da compra" name="supplier" required defaultValue="">
           <option value="">Selecione</option>{suppliers.map(supplier=><option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
         </select></label>
         <label>Buscar SKU para compra <input value={query} onChange={event=>setQuery(event.target.value)}/></label>
-        <label>Variante da compra <select name="variant" required defaultValue="">
+        <label>Variante da compra <select aria-label="Variante da compra" name="variant" required defaultValue="">
           <option value="">Selecione</option>{variants.map(variant=><option key={variant.id} value={variant.id}>{variant.sku}</option>)}
         </select></label>
         <label>Quantidade da compra <input name="quantity" type="number" required min={1} max={100000}/></label>
@@ -126,7 +126,7 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
       </form>
       <ul>{purchases.map(purchase=><li key={purchase.id}>
         {purchase.supplier} · {purchase.sku} · {purchase.quantity} un. · {money(purchase.unit_cost_cents)} por unidade{' '}
-        {purchase.received_at?'Recebido':<button className="light-button" disabled={busy}
+        {purchase.received_at?<span>Recebido</span>:<button className="light-button" disabled={busy}
           onClick={()=>void write('purchases/'+purchase.id+'/receive','Compra recebida e estoque atualizado.')
             .then(ok=>{if(ok)onStockChanged();})}>Receber compra</button>}
       </li>)}</ul>
