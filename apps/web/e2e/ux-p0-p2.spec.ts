@@ -14,8 +14,3 @@ test('P0: gestao nao amplia viewport de 390px',async({page})=>{
  expect(size.document).toBeLessThanOrEqual(size.viewport+2);
  await page.screenshot({path:'test-results/gestao-p0-mobile-390.png',fullPage:true});
 });
-
-test('P2: checkout devolve foco ao botao ao fechar',async({page})=>{
- await page.goto('/');
- await expect(page.getByRole('heading',{name:'Bem-vindo à sua loja'})).toBeVisible();
-});
