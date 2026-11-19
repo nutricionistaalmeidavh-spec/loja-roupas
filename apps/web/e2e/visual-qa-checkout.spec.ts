@@ -1,0 +1,23 @@
+import {test,expect} from '@playwright/test';
+import {loginWithCash} from './visual-qa-login';
+import {createVisualProduct} from './visual-qa-product';
+import {stockVisualProduct} from './visual-qa-stock';
+test('checkout visual ponta a ponta',async({page},info)=>{
+ test.setTimeout(120000);
+ await loginWithCash(page);
+ const {sku,name}=await createVisualProduct(page);
+ await stockVisualProduct(page,sku);
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
+ const card=page.locator('.product-card').filter({hasText:name});
+ await expect(card).toBeVisible();
+ await card.getByRole('button',{name:'Adicionar '+name}).click();
+ await page.screenshot({path:info.outputPath('01-pdv-carrinho.png')});
+ await page.getByRole('button',{name:'Revisar e pagar'}).click();
+ const modal=page.getByRole('dialog',{name:'Revisar e finalizar venda'});
+ await expect(modal.getByText('R$ 149,90').first()).toBeVisible();
+ await page.screenshot({path:info.outputPath('02-checkout.png')});
+ await modal.getByLabel('Dinheiro recebido e conferido').check();
+ await modal.getByRole('button',{name:'Confirmar venda e pagamentos'}).click();
+ await expect(page.getByRole('dialog',{name:'Venda confirmada'})).toBeVisible();
+ await page.screenshot({path:info.outputPath('03-venda-confirmada.png')});
+});
