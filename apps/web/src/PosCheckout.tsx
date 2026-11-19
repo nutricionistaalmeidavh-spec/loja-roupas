@@ -1,5 +1,5 @@
 import { requestId } from './request-id.ts';
-import { useEffect,useMemo,useState } from 'react';
+import { useEffect,useMemo,useRef,useState } from 'react';
 import type { FormEvent } from 'react';
 import type { DraftLine } from '@loja/domain';
 import { ApiError } from './api-client.ts';
@@ -26,6 +26,27 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
  const [busy,setBusy]=useState(false);
  const [pending,setPending]=useState<{key:string;body:string}|null>(null);
  const [uncertain,setUncertain]=useState(false);
+ const modalRef=useRef<HTMLElement>(null);
+ useEffect(()=>{
+  const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  const modal=modalRef.current;
+  modal?.focus();
+  function keydown(event:globalThis.KeyboardEvent){
+    if(event.key==='Escape'){
+      if(!busy&&!uncertain)onClose();
+      return;
+    }
+    if(event.key!=='Tab'||!modal)return;
+    const focusables=[...modal.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')].filter(x=>x.getClientRects().length>0);
+    if(!focusables.length){event.preventDefault();modal.focus();return;}
+    const first=focusables[0],last=focusables[focusables.length-1];
+    if(event.shiftKey&&(document.activeElement===first||document.activeElement===modal)){event.preventDefault();last.focus();}
+    else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+  }
+  document.addEventListener('keydown',keydown);
+  return ()=>{document.removeEventListener('keydown',keydown);previous?.focus();};
+ },[busy,uncertain,onClose]);
+
  useEffect(()=>{
   let cancelled=false;
   setLoading(true);setError('');
@@ -87,7 +108,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   }finally{setBusy(false);}
  }
  return <div className="drawer-backdrop checkout-overlay" onMouseDown={()=>{if(!busy&&!uncertain)onClose();}}>
-  <section className="checkout-modal" role="dialog" aria-modal="true" aria-label="Revisar e finalizar venda"
+  <section ref={modalRef} tabIndex={-1} className="checkout-modal" role="dialog" aria-modal="true" aria-label="Revisar e finalizar venda"
     onMouseDown={e=>e.stopPropagation()}>
    <header className="checkout-header"><h2>Revisar e finalizar venda</h2>
     <button type="button" className="light-button" disabled={busy||uncertain} onClick={onClose}>Fechar</button></header>
