@@ -7,7 +7,7 @@ import {receiptText} from './pos-client.ts';
 import {requestId} from './request-id.ts';
 
 type Job={id:string;sale_id:string;sale_number:string;paper_mm:number};
-type Purchase={id:string;supplier:string;sku:string;quantity:number;unit_cost_cents:string;received_at:string|null};
+type Purchase={id:string;supplier:string;sku:string;quantity:number;unit_cost_cents:string;received_at:string|null;promised_on:string|null;accepted_quantity:number|null};
 type Pickup={id:string;created_at:string;quoted_total_cents:string};
 type Supplier={id:string;name:string};
 const base='/v1/management/';
@@ -53,14 +53,14 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
     return ()=>{clearTimeout(timeout);controller.abort();};
   },[session,query]);
 
-  async function write(path:string,success:string,body?:string) {
+  async function write(path:string,success:string,body?:string,method:'POST'|'PUT'='POST') {
     if(busy)return false;
     setBusy(true);setError('');setNotice('');
     const signature=path+(body??'');
     const key=pending.current.get(signature)??requestId();
     pending.current.set(signature,key);
     try{
-      await jsonRequest(base+path,{method:'POST',headers:{...headers(session,key),
+      await jsonRequest(base+path,{method,headers:{...headers(session,key),
         ...(body?{'content-type':'application/json'}:{})},body},fetch);
       pending.current.delete(signature);
       setNotice(success);setRevision(value=>value+1);
@@ -75,7 +75,8 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
     const values=new FormData(form);
     try{
       const body=JSON.stringify({supplier_id:values.get('supplier'),variant_id:values.get('variant'),
-        quantity:Number(values.get('quantity')),unit_cost_cents:reaisToCents(String(values.get('cost')))});
+        quantity:Number(values.get('quantity')),unit_cost_cents:reaisToCents(String(values.get('cost'))),
+        ...(values.get('promised')?{promised_on:values.get('promised')}:{})});
       if(await write('purchases','Pedido de compra registrado.',body))form.reset();
     }catch(error){setError(message(error));}
   }
@@ -122,11 +123,22 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
         </select></label>
         <label>Quantidade da compra <input name="quantity" type="number" required min={1} max={100000}/></label>
         <label>Custo unitário (R$) <input name="cost" inputMode="decimal" required placeholder="0,00"/></label>
+        <label>Data prometida <input name="promised" type="date"/></label>
         <button className="primary-action" disabled={busy}>Registrar pedido de compra</button>
       </form>
       <ul>{purchases.map(purchase=><li key={purchase.id}>
         {purchase.supplier} · {purchase.sku} · {purchase.quantity} un. · {money(purchase.unit_cost_cents)} por unidade{' '}
-        {purchase.received_at?<span>Recebido</span>:<button className="light-button" disabled={busy}
+        {purchase.promised_on&&<span>Prazo {purchase.promised_on.split('-').reverse().join('/')} · </span>}
+        {purchase.received_at?<><span>Recebido</span>
+          <form key={purchase.accepted_quantity??'unevaluated'} onSubmit={event=>{
+            event.preventDefault();
+            const accepted_quantity=Number(new FormData(event.currentTarget).get('accepted'));
+            void write('purchases/'+purchase.id+'/quality','Qualidade registrada.',JSON.stringify({accepted_quantity}),'PUT');
+          }}>
+            <label>Unidades aprovadas <input name="accepted" type="number" min={0} max={purchase.quantity} required
+              defaultValue={purchase.accepted_quantity??''}/></label>
+            <button className="light-button" disabled={busy}>Salvar qualidade</button>
+          </form></>:<button className="light-button" disabled={busy}
           onClick={()=>void write('purchases/'+purchase.id+'/receive','Compra recebida e estoque atualizado.')
             .then(ok=>{if(ok)onStockChanged();})}>Receber compra</button>}
       </li>)}</ul>

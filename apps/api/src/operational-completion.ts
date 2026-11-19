@@ -7,7 +7,7 @@ import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from '.
 const uuid = {type:'string',pattern:'^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'};
 const params = {type:'object',required:['id'],properties:{id:uuid}};
 const key = (request:FastifyRequest) => requireIdempotencyKey(request.headers['idempotency-key']);
-type Purchase = {supplier_id:string;variant_id:string;quantity:number;unit_cost_cents:number};
+type Purchase = {supplier_id:string;variant_id:string;quantity:number;unit_cost_cents:number;promised_on?:string};
 
 async function audit(client:PoolClient, auth:AuthContext, action:string, id:string) {
   await client.query('INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id) VALUES($1,$2,$3,$4)',
@@ -39,7 +39,7 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
 
   app.get('/v1/management/purchases',async(request,reply)=>{
     if(requirePermission(request,reply,'purchase.read'))return reply;
-    const result=await db.query(`SELECT p.id,p.quantity,p.unit_cost_cents::text,p.received_at,s.name AS supplier,v.sku
+    const result=await db.query(`SELECT p.id,p.quantity,p.unit_cost_cents::text,p.received_at,p.promised_on::text,p.accepted_quantity,s.name AS supplier,v.sku
       FROM purchase_orders p JOIN suppliers s ON s.id=p.supplier_id AND s.store_id=p.store_id
       JOIN product_variants v ON v.id=p.variant_id AND v.store_id=p.store_id
       WHERE p.store_id=$1 ORDER BY (p.received_at IS NULL) DESC,p.created_at DESC,p.id LIMIT 100`,
@@ -50,14 +50,15 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
   app.post<{Body:Purchase}>('/v1/management/purchases',{
     schema:{body:{type:'object',additionalProperties:false,required:['supplier_id','variant_id','quantity','unit_cost_cents'],
       properties:{supplier_id:uuid,variant_id:uuid,quantity:{type:'integer',minimum:1,maximum:100000},
-        unit_cost_cents:{type:'integer',minimum:0,maximum:100000000}}}},
+        unit_cost_cents:{type:'integer',minimum:0,maximum:100000000},
+        promised_on:{type:'string',format:'date'}}}},
   },async(request,reply)=>{
     if(requirePermission(request,reply,'purchase.write'))return reply;
     const auth=request.authContext!,body=request.body;
     const out=await withIdempotentTransaction(db,auth,'purchase.create',key(request),body,async client=>{
       const result=await client.query<{id:string}>(`INSERT INTO purchase_orders
-        (store_id,supplier_id,variant_id,quantity,unit_cost_cents) VALUES($1,$2,$3,$4,$5) RETURNING id`,
-        [auth.storeId,body.supplier_id,body.variant_id,body.quantity,body.unit_cost_cents]);
+        (store_id,supplier_id,variant_id,quantity,unit_cost_cents,promised_on) VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [auth.storeId,body.supplier_id,body.variant_id,body.quantity,body.unit_cost_cents,body.promised_on??null]);
       await audit(client,auth,'purchase.create',result.rows[0].id);
       return result.rows[0];
     });
@@ -84,6 +85,24 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
         [auth.storeId,line.variant_id,revision,JSON.stringify({variant_id:line.variant_id,revision,purchase_id:id})]);
       await audit(client,auth,'purchase.receive',id);
       return {id,received:true};
+    });
+    return out.result;
+  });
+
+  app.put<{Params:{id:string};Body:{accepted_quantity:number}}>('/v1/management/purchases/:id/quality',{
+    schema:{params,body:{type:'object',additionalProperties:false,required:['accepted_quantity'],
+      properties:{accepted_quantity:{type:'integer',minimum:0,maximum:100000}}}},
+  },async(request,reply)=>{
+    if(requirePermission(request,reply,'purchase.write'))return reply;
+    const auth=request.authContext!,{id}=request.params,{accepted_quantity}=request.body;
+    const out=await withIdempotentTransaction(db,auth,'purchase.quality:'+id,key(request),request.body,async client=>{
+      const result=await client.query(`UPDATE purchase_orders SET accepted_quantity=$3
+        WHERE store_id=$1 AND id=$2 AND received_at IS NOT NULL AND quantity >= $3 RETURNING id`,
+        [auth.storeId,id,accepted_quantity]);
+      if(!result.rowCount)throw new DomainError(409,'QUALITY_UNAVAILABLE','Compra ainda não recebida ou quantidade aprovada inválida');
+      await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
+        VALUES($1,$2,'purchase.quality',$3,$4::jsonb)`,[auth.storeId,auth.userId,id,JSON.stringify({accepted_quantity})]);
+      return {id,accepted_quantity};
     });
     return out.result;
   });

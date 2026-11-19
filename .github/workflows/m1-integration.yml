@@ -70,7 +70,23 @@ jobs:
         timeout-minutes: 6
         run: pnpm --filter @loja/web exec playwright install --with-deps chromium
       - name: E2E Web real (login → cadastro → estoque → carrinho)
+        env:
+          LOJA_E2E_BUILT: '1'
         run: pnpm --filter @loja/web test:e2e
+      - name: Ler etiqueta e conferir PDFs térmicos
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes zbar-tools poppler-utils
+          label=$(find apps/web/test-results -name code128.png -print -quit)
+          receipt58=$(find apps/web/test-results -name comprovante-58.pdf -print -quit)
+          receipt80=$(find apps/web/test-results -name comprovante-80.pdf -print -quit)
+          decoded=$(zbarimg --quiet --raw "$label")
+          [[ $decoded == POS-QA-* ]]
+          for receipt in "$receipt58" "$receipt80"; do
+            pdftotext -layout "$receipt" - | grep -Fi 'COMPROVANTE NÃO FISCAL'
+          done
+          pdfinfo "$receipt58" | awk '/^Page size:/ {if ($3<163 || $3>166) exit 1; ok=1} END {if (!ok) exit 1}'
+          pdfinfo "$receipt80" | awk '/^Page size:/ {if ($3<225 || $3>228) exit 1; ok=1} END {if (!ok) exit 1}'
       - name: Publicar somente evidências de QA
         if: always()
         uses: actions/upload-artifact@v4

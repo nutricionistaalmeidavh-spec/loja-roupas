@@ -11,10 +11,10 @@ type Widget=keyof typeof widgets;
 type Preferences={target_cents:number;low_stock_limit:number;widgets:Widget[]};
 type Period={period:string;gross_cents:string;refunded_cents:string};
 type Dashboard={
-  preferences:Preferences;months:Period[];
+  preferences:Preferences;months:Period[];historical_months:Period[];
   forecast:{active_days:number;estimate_cents:string|null;low_cents:string|null;high_cents:string|null};
   collections:Array<{name:string;units:string;revenue_cents:string}>;
-  suppliers:Array<{id:string;name:string;orders:number;received:number;average_days:string|null}>;
+  suppliers:Array<{id:string;name:string;orders:number;received:number;average_days:string|null;score:string|null;scored_orders:number}>;
   low_stock:Array<{id:string;sku:string;name:string;available:string}>;
 };
 const brl=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
@@ -114,9 +114,10 @@ export function CommercialIntelligence({session}:{session:Session}) {
         </form>
       </details>
       {prefs.widgets.includes('seasonality')&&<details>
-        <summary>Sazonalidade mensal</summary>
+        <summary>Sazonalidade mensal · 36 meses</summary>
+        <p>Totais por mês no fuso da loja. O mês atual ainda está em andamento.</p>
         <table><thead><tr><th scope="col">Mês</th><th scope="col">Vendas</th><th scope="col">Devoluções</th><th scope="col">Líquido</th></tr></thead>
-          <tbody>{data.months.map(period=><tr key={period.period}><td>{period.period.slice(0,7).split('-').reverse().join('/')}</td>
+          <tbody>{data.historical_months.map(period=><tr key={period.period}><td>{period.period.slice(0,7).split('-').reverse().join('/')}</td>
             <td>{money(period.gross_cents)}</td><td>{money(period.refunded_cents)}</td><td>{money(getNet(period))}</td></tr>)}</tbody>
         </table>
       </details>}
@@ -135,9 +136,11 @@ export function CommercialIntelligence({session}:{session:Session}) {
       </details>}
       {prefs.widgets.includes('suppliers')&&<details>
         <summary>Desempenho de fornecedores</summary>
-        <p>Pedidos dos últimos 90 dias. O prazo médio requer três recebimentos.</p>
+        <p>Pedidos dos últimos 90 dias. A nota combina entrega no prazo, proporção aprovada e custo frente aos pedidos do mesmo SKU em outros fornecedores. Cada critério pesa um terço. A nota exige três pedidos com os três critérios observados.</p>
         <ul>{data.suppliers.map(supplier=><li key={supplier.id}>{supplier.name} · {supplier.received}/{supplier.orders} recebidos · {
-          supplier.average_days===null?'Amostra insuficiente':supplier.average_days.replace('.',',')+' dias em média'}</li>)}</ul>
+          supplier.average_days===null?'Amostra insuficiente':supplier.average_days.replace('.',',')+' dias em média'} · {
+          supplier.score===null?'Sem nota · '+supplier.scored_orders+' pedidos avaliáveis':
+            'Nota '+supplier.score.replace('.',',')+'/100 · '+supplier.scored_orders+' pedidos avaliados'}</li>)}</ul>
       </details>}
       {prefs.widgets.includes('stock')&&<details>
         <summary>Estoque baixo ({data.low_stock.length})</summary>

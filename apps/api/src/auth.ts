@@ -10,7 +10,8 @@ const publicPaths = new Set(['/v1/health', '/v1/ready', '/v1/auth/sessions']);
 type LoginBody = { login: string; password: string };
 
 export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
-  const attempts = new Map<string, { failures: number; expires: number }>();
+  const attempts = new Map<string, { count: number; expires: number }>();
+  let nextCleanup = 0;
   app.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const path = request.url.split('?')[0];
     if (publicPaths.has(path)) return;
@@ -19,6 +20,7 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
         (route === '/v1/storefront/:id' || route === '/v1/storefront/:id/products/:productId/photo')) return;
     if (request.method === 'POST' && route === '/v1/storefront/:id/pickup-orders') return;
     if (request.method === 'GET' && route === '/v1/storefront/:id/pickup-orders/:orderId/status') return;
+    reply.header('Cache-Control','no-store');
     const header = request.headers.authorization;
     const storeHeader = request.headers['x-store-id'];
     if (typeof header !== 'string' || !/^Bearer [A-Za-z0-9_-]{43}$/.test(header)) {
@@ -53,22 +55,35 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
     const login = request.body.login.trim().toLowerCase();
     const bucket = `${request.ip}:${login}`;
     const now = Date.now();
-    const state = attempts.get(bucket);
-    if (state && state.expires > now && state.failures >= 5) {
-      return reply.code(429).send({ code:'RATE_LIMITED', message:'Muitas tentativas. Tente novamente depois.' });
+    reply.header('Cache-Control','no-store');
+    if(now>=nextCleanup){
+      for(const [key,state] of attempts)if(state.expires<=now)attempts.delete(key);
+      nextCleanup=now+60_000;
     }
-    const result = await db.query<{ id:string; password_hash:string }>(
-      "SELECT id::text, password_hash FROM users WHERE login=$1 AND status='active' LIMIT 1", [login]);
-    const user = result.rows[0];
-    const valid = user && await verifyPassword(request.body.password, user.password_hash);
-    if (!valid) {
-      attempts.set(bucket, { failures: (state && state.expires>now ? state.failures : 0) + 1, expires: now+15*60_000 });
-      return reply.code(401).send({ code:'INVALID_CREDENTIALS', message:'Credenciais inválidas' });
+    const current=attempts.get(bucket);
+    const active=current&&current.expires>now?current:null;
+    if((active&&active.count>=5)||(!current&&attempts.size>=4096)){
+      return reply.code(429).send({code:'RATE_LIMITED',message:'Muitas tentativas. Tente novamente depois.'});
     }
+    const attempt=active??{count:0,expires:now+15*60_000};
+    attempt.count++;
+    attempts.set(bucket,attempt);
+    let user:{id:string;password_hash:string}|undefined;
+    try{
+      const result=await db.query<{id:string;password_hash:string}>(
+        "SELECT id::text, password_hash FROM users WHERE login=$1 AND status='active' LIMIT 1",[login]);
+      user=result.rows[0];
+      if(!user||!await verifyPassword(request.body.password,user.password_hash)){
+        return reply.code(401).send({code:'INVALID_CREDENTIALS',message:'Credenciais inválidas'});
+      }
+    }catch(error){
+      if(attempts.get(bucket)===attempt&&--attempt.count===0)attempts.delete(bucket);
+      throw error;
+    }
+    if(attempts.get(bucket)===attempt)attempts.delete(bucket);
     const storeRows = await db.query<{ store_id:string; roles: string[] }>(
       'SELECT store_id::text, array_agg(role_code) AS roles FROM user_store_roles WHERE user_id=$1 GROUP BY store_id', [user.id]);
     if (!storeRows.rowCount) return reply.code(403).send({ code:'FORBIDDEN', message:'Usuário sem loja autorizada' });
-    attempts.delete(bucket);
     const {token, tokenHash} = issueSession();
     const expiresAt = new Date(now + 8*60*60_000).toISOString();
     await db.query('INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES ($1,$2,$3)', [user.id,tokenHash,expiresAt]);

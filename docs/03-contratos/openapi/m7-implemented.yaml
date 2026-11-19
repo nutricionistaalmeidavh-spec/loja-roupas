@@ -21,6 +21,7 @@ paths:
                   preferences: { $ref: '#/components/schemas/Preferences' }
                   daily: { type: array, items: { $ref: '#/components/schemas/Period' } }
                   months: { type: array, items: { $ref: '#/components/schemas/Period' } }
+                  historical_months: { type: array, items: { $ref: '#/components/schemas/Period' } }
                   forecast: { type: object }
                   collections: { type: array, items: { type: object } }
                   suppliers: { type: array, items: { type: object } }
@@ -57,6 +58,71 @@ paths:
       responses:
         '200': { description: Coleção atualizada e auditada }
         '404': { description: Produto indisponível na loja }
+  /v1/management/product-fields:
+    post:
+      summary: Criar campo privado de texto aplicável aos produtos da loja
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string, minLength: 1, maxLength: 60 }
+      responses:
+        '201': { description: Campo criado }
+        '409': { description: Nome já utilizado ou limite de 12 campos atingido }
+  /v1/management/products/{id}/fields:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Listar campos da loja e valores do produto
+      responses:
+        '200': { description: Campos e respectivos valores ou nulos }
+        '404': { description: Produto indisponível nesta loja }
+  /v1/management/products/{id}/fields/{fieldId}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: fieldId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      summary: Gravar ou limpar texto no campo do produto
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string, maxLength: 240 }
+      responses:
+        '200': { description: Valor salvo ou limpo }
+        '404': { description: Produto ou campo indisponível nesta loja }
+  /v1/management/purchases/{id}/quality:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      summary: Informar quantas unidades recebidas passaram na inspeção
+      parameters:
+        - $ref: '#/components/parameters/WriteKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accepted_quantity]
+              properties:
+                accepted_quantity: { type: integer, minimum: 0, maximum: 100000 }
+      responses:
+        '200': { description: Inspeção registrada }
+        '409': { description: Compra indisponível ou quantidade acima do recebido }
+
 components:
   parameters:
     WriteKey:

@@ -49,6 +49,8 @@ jobs:
           )
           INSERT INTO product_photos(product_id,store_id,content_type,image_bytes,sha256)
           SELECT id,store_id,'image/png',decode(repeat('cafe',8),'hex'),repeat('a',64) FROM product;
+          INSERT INTO product_variants(store_id,product_id,sku,color,size,price_cents)
+          SELECT store_id,id,'SKU-QA-OFFLINE','Preto','M',1000 FROM products WHERE name='Produto QA';
           SQL
           scripts/backup-lan.sh "$RUNNER_TEMP/loja.gpg"
           scripts/restore-lan.sh "$RUNNER_TEMP/loja.gpg" loja_restore_smoke
@@ -66,6 +68,29 @@ jobs:
           test "$code" = 503
           lan up -d --wait postgres
           curl --fail --silent --retry 10 --retry-all-errors --retry-delay 1 http://127.0.0.1:8080/v1/ready
+      - name: Operar na rede isolada sem rota WAN
+        run: |
+          source scripts/lan-common.sh
+          lan down
+          override="$RUNNER_TEMP/loja-offline-compose.yml"
+          printf 'networks:\n  default:\n    internal: true\n' > "$override"
+          offline() {
+            docker compose --env-file .env.lan -p loja-roupas-lan \
+              -f infra/compose.lan.yml -f "$override" "$@"
+          }
+          offline up -d --no-build --pull never --wait
+          test "$(docker network inspect --format '{{.Internal}}' loja-roupas-lan_default)" = true
+          offline exec -T api node --input-type=module -e '
+            const url = "http://web:8080";
+            const login = await fetch(url+"/v1/auth/sessions",{method:"POST",headers:{"content-type":"application/json"},
+              body:JSON.stringify({login:"qa-admin",password:"Senha-LAN-Somente-CI"})});
+            if (!login.ok) throw new Error("Falha de autenticação na rede isolada");
+            const session = await login.json();
+            const inventory = await fetch(url+"/v1/catalog/products", {headers:{
+              Authorization:"Bearer "+session.token, "X-Store-Id":session.stores[0].store_id}});
+            if (!inventory.ok || !(await inventory.json()).items.some(item=>item.name==="Produto QA"))
+              throw new Error("Catálogo existente indisponível na rede isolada");
+          '
       - name: Diagnóstico
         if: failure()
         run: |

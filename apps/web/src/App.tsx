@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
-import { ApiError, listCatalog, revokeSession } from './api-client.ts';
+import { ApiError, listCatalog, scanCatalog, revokeSession } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
@@ -184,7 +184,7 @@ export function App() {
     if(!session||!search.trim()||scanBusy)return;
     setScanBusy(true);setMessage('');
     try{
-      const page=mapCatalog(await listCatalog(session,search.trim()));
+      const page=mapCatalog(await scanCatalog(session,search));
       const code=search.trim().toUpperCase();
       const exact=page.flatMap(p=>p.variants).filter(v=>
         v.sku.toUpperCase()===code||(v.barcode??'').toUpperCase()===code);

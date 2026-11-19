@@ -7,13 +7,15 @@ A área Inteligência comercial usa as vendas, devoluções, variantes e compras
 | Indicador | Como é calculado |
 |---|---|
 | Vendas líquidas e meta | Vendas escrituradas menos devoluções registradas no mês e fuso da loja. |
-| Sazonalidade | Doze meses civis com bruto, devoluções e líquido. O mês atual está em andamento. |
+| Sazonalidade | Trinta e seis meses civis com bruto, devoluções e líquido. O mês atual está em andamento. |
 | Projeção de 14 dias | Média dos líquidos de duas quinzenas completas anteriores ao dia atual. A faixa mostra os totais observados nas duas quinzenas. É exibida a partir de sete dias com vendas na janela de 28 dias. |
 | Coleções | Vendas confirmadas dos últimos 90 dias, agrupadas pelo nome da coleção atual do produto. |
 | Fornecedores | Contagem de pedidos e recebimentos dos últimos 90 dias. O prazo médio é exibido a partir de três pedidos recebidos. |
 | Estoque baixo | Até 30 SKUs com disponibilidade igual ou inferior ao limite. As unidades reservadas são descontadas. |
 
-O painel agrega os lançamentos de devolução disponíveis no sistema. Hoje eles correspondem à devolução integral em dinheiro. A projeção e o alerta de estoque são informativos. O cadastro de compras ainda carece de evidências de prazo prometido e qualidade para um score completo. Campos personalizados e sazonalidade plurianual continuam pendentes.
+O painel agrega os lançamentos de devolução disponíveis no sistema. Hoje eles correspondem à devolução integral em dinheiro. A projeção e o alerta de estoque são informativos. O score usa três critérios com pesos iguais. Entrega no prazo usa a data prometida e a data local de recebimento. Qualidade usa a proporção de unidades aprovadas na inspeção. Preço compara o custo unitário com a média de pelo menos três compras recebidas do mesmo SKU em outros fornecedores, limitando a pontuação a 100. A nota só aparece após três pedidos com os três critérios observados em 90 dias.
+
+No editor de produtos, o gerente pode criar até 12 campos de texto por loja e salvar ou limpar os valores por produto. Os campos são privados e as alterações são auditadas.
 
 ## M8 · Esteira e candidata
 
@@ -25,3 +27,25 @@ O painel agrega os lançamentos de devolução disponíveis no sistema. Hoje ele
 | Candidatas Linux e Windows x64 | Pacotes Electron portáteis acompanhados de SHA-256 como artefatos de CI por sete dias. O cliente usa um servidor Loja de Roupas disponível em LAN. |
 
 A homologação geral inclui operação física sem WAN, impressoras e scanners reais, PWA em aparelhos, carga representativa da loja, auditoria completa de acessibilidade, revisão geral de segurança e instaladores nativos. A publicação de uma release segue o fluxo de aprovação do projeto.
+
+## Homologação de instalação e periféricos
+
+| Cenário | Ensaio automatizado | Evidência física ainda necessária |
+|---|---|---|
+| Scanner | Chromium envia a sequência de teclas do scanner e Enter no campo do PDV. A leitura do código de barras adiciona a variante e a venda é concluída com o estoque do servidor. | Leitura com scanner USB ou Bluetooth configurado como teclado. |
+| Etiqueta | O PDV renderiza Code 128 e o CI decodifica a imagem com ZBar, além de guardar um PDF da etiqueta. | Contraste, escala, margem e leitura após imprimir na mídia real. |
+| Comprovantes térmicos | O navegador exercita a solicitação auditada, gera PDFs com largura de 58 e 80 mm e verifica largura e texto com Poppler. | Driver, margem, corte e impressão efetiva nos dois formatos. |
+| PWA sem rede | Chromium testa o bundle de produção, controlador do service worker, erro offline e recuperação. | Instalação e retomada em aparelhos Android e iOS. |
+| Operação sem WAN | A stack é iniciada a partir de imagens locais em rede Docker interna. Autenticação e leitura do catálogo passam pelo proxy usando a base existente. | Repetir com servidor e terminal em equipamentos separados na LAN da loja, com o enlace da internet desligado. |
+| Distribuição nativa | O CI compila e exercita instalação e desinstalação do pacote Debian amd64 e do setup Windows x64. O executável é iniciado no runner e abre um servidor local de teste com sandbox ativa. Checksum acompanha os artefatos. | Validação em máquinas-alvo com os drivers e políticas locais. O cliente continua usando o servidor LAN. |
+
+A tabela de sazonalidade agora contém 36 meses civis. O contrato mantém a janela original de 12 meses em `months` e fornece o histórico estendido em `historical_months`.
+
+
+## Verificação em loja
+
+Use uma base de teste e uma estação secundária da LAN. Confirme que o servidor e o terminal continuam comunicando pela rede local após desligar a WAN. Faça login, leia uma etiqueta real e finalize uma venda com recibo não fiscal. Consulte a baixa no PostgreSQL após reconexão.
+
+Em cada impressora, registre modelo, conexão, driver e papel. Imprima os comprovantes de 58 e 80 mm com escala de 100%, verifique margem e corte e escaneie a etiqueta Code 128 impressa. Registre foto ou vídeo da saída, resultado da leitura e ambiente. Em Android e iOS, instale a PWA em origem segura, feche e reabra o aplicativo. Teste perda e retorno da LAN e confirme que o sistema exige conexão para gravar. O ensaio pode usar os PDFs e capturas do CI como referência.
+
+A revisão defensiva desta etapa cobre limites concorrentes de autenticação, expiração de contadores, ausência de cache para sessão e respostas privadas, isolamento entre lojas e preferências da janela Electron. Revisão independente, provisionamento de dispositivos e verificação de drivers seguem fora desse ensaio automatizado.
