@@ -17,6 +17,7 @@ import { registerProductFields } from './product-fields.ts';
 import { registerProductImport } from './import-products.ts';
 import { registerStockHolds } from './stock-holds.ts';
 import { registerStockSpreadsheet } from './stock-spreadsheet.ts';
+import { registerStockSpreadsheetP2 } from './stock-spreadsheet-p2.ts';
 import { registerStaticUi } from './static-ui.ts';
 
 export function buildApp(db: Pool) {
@@ -42,6 +43,7 @@ export function buildApp(db: Pool) {
   registerStoreOperations(app, db);
   registerStockHolds(app, db);
   registerStockSpreadsheet(app, db);
+  registerStockSpreadsheetP2(app, db);
   registerPickupOrders(app, db);
   registerOperationalCompletion(app, db);
   registerIntelligence(app, db);
