@@ -8,6 +8,7 @@ test('gestor recebe guia completo e pode pular e reabrir sem alterar vendas',asy
  const tour=page.getByRole('dialog',{name:'Guia inicial da loja'});
  await expect(tour).toBeVisible();
  await expect(tour.getByText(/Passo 1 de/)).toBeVisible();
+ await page.screenshot({path:'test-results/primeiro-acesso-tour-desktop.png',fullPage:true});
  await tour.getByRole('button',{name:'Próximo'}).click();
  await expect(tour.getByText(/Passo 2 de/)).toBeVisible();
  await tour.getByRole('button',{name:'Voltar'}).click();

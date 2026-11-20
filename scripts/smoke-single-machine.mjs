@@ -16,7 +16,11 @@ try{
  instance=await electron.launch({executablePath,args:['--user-data-dir='+userData],
   chromiumSandbox:true,env,timeout:45000});
  const setup=await instance.firstWindow({timeout:25000});
- await setup.getByRole('heading',{name:'Crie sua loja'}).waitFor({timeout:110000});
+ try{await setup.getByRole('heading',{name:'Crie sua loja'}).waitFor({timeout:110000});}
+ catch(error){
+  console.error('Estado do assistente Windows:',await setup.locator('body').innerText().catch(()=>'<janela encerrada>'));
+  throw error;
+ }
  await setup.locator('input[name=name]').fill('Loja Local CI');
  await setup.locator('input[name=login]').fill('local-admin');
  await setup.locator('input[name=password]').fill('Senha-Local-CI-2026');
