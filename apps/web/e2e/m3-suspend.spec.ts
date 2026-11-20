@@ -10,7 +10,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  if(await page.getByRole('button',{name:'Abrir caixa',exact:true}).count()){
   await page.getByRole('button',{name:'Abrir caixa',exact:true}).click();
    await page.getByLabel('Valor inicial (R$)').fill('0,00');
-  await page.getByRole('button',{name:'Abrir caixa',exact:true}).click();
+  await page.getByRole('button',{name:'Confirmar abertura'}).click();
   await expect(page.getByText('Caixa aberto.')).toBeVisible();
  }else await expect(page.getByText('Caixa aberto',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
