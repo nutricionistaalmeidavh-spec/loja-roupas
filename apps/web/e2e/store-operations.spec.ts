@@ -30,6 +30,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await expect(page.getByRole('listitem').filter({hasText:supplier})).toBeVisible();
 
   await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+  await page.getByRole('button',{name:'Editar produto'}).click();
   await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:name});
   await page.getByRole('combobox',{name:'Variante para preço',exact:true}).selectOption(variant);
   await page.getByRole('button',{name:'Publicar na vitrine'}).click();
