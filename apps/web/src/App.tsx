@@ -10,6 +10,7 @@ import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { ReceiveStockForm } from './Management.tsx';
 import { ProductsWorkspace } from './ProductsWorkspace.tsx';
+import { TaskDialog } from './TaskDialog.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
 import { M2StockAdjustment } from './M2Admin.tsx';
 import { PickupLookup } from './PickupOrders.tsx';
@@ -39,6 +40,7 @@ export function App() {
   const [cursor,setCursor] = useState<string|null>(null);
   const [paging,setPaging] = useState(false);
   const [stockSearch,setStockSearch] = useState('');
+  const [stockAction,setStockAction] = useState<'receive'|'adjust'|null>(null);
   const [cashState,setCashState] = useState<CashState|null>(null);
   const [cashRefresh,setCashRefresh] = useState(0);
   const [pickup,setPickup] = useState<PickupOrder>();
@@ -338,7 +340,23 @@ export function App() {
       {page==='gestao'&&manager&&<StoreOperations session={session} cashId={cashId} onReturned={refreshed}/>}
       {page==='produtos'&&manager&&<ProductsWorkspace session={session} onSaved={refreshed}/>}
       {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
-      {page==='estoque'&&canReceive&&<>
+      {page==='estoque'&&canReceive&&<div className="products-workspace">
+        <section className="workspace-hero">
+          <div><h2>Estoque da loja</h2><p>Consulte e registre movimentações apenas quando necessário.</p></div>
+          <div className="workspace-actions">
+            <button className="primary-action" onClick={()=>setStockAction('receive')}>Receber estoque</button>
+            {manager&&<button className="light-button" onClick={()=>setStockAction('adjust')}>Ajustar estoque</button>}
+          </div>
+        </section>
+        <section className="workspace-card">
+          <p>Entrada de mercadorias aumenta o saldo disponível. Ajustes são registrados com motivo e histórico de auditoria.</p>
+          <p className="muted small">As operações conferem a peça e a variante antes da confirmação.</p>
+        </section>
+      </div>}
+    </main>
+    {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide
+      onClose={()=>setStockAction(null)}>
+      <div className="stock-task-layout">
         <div className="management-form">
           <label>Localizar peça para recebimento (nome ou SKU)
             <input value={stockSearch} onChange={e=>setStockSearch(e.target.value)} placeholder="Buscar no servidor"/>
@@ -347,9 +365,12 @@ export function App() {
           <p className="muted small">Mostrando até 50 resultados; pesquise o SKU exato para outros itens.</p>
         </div>
         <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
-        {manager&&<M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>}
-      </>}
-    </main>
+      </div>
+    </TaskDialog>}
+    {page==='estoque'&&manager&&stockAction==='adjust'&&<TaskDialog title="Ajustar estoque" wide
+      onClose={()=>setStockAction(null)}>
+      <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>
+    </TaskDialog>}
     {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
       draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
