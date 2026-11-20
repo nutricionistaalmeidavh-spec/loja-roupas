@@ -1,15 +1,15 @@
 import { requestId } from './request-id.ts';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
 import { ApiError, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
-import { colorSwatch } from './visual-colors.ts';
 import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { FirstRunTour } from './FirstRunTour.tsx';
+import { colorSwatch } from './visual-colors.ts';
 import { ReceiveStockForm } from './Management.tsx';
 import { ProductsWorkspace } from './ProductsWorkspace.tsx';
 import { TaskDialog } from './TaskDialog.tsx';
@@ -384,11 +384,11 @@ export function App() {
         </div>}
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
-      </section><aside className="cart-panel" data-tour="cart" aria-label="Carrinho da venda">{cart}</aside></div>}
+      </section><aside data-tour="cart" className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
       {page==='gestao'&&manager&&<div data-tour="management"><StoreOperations session={session} cashId={cashId} onReturned={refreshed}/></div>}
       {page==='produtos'&&manager&&<div data-tour="products"><ProductsWorkspace session={session} onSaved={refreshed}/></div>}
-      {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
-      {page==='estoque'&&canReceive&&<div data-tour="stock" className="products-workspace">
+      {page==='caixa'&&canCash&&<div data-tour="cash"><CashPanel session={session} onChanged={cashUpdated}/></div>}
+      {page==='estoque'&&canReceive&&<div className="products-workspace" data-tour="stock">
         <section className="workspace-hero">
           <div><h2>Estoque da loja</h2><p>Consulte e registre movimentações apenas quando necessário.</p></div>
           <div className="workspace-actions">
