@@ -1,5 +1,5 @@
 import { requestId } from './request-id.ts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, createProduct, receiveStock } from './api-client.ts';
 import type { Session, ProductPayload, StockReceiptPayload } from './api-client.ts';
@@ -15,7 +15,7 @@ function uncertainResult(error: unknown) {
   return !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
 }
 
-export function CreateProductForm({ session, onSaved }: { session: Session; onSaved: () => void }) {
+export function CreateProductForm({ session, onSaved, onLockChange }: { session: Session; onSaved: () => void; onLockChange?: (locked:boolean)=>void }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Feminino');
   const [rows, setRows] = useState<VariantRow[]>([blankVariant()]);
@@ -24,6 +24,7 @@ export function CreateProductForm({ session, onSaved }: { session: Session; onSa
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
+  useEffect(()=>{onLockChange?.(busy||uncertain);return ()=>onLockChange?.(false);},[busy,uncertain,onLockChange]);
 
   function updateRow(index: number, field: keyof VariantRow, value: string) {
     setRows(current => current.map((row, i) => i === index ? {...row, [field]:value} : row));
@@ -95,7 +96,7 @@ export function CreateProductForm({ session, onSaved }: { session: Session; onSa
   </form>;
 }
 
-export function ReceiveStockForm({ session, products, onSaved }: { session: Session; products: Product[]; onSaved: () => void }) {
+export function ReceiveStockForm({ session, products, onSaved, onLockChange }: { session: Session; products: Product[]; onSaved: () => void; onLockChange?: (locked:boolean)=>void }) {
   const [variantId, setVariantId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [note, setNote] = useState('');
@@ -105,6 +106,7 @@ export function ReceiveStockForm({ session, products, onSaved }: { session: Sess
   const [referenceId,setReferenceId] = useState(()=>requestId());
   const [notice,setNotice] = useState('');
   const [error,setError] = useState('');
+  useEffect(()=>{onLockChange?.(busy||uncertain);return ()=>onLockChange?.(false);},[busy,uncertain,onLockChange]);
   const variants = products.flatMap(p=>p.variants.map(v=>({label:`${p.name} · ${v.color} · ${v.size} · ${v.sku} (saldo ${v.available})`,id:v.id})));
   async function submit(event: FormEvent) {
     event.preventDefault();
