@@ -1,0 +1,31 @@
+name: Planilha XLSX — atualizar lockfile na branch de trabalho
+on:
+  push:
+    branches: [feat/loja-planilha-xlsx-estoque-p0-p1]
+    paths: [apps/web/package.json]
+permissions:
+  contents: write
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Resolver dependencias npm OSS e gerar lock reproduzivel
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+      - name: Registrar somente o lockfile na mesma branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git diff --staged --quiet && exit 0
+          git commit -m "chore(deps): lock OSS XLSX e grade editavel"
+          git push origin HEAD:feat/loja-planilha-xlsx-estoque-p0-p1
