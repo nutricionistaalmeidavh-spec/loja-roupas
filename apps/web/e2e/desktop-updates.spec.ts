@@ -6,6 +6,7 @@ test('jetlog ao abrir e atualização em Configurações nunca fazem download se
    __installCount:0,
    __checkCount:0,
    lojaUpdates:{
+    async info(){return {supported:true,currentVersion:'0.1.0'};},
     async check(){
      (window as unknown as {__checkCount:number}).__checkCount++;
      return {supported:true,currentVersion:'0.1.0',available:{
