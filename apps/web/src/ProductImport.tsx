@@ -4,6 +4,7 @@ import {headers,jsonRequest,ApiError} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {requestId} from './request-id.ts';
 import {CSV_TEMPLATE,parseProductCsv} from './product-import.ts';
+import {readProductXlsx} from './xlsx-reader.ts';
 import type {ImportPreview} from './product-import.ts';
 
 type ImportResult={products_created:number;variants_created:number;stock_units_received:number;product_ids:string[]};
@@ -25,9 +26,10 @@ export function ProductImport({session,onSaved}:{session:Session;onSaved:()=>voi
   const file=event.target.files?.[0];event.target.value='';
   if(!file||busy||uncertain)return;
   setFilename(file.name);setPreview(null);setError('');setNotice('');setPending(null);
-  if(!/\.csv$/i.test(file.name)){setError('Salve a planilha no formato CSV UTF-8 e selecione o arquivo .csv.');return;}
-  if(file.size>1024*1024){setError('Arquivo maior que 1 MB. Divida em lotes de até 300 linhas.');return;}
-  try{setPreview(parseProductCsv(await file.text()));}
+  if(!/\.(csv|xlsx)$/i.test(file.name)){setError('Selecione uma planilha .csv ou .xlsx.');return;}
+  if(file.size>2*1024*1024){setError('Arquivo maior que 2 MB. Divida em lotes de até 300 linhas.');return;}
+  try{const csv=/\.xlsx$/i.test(file.name)?await readProductXlsx(await file.arrayBuffer()):await file.text();
+   setPreview(parseProductCsv(csv));}
   catch(err){setError(err instanceof Error?err.message:'Não foi possível ler o arquivo');}
  }
  async function confirm(){
@@ -54,12 +56,12 @@ export function ProductImport({session,onSaved}:{session:Session;onSaved:()=>voi
   <p className="muted">Cadastre várias roupas, grades de tamanho, preços, códigos de barras e estoque inicial de uma vez.</p>
   <div className="import-steps">
    <section><strong>1. Baixe o modelo</strong>
-    <p>Abra no Excel ou LibreOffice, substitua as linhas de exemplo e salve como CSV UTF-8 separado por ponto e vírgula.</p>
+    <p>Abra o modelo no Excel ou LibreOffice, substitua os exemplos e salve em CSV UTF-8 ou Excel (.xlsx).</p>
     <button type="button" className="light-button" onClick={downloadTemplate}>Baixar modelo da planilha (.csv)</button>
    </section>
    <section><strong>2. Envie a planilha preenchida</strong>
-    <label className="import-file-label">Selecionar arquivo CSV
-     <input type="file" accept=".csv,text/csv" disabled={busy||uncertain} onChange={event=>void choose(event)}/>
+    <label className="import-file-label">Selecionar planilha (.csv ou .xlsx)
+     <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy||uncertain} onChange={event=>void choose(event)}/>
     </label>
     {filename&&<p className="muted small">Arquivo: {filename}</p>}
    </section>
@@ -91,6 +93,6 @@ export function ProductImport({session,onSaved}:{session:Session;onSaved:()=>voi
   </section>}
   {error&&<p role="alert" className="error">{error}{uncertain&&' O servidor pode ter gravado os dados. Use o botão de repetição sem alterar o arquivo.'}</p>}
   {notice&&<p role="status" className="notice">{notice}</p>}
-  <p className="muted small">Limite: 300 linhas e 1 MB por arquivo. SKU e código de barras devem ser únicos. Serviços externos não são necessários.</p>
+  <p className="muted small">Limite: 300 linhas e 2 MB por arquivo. SKU e código de barras devem ser únicos. Serviços externos não são necessários.</p>
  </div>;
 }
