@@ -8,9 +8,8 @@ import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
-import { CreateProductForm, ReceiveStockForm } from './Management.tsx';
+import { ProductWorkspace, StockWorkspace } from './RetailWorkspaces.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
-import { M2CatalogEditor, M2StockAdjustment } from './M2Admin.tsx';
 import { PickupLookup } from './PickupOrders.tsx';
 import type { PickupOrder } from './PickupOrders.tsx';
 import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
@@ -268,7 +267,7 @@ export function App() {
           <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
-            {catalogError?'Servidor indisponível':cashId?'Caixa aberto · PostgreSQL':'Catálogo conectado · Sem caixa'}</span>
+            {catalogError?'Servidor indisponível':cashId?'Loja conectada · Caixa aberto':'Catálogo conectado · Caixa fechado'}</span>
           <button className="mobile-logout" onClick={logout}>Sair</button>
         </div>
       </header>
@@ -283,7 +282,7 @@ export function App() {
         </select>
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
-        <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
+        <div className="heading"><h2>Selecionar produtos</h2><p>Pesquise uma peça, escolha cor e tamanho e adicione ao carrinho.</p></div>
         {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" onClick={recoverDraft}>Recuperar carrinho</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
           <strong>Vendas suspensas ({savedDrafts.length})</strong>
@@ -332,22 +331,12 @@ export function App() {
           {!filtered.length&&<p className="empty-catalog">Nenhuma peça disponível para estes filtros. Cadastre produtos ou altere a busca.</p>}
         </div>}
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
-        <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
+        <p className="muted small">Se não encontrar a peça, pesquise pelo SKU completo ou código de barras.</p>
       </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
       {page==='gestao'&&manager&&<StoreOperations session={session} cashId={cashId} onReturned={refreshed}/>}
-      {page==='produtos'&&manager&&<><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></>}
+      {page==='produtos'&&manager&&<ProductWorkspace session={session} onSaved={refreshed}/>}
       {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
-      {page==='estoque'&&canReceive&&<>
-        <div className="management-form">
-          <label>Localizar peça para recebimento (nome ou SKU)
-            <input value={stockSearch} onChange={e=>setStockSearch(e.target.value)} placeholder="Buscar no servidor"/>
-          </label>
-          {stockLoading&&<p className="notice">Carregando variantes para recebimento…</p>}
-          <p className="muted small">Mostrando até 50 resultados; pesquise o SKU exato para outros itens.</p>
-        </div>
-        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
-        {manager&&<M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>}
-      </>}
+      {page==='estoque'&&canReceive&&<StockWorkspace session={session} products={allProducts} manager={manager} onSaved={refreshed} query={stockSearch} onSearch={setStockSearch} loading={stockLoading} refreshKey={refetch}/>}
     </main>
     {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
