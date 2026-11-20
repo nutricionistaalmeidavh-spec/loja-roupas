@@ -1,10 +1,9 @@
 import { readSheet } from 'read-excel-file/browser';
 import writeExcelFile from 'write-excel-file/browser';
 import { PRODUCT_CSV_COLUMNS } from './product-import.ts';
-import { parseProductSheetRows } from './product-xlsx.ts';
+import { parseProductSheetRows,MAX_XLSX_FILE_SIZE } from './product-xlsx.ts';
 import type { ImportPreview } from './product-import.ts';
 
-export const MAX_XLSX_FILE_SIZE=5*1024*1024;
 const header=[...PRODUCT_CSV_COLUMNS];
 
 function xlsxColumns(){
