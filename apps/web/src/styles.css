@@ -246,3 +246,10 @@
  .management-tabs button{width:100%}
  .management-workspace .management-section h3{font-size:18px}
 }
+
+.product-editor-tabs{display:flex;flex-wrap:wrap;gap:7px;border-bottom:1px solid #e8e8e8;padding-bottom:13px}
+.product-editor-tabs button{padding:10px 14px;border-radius:8px;border:1px solid #e2e2e2;background:#fff;min-height:42px;color:#505050;font-weight:650}
+.product-editor-tabs button.active{background:#252525;color:#fff;border-color:#252525}
+.product-editor-tabs button:focus-visible{outline:3px solid #9c7950;outline-offset:3px}
+@media(max-width:600px){.product-editor-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.product-editor-tabs button{width:100%}}
