@@ -87,7 +87,7 @@ export function parseBulkClipboard(source:string,existing:readonly ClipboardRow[
   }
   byProduct.set(sourceRow.product_id,{name,category});
   if(sourceRow.sku!==sku||sourceRow.name!==name||sourceRow.category!==category||
-   sourceRow.color!==color||sourceRow.size!==size||(sourceRow.barcode??null)!==barcode||
+   sourceRow.color!==color||sourceRow.size!==size||(sourceRow.barcode||null)!==barcode||
    sourceRow.price_cents!==price){
    updates.push({variant_id:sourceRow.variant_id,sku,name,category,color,size,barcode,
     price_cents:price,expected_product_revision:sourceRow.product_revision,

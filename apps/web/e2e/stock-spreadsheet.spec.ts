@@ -36,7 +36,7 @@ test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',as
  await row.getByRole('gridcell',{name:sku,exact:true}).click();
  await page.getByRole('button',{name:'Histórico selecionado '+sku}).click();
  const history=page.getByRole('dialog',{name:'Histórico — '+sku});
- await expect(history.getByText('Recebimento')).toBeVisible();
+ await expect(history.getByRole('cell',{name:'Recebimento'})).toBeVisible();
  await expect(history.getByText('+2 peças')).toBeVisible();
  await history.getByRole('button',{name:'Fechar Histórico — '+sku}).click();
  await page.getByRole('button',{name:'Receber selecionado '+sku}).click();
