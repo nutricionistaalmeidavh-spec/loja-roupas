@@ -14,6 +14,7 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const [mode,setMode]=useState<'list'|'edit'>('list');
+  const [selectedProduct,setSelectedProduct]=useState<{id:string;name:string}|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
   const [importOpen,setImportOpen]=useState(false);
   const [revision,setRevision]=useState(0);
@@ -38,7 +39,7 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
       <div className="workspace-actions">
         <button type="button" className="primary-action" onClick={()=>setCreateOpen(true)}>+ Novo produto</button>
         <button type="button" className="light-button" onClick={()=>setImportOpen(true)}>Importar planilha</button>
-        <button type="button" className="light-button" onClick={()=>setMode(x=>x==='edit'?'list':'edit')}>
+        <button type="button" className="light-button" onClick={()=>{setSelectedProduct(null);setMode(x=>x==='edit'?'list':'edit');}}>
           {mode==='edit'?'Voltar ao catálogo':'Editar produto'}
         </button>
       </div>
@@ -61,13 +62,14 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
           </div>
           <div className="catalog-list-meta">
             <span>{product.variants.reduce((n,v)=>n+v.available,0)} em estoque</span>
-            <button className="light-button" onClick={()=>setMode('edit')}>Editar</button>
+            <button className="light-button" onClick={()=>{setSelectedProduct({id:product.id,name:product.name});setMode('edit');}}>Editar</button>
           </div>
         </article>)}
       </div>
       {products.length===50&&<p className="muted small">Exibindo até 50 peças. Refine a busca para encontrar outros produtos.</p>}
     </section>:<div className="workspace-editor">
-      <M2CatalogEditor session={session} onSaved={refreshed}/>
+      <M2CatalogEditor key={selectedProduct?.id??'catalog-editor'} session={session} onSaved={refreshed}
+        initialProductId={selectedProduct?.id} initialProductName={selectedProduct?.name}/>
     </div>}
     {createOpen&&<TaskDialog title="Novo produto" wide onClose={()=>setCreateOpen(false)}>
       <CreateProductForm session={session} onSaved={refreshed}/>
