@@ -8,13 +8,15 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByRole('button',{name:'Novo produto'}).click();
  await page.getByLabel('Nome da peça').fill(name);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Preto');
  await page.getByLabel('Tamanho').fill('M');
  await page.getByLabel('Preço (R$)').fill('199,90');
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
- await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'Produto cadastrado com sucesso'})).toBeVisible();
+ await page.getByRole('button',{name:'Editar catálogo'}).click();
 
  await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
  await page.getByLabel('Nome do produto').fill(name+' atual');
@@ -37,12 +39,15 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  },{timeout:10000}).toBe('ok');
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
+ await page.getByRole('button',{name:'Registrar entrada'}).click();
  const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(item).toBeAttached();
  await page.getByLabel('Variante (SKU)').selectOption((await item.getAttribute('value'))!);
  await page.getByLabel('Quantidade recebida').fill('6');
  await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
  await expect(page.getByText(/Novo saldo em mãos: 6/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Entrada de estoque'}).click();
+ await page.getByRole('button',{name:'Ajustar saldo'}).click();
  await page.getByLabel('Localizar SKU para conferência').fill(sku);
  const adjustment=page.getByLabel('Variante para ajustar').locator('option',{hasText:sku});
  await expect(adjustment).toBeAttached();
@@ -52,6 +57,7 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByRole('button',{name:'Confirmar ajuste gerencial'}).click();
  await expect(page.getByText(/Saldo total em mãos: 4/)).toBeVisible();
  await expect(page.getByText(/adjustment/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Ajustar saldo de estoque'}).click();
 
  await page.getByRole('button',{name:'PDV'}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
