@@ -8,6 +8,7 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByRole('button',{name:/Novo produto/}).click();
  await page.getByLabel('Nome da peça').fill(name);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Preto');
@@ -15,8 +16,10 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByLabel('Preço (R$)').fill('199,90');
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Novo produto'}).click();
 
- await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
+  await page.getByRole('button',{name:'Editar produto'}).click();
+await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
  await page.getByLabel('Nome do produto').fill(name+' atual');
  await page.getByRole('button',{name:'Salvar informações'}).click();
  await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
