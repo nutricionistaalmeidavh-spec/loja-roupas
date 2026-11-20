@@ -46,7 +46,7 @@ $native=@(Get-ChildItem -LiteralPath $store -Directory -Filter '@esbuild+win32-x
 if($esb.Count -ne 1 -or $native.Count -ne 1){throw 'Pinned esbuild packages not found'}
 $src=Join-Path $esb[0].FullName 'node_modules/esbuild'
 $nativeSrc=Join-Path $native[0].FullName 'node_modules/@esbuild/win32-x64'
-if(!(Test-Path (Join-Path $src 'lib/main.js')) -or !(Test-Path (Join-Path $nativeSrc 'bin/esbuild.exe'))){throw 'esbuild package incomplete'}
+if(!(Test-Path (Join-Path $src 'lib/main.js')) -or !(Test-Path (Join-Path $nativeSrc 'esbuild.exe'))){throw 'esbuild package incomplete'}
 New-Item -ItemType Directory -Force -Path (Join-Path $api 'node_modules/@esbuild') | Out-Null
 Copy-Item -Recurse -LiteralPath $src -Destination (Join-Path $api 'node_modules/esbuild')
 Copy-Item -Recurse -LiteralPath $nativeSrc -Destination (Join-Path $api 'node_modules/@esbuild/win32-x64')
