@@ -35,7 +35,7 @@ test('P2: bloqueia campo SKU desconhecido, duplicado e colunas de estoque',()=>{
 });
 
 test('P2: nao altera nome/categoria divergente entre variantes do mesmo produto',()=>{
- const text=buildBulkClipboard(items).replace('CAM-P\tCamisa','CAM-P\tOutra');
+ const text=buildBulkClipboard(items).replace('CAM-P\tCAM-P\tCamisa','CAM-P\tCAM-P\tOutra');
  const result=parseBulkClipboard(text,items);
  assert.ok(result.issues.some(x=>/mesmo produto/.test(x.message)));
 });
