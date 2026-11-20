@@ -1,3 +1,4 @@
+import {readFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
 
 function crc32(data:Buffer):number{
@@ -55,6 +56,14 @@ test('lê Excel XLSX real (ZIP com XML e shared strings) e importa variantes',as
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
  await page.getByRole('button',{name:'Importar planilha'}).click();
  const dialog=page.getByRole('dialog',{name:'Importar produtos por planilha'});
+ const [model]=await Promise.all([page.waitForEvent('download'),dialog.getByRole('button',{name:'Baixar modelo Excel (.xlsx)'}).click()]);
+ expect(model.suggestedFilename()).toBe('modelo-importacao-produtos.xlsx');
+ const modelPath=await model.path();
+ expect(modelPath).toBeTruthy();
+ const modelBuffer=await readFile(modelPath!);
+ await dialog.locator('input[type=file]').setInputFiles({name:'modelo.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:modelBuffer});
+ await expect(dialog.getByText('3 variantes')).toBeVisible();
+ await expect(dialog.getByText('13 unidades de estoque')).toBeVisible();
  await dialog.locator('input[type=file]').setInputFiles({
   name:'roupas.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer
  });
