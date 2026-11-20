@@ -9,7 +9,8 @@ import {ProductImport} from './ProductImport.tsx';
 type ProductAction='create'|'edit'|'import'|null;
 export function ProductWorkspace({session,onSaved}:{session:Session;onSaved:()=>void}){
  const [action,setAction]=useState<ProductAction>(null);
- function saved(){onSaved();if(action==='create')setAction(null);}
+ const [notice,setNotice]=useState('');
+ function saved(){onSaved();setNotice('Produto cadastrado com sucesso.');if(action==='create')setAction(null);}
  return <section className="workspace-hub" aria-label="Gerenciar produtos">
   <div className="hub-heading">
    <div><h2>Catálogo de roupas</h2><p>Cadastre peças, organize variantes e mantenha preços e fotografias atualizados.</p></div>
@@ -18,6 +19,7 @@ export function ProductWorkspace({session,onSaved}:{session:Session;onSaved:()=>
     <button type="button" className="light-button" onClick={()=>setAction('import')}>Importar planilha</button>
    </div>
   </div>
+  {notice&&<p role="status" className="notice">{notice}</p>}
   <div className="hub-grid">
    <button className="hub-tile" type="button" onClick={()=>setAction('create')}>
     <span className="hub-icon" aria-hidden="true">+</span><strong>Cadastrar peça</strong><span>Nome, categoria, cores e tamanhos</span>
@@ -37,7 +39,7 @@ export function ProductWorkspace({session,onSaved}:{session:Session;onSaved:()=>
    <CreateProductForm session={session} onSaved={saved}/>
   </AppDialog>}
   {action==='import'&&<AppDialog title="Importar produtos por planilha" wide onClose={()=>setAction(null)}>
-   <ProductImport session={session} onSaved={onSaved}/>
+   <ProductImport session={session} onSaved={()=>{onSaved();setNotice('Importação de produtos concluída.');}}/>
   </AppDialog>}
  </section>;
 }
@@ -54,7 +56,7 @@ export function StockWorkspace({session,products,manager,onSaved,query,onSearch,
   <div className="hub-heading">
    <div><h2>Estoque de peças</h2><p>Consulte saldos por SKU, receba mercadorias e corrija divergências com histórico.</p></div>
    <div className="hub-actions">
-    <button className="primary-action" type="button" onClick={()=>setAction('receive')}>Entrada de estoque</button>
+    <button className="primary-action" type="button" onClick={()=>setAction('receive')}>Registrar entrada</button>
     {manager&&<button className="light-button" type="button" onClick={()=>setAction('adjust')}>Ajustar saldo</button>}
    </div>
   </div>
