@@ -50,8 +50,7 @@ jobs:
           [[ "$expected" =~ ^[a-f0-9]{64}$ ]]
           actual="$(sha256sum Loja-de-Roupas-Setup-x64.exe | awk '{print $1}')"
           [[ "$actual" == "$expected" ]] || { echo "Checksum do instalador diverge da CI"; exit 1; }
-          printf '%s  Loja-de-Roupas-Setup-x64.exe
-' "$actual" > SHA256SUMS
+          echo "$actual  Loja-de-Roupas-Setup-x64.exe" > SHA256SUMS
           sha256sum -c SHA256SUMS
           echo "SHA256 verificado: $actual"
       - name: Escrever notas de lançamento
@@ -79,9 +78,8 @@ jobs:
         run: |
           set -euo pipefail
           gh release create v0.1.0             release-assets/windows/Loja-de-Roupas-Setup-x64.exe             release-assets/windows/SHA256SUMS             --repo "$GITHUB_REPOSITORY"             --target c3d56632ae5cd0ef2bdd2fb1bf3c9e9fccd350ea             --title "Loja de Roupas v0.1.0"             --notes-file release-assets/RELEASE_NOTES.md             --draft
-          files="$(gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json assets             --jq '.assets[].name' | sort)"
-          expected="$(printf 'Loja-de-Roupas-Setup-x64.exe
-SHA256SUMS' | sort)"
+          files="$(gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort | paste -sd ',' -)"
+          expected="Loja-de-Roupas-Setup-x64.exe,SHA256SUMS"
           [[ "$files" == "$expected" ]] || { echo "Assets de release incompletos"; exit 1; }
           gh release edit v0.1.0 --repo "$GITHUB_REPOSITORY" --draft=false --latest
           gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json url,isDraft             --jq 'select(.isDraft == false) | .url' | tee -a "$GITHUB_STEP_SUMMARY"
