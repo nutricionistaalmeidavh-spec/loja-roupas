@@ -1,5 +1,5 @@
 import { requestId } from './request-id.ts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, createProduct, receiveStock } from './api-client.ts';
 import type { Session, ProductPayload, StockReceiptPayload } from './api-client.ts';
@@ -15,13 +15,14 @@ function uncertainResult(error: unknown) {
   return !(error instanceof ApiError) || error.status === 0 || error.status >= 500;
 }
 
-export function CreateProductForm({ session, onSaved }: { session: Session; onSaved: () => void }) {
+export function CreateProductForm({ session, onSaved, onLockChange }: { session: Session; onSaved: () => void; onLockChange?: (locked:boolean)=>void }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Feminino');
   const [rows, setRows] = useState<VariantRow[]>([blankVariant()]);
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
+  useEffect(()=>{onLockChange?.(busy||uncertain);return ()=>onLockChange?.(false);},[busy,uncertain,onLockChange]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
@@ -95,13 +96,14 @@ export function CreateProductForm({ session, onSaved }: { session: Session; onSa
   </form>;
 }
 
-export function ReceiveStockForm({ session, products, onSaved, initialVariantId = '' }: { session: Session; products: Product[]; onSaved: () => void; initialVariantId?: string }) {
+export function ReceiveStockForm({ session, products, onSaved, initialVariantId = '', onLockChange }: { session: Session; products: Product[]; onSaved: () => void; initialVariantId?: string; onLockChange?: (locked:boolean)=>void }) {
   const [variantId, setVariantId] = useState(initialVariantId);
   const [quantity, setQuantity] = useState('1');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
+  useEffect(()=>{onLockChange?.(busy||uncertain);return ()=>onLockChange?.(false);},[busy,uncertain,onLockChange]);
   const [referenceId,setReferenceId] = useState(()=>requestId());
   const [notice,setNotice] = useState('');
   const [error,setError] = useState('');

@@ -45,6 +45,7 @@ export function App() {
   const [paging,setPaging] = useState(false);
   const [stockSearch,setStockSearch] = useState('');
   const [stockAction,setStockAction] = useState<'receive'|'adjust'|null>(null);
+  const [stockLocked,setStockLocked] = useState(false);
   const [cashState,setCashState] = useState<CashState|null>(null);
   const [cashRefresh,setCashRefresh] = useState(0);
   const [pickup,setPickup] = useState<PickupOrder>();
@@ -402,7 +403,7 @@ export function App() {
         </Suspense>
       </div>}
     </main>
-    {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide
+    {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide busy={stockLocked}
       onClose={()=>setStockAction(null)}>
       <div className="stock-task-layout">
         <div className="management-form">
@@ -412,12 +413,12 @@ export function App() {
           {stockLoading&&<p className="notice">Carregando variantes para recebimento…</p>}
           <p className="muted small">Mostrando até 50 resultados; pesquise o SKU exato para outros itens.</p>
         </div>
-        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
+        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed} onLockChange={setStockLocked}/>
       </div>
     </TaskDialog>}
-    {page==='estoque'&&manager&&stockAction==='adjust'&&<TaskDialog title="Ajustar estoque" wide
+    {page==='estoque'&&manager&&stockAction==='adjust'&&<TaskDialog title="Ajustar estoque" wide busy={stockLocked}
       onClose={()=>setStockAction(null)}>
-      <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>
+      <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch} onLockChange={setStockLocked}/>
     </TaskDialog>}
     {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
