@@ -85,7 +85,7 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
  let apiChild=null,startedPostgres=false;
  const databaseUrl=makeDatabaseUrl(config.password,config.pgPort);
  const appEnv={...env,DATABASE_URL:databaseUrl,HOST:'127.0.0.1',PORT:String(config.apiPort),
-  LOJA_WEB_DIST:webRoot,ELECTRON_RUN_AS_NODE:'1'};
+  LOJA_WEB_DIST:webRoot,LOJA_SYNC_SECRET_DIR:path.join(userData,'sync-secrets'),ELECTRON_RUN_AS_NODE:'1'};
  const node=async(entry,extra={})=>execute(exe,['--import','tsx',path.join(apiRoot,'src',entry)],{cwd:apiRoot,env:{...appEnv,...extra}});
  const stop=async()=>{
   if(apiChild){apiChild.kill();apiChild=null;}

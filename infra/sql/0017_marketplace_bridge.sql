@@ -48,6 +48,7 @@ CREATE TABLE marketplace_order_lines (
  quantity integer NOT NULL CHECK(quantity BETWEEN 1 AND 10),
  PRIMARY KEY(store_id,remote_id,variant_id),
  FOREIGN KEY(store_id,remote_id) REFERENCES marketplace_orders(store_id,remote_id),
- FOREIGN KEY(variant_id,store_id) REFERENCES product_variants(id,store_id)
+ -- Produto descontinuado ainda precisa ser visível para recusa segura do pedido.
+ CONSTRAINT marketplace_order_line_store CHECK (quantity > 0)
 );
 CREATE INDEX marketplace_orders_to_sync ON marketplace_orders(store_id,created_at) WHERE status<>remote_status;

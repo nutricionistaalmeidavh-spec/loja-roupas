@@ -19,6 +19,7 @@ import { registerStockHolds } from './stock-holds.ts';
 import { registerStockSpreadsheet } from './stock-spreadsheet.ts';
 import { registerStockSpreadsheetP2 } from './stock-spreadsheet-p2.ts';
 import { registerStaticUi } from './static-ui.ts';
+import { registerMarketplaceBridge } from './marketplace-bridge.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -49,6 +50,7 @@ export function buildApp(db: Pool) {
   registerIntelligence(app, db);
   registerProductFields(app, db);
   registerStaticUi(app);
+  registerMarketplaceBridge(app,db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

@@ -7,7 +7,7 @@ import {openSyncKey} from './marketplace-secrets.ts';
 
 type Link={slug:string;secret_encrypted:string;order_cursor:string|null};
 type Variant={id:string;product_id:string;name:string;category:string;color:string;size:string;price_cents:string;available:string;
- storefront_published:boolean;photo_hash:string|null;revision:string|null;fingerprint:string|null};
+ storefront_published:boolean;has_public_siblings:boolean;photo_hash:string|null;revision:string|null;fingerprint:string|null};
 type Pending={variant_id:string;revision:string;payload:Listing & {revision:number}};
 const errorText=(err:unknown)=>String(err instanceof Error?err.message:'Erro de sincronização').replace(/Bearer [a-z0-9_-]+/gi,'Bearer [oculto]').slice(0,240);
 async function remote<T>(base:URL,key:string,path:string,method='GET',body?:unknown,transport:typeof fetch=fetch):Promise<T>{
@@ -50,7 +50,8 @@ async function enqueueCatalog(db:Pool,storeId:string,base:URL,key:string,slug:st
   const rows=await db.query<Variant>(
    'SELECT v.id::text,p.id::text AS product_id,p.name,p.category,v.color,v.size,v.price_cents::text,'+
    ' greatest(0,coalesce(b.on_hand,0)-coalesce(b.reserved,0))::text AS available,v.storefront_published,'+
-   ' ph.sha256 AS photo_hash,l.revision::text,l.fingerprint'+
+   ' ph.sha256 AS photo_hash,l.revision::text,l.fingerprint,'+
+   ' EXISTS(SELECT 1 FROM product_variants pv WHERE pv.store_id=v.store_id AND pv.product_id=v.product_id AND pv.storefront_published) AS has_public_siblings'+
    ' FROM product_variants v JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id'+
    ' LEFT JOIN stock_balances b ON b.store_id=v.store_id AND b.variant_id=v.id'+
    ' LEFT JOIN product_photos ph ON ph.store_id=v.store_id AND ph.product_id=p.id'+
@@ -60,7 +61,7 @@ async function enqueueCatalog(db:Pool,storeId:string,base:URL,key:string,slug:st
   for(const row of rows.rows){
    last=row.id;
    if(!seen.has(row.product_id)){
-    await publishPhoto(db,storeId,base,key,row.product_id,row.storefront_published?row.photo_hash:null,transport);
+    await publishPhoto(db,storeId,base,key,row.product_id,row.has_public_siblings?row.photo_hash:null,transport);
     seen.add(row.product_id);
    }
    const listing:Listing={id:row.id,product_id:row.product_id,name:row.name,category:row.category,

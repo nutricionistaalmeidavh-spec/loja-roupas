@@ -226,6 +226,7 @@ export default {async fetch(request,env){
  const tenant=await syncTenant(request,env);if(!tenant)return fail(401,'invalid_license_or_sync_key');
  const uploadPhoto=/^\/v1\/sync\/photos\/([a-f0-9-]{36})$/i.exec(path);
  if(uploadPhoto&&(method==='PUT'||method==='DELETE'))return syncPhoto(request,env,tenant,uploadPhoto[1]);
+ if(method==='GET'&&path==='/v1/sync/identity')return json({slug:tenant.slug});
  if(method==='PUT'&&path==='/v1/sync/catalog')return syncCatalog(request,env,tenant);
  if(method==='GET'&&path==='/v1/sync/orders')return syncOrders(env,tenant,url);
  const update=/^\/v1\/sync\/orders\/([0-9a-f-]{36})$/.exec(path);
