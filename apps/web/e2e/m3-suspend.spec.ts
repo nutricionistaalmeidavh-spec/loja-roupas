@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
 test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({page})=>{
  const sku='DRAFT-'+Math.random().toString(36).slice(2,10).toUpperCase();
+ const productName='Vestido Suspenso QA '+sku;
  await page.goto('/');
  await page.getByLabel('Usuário').fill('qa-admin');
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
@@ -14,7 +15,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  }else await expect(page.getByText('Caixa aberto',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
  await page.getByRole('button',{name:/Novo produto/}).click();
- await page.getByLabel('Nome da peça').fill('Vestido Suspenso QA');
+ await page.getByLabel('Nome da peça').fill(productName);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Azul');
  await page.getByLabel('Tamanho').fill('M');
@@ -34,9 +35,9 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
  await page.getByRole('button',{name:'PDV'}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
- const card=page.locator('.product-card').filter({hasText:'Vestido Suspenso QA'});
+ const card=page.locator('.product-card').filter({hasText:productName});
  await expect(card.getByText('2 disponíveis')).toBeVisible();
- await card.getByRole('button',{name:'Adicionar Vestido Suspenso QA'}).click();
+ await card.getByRole('button',{name:'Adicionar '+productName}).click();
  await expect(page.getByText('1 peça adicionada')).toBeVisible();
  await page.getByRole('button',{name:'Suspender venda'}).click();
  await expect(page.getByText(/Venda suspensa e salva no servidor/)).toBeVisible();
