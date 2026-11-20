@@ -110,7 +110,7 @@ export function StockMovementHistory({session,variantId,sku,onClose}:{
       <td>{new Date(m.occurred_at).toLocaleString('pt-BR')}</td>
       <td>{m.sku}</td>
       <td>{labels[m.movement_kind]??m.movement_kind}</td>
-      <td className={m.qty_delta<0?'negative':'positive'}>{m.qty_delta>0?'+':''}{m.qty_delta}</td>
+      <td className={m.qty_delta<0?'negative':'positive'}>{m.qty_delta>0?'+':''}{m.qty_delta} peças</td>
       <td>{origins[m.source_type]??m.source_type}</td>
       <td>{m.supplier_name??'—'}{m.purchase_id?' · '+m.purchase_id.slice(0,8):''}</td>
       <td>{m.operator_login??'Não registrado'}</td>
