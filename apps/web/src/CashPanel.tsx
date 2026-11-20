@@ -6,6 +6,7 @@ import type { Session } from './api-client.ts';
 import { currentCash,openCash,closeCash,moveCash } from './pos-client.ts';
 import type { CashState } from './pos-client.ts';
 import { reaisToCents } from './catalog-model.ts';
+import { TaskDialog } from './TaskDialog.tsx';
 
 const currency=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>void}){
@@ -16,6 +17,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
  const [busy,setBusy]=useState(false),[key,setKey]=useState<string|null>(null);
  const [pendingSignature,setPendingSignature]=useState('');
  const [refresh,setRefresh]=useState(0);
+ const [cashTask,setCashTask]=useState<'movement'|'close'|null>(null);
  const active=cash?.active?cash:null;
  useEffect(()=>{
   setLoading(true);
@@ -43,7 +45,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
    if(action==='movement')await moveCash(session,active!.id,kind,reaisToCents(amount),reason,nextKey);
    setStatus(action==='open'?'Caixa aberto.':action==='close'?'Caixa fechado.':'Movimento de caixa registrado.');
    setKey(null);setPendingSignature('');setRefresh(x=>x+1);onChanged();
-   setReason('');setAmount('');
+   setReason('');setAmount('');setCashTask(null);
   }catch(err){
    setError(err instanceof Error?err.message:'Erro no caixa');
    if(err instanceof ApiError&&err.status>=400&&err.status<500){setKey(null);setPendingSignature('');}
@@ -60,23 +62,35 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
    <button disabled={busy} className="primary-action">Abrir caixa</button>
   </form>}
   {active&&<>
-   <form className="editor-block" onSubmit={e=>void perform(e,'movement')}>
-    <h3>Movimentação</h3>
-    <label>Tipo<select value={kind} onChange={e=>setKind(e.target.value as 'supply'|'withdrawal')}>
-      <option value="supply">Suprimento</option><option value="withdrawal">Sangria</option>
-    </select></label>
-    <label>Valor (R$)<input required inputMode="decimal" placeholder="25,00" value={amount}
-      onChange={e=>setAmount(e.target.value)}/></label>
-    <label>Justificativa<input required minLength={8} maxLength={250} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-    <button disabled={busy} className="light-button">Registrar movimento</button>
-   </form>
-   <form className="editor-block" onSubmit={e=>void perform(e,'close')}>
-    <h3>Fechar caixa</h3>
-    <label>Dinheiro contado (R$)<input required inputMode="decimal" value={counted}
-      onChange={e=>setCounted(e.target.value)}/></label>
-    <label>Justificativa em caso de divergência<input maxLength={250} minLength={8} value={reason} onChange={e=>setReason(e.target.value)}/></label>
-    <button disabled={busy} className="light-button">Fechar e conferir caixa</button>
-   </form>
+   <div className="cash-quick-actions">
+     <button type="button" className="light-button" onClick={()=>setCashTask('movement')}>Sangria ou suprimento</button>
+     <button type="button" className="primary-action" onClick={()=>setCashTask('close')}>Fechar caixa</button>
+   </div>
+   {cashTask==='movement'&&<TaskDialog title="Sangria ou suprimento" busy={busy||Boolean(key)} onClose={()=>setCashTask(null)}>
+    <form className="editor-block" onSubmit={e=>void perform(e,'movement')}>
+      <h3>Movimentação</h3>
+      <label>Tipo<select value={kind} onChange={e=>setKind(e.target.value as 'supply'|'withdrawal')}>
+        <option value="supply">Suprimento</option><option value="withdrawal">Sangria</option>
+      </select></label>
+      <label>Valor (R$)<input required inputMode="decimal" placeholder="25,00" value={amount}
+        onChange={e=>setAmount(e.target.value)}/></label>
+      <label>Justificativa<input required minLength={8} maxLength={250} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+      {error&&<p className="error" role="alert">{error}</p>}
+      <button disabled={busy} className="primary-action">Registrar movimento</button>
+    </form>
+   </TaskDialog>}
+   {cashTask==='close'&&<TaskDialog title="Fechar caixa" busy={busy||Boolean(key)} onClose={()=>setCashTask(null)}>
+    <form className="editor-block" onSubmit={e=>void perform(e,'close')}>
+      <h3>Conferência do caixa</h3>
+      <p>Informe o dinheiro físico contado. Divergências exigem justificativa.</p>
+      <label>Dinheiro contado (R$)<input required inputMode="decimal" value={counted}
+        onChange={e=>setCounted(e.target.value)}/></label>
+      <label>Justificativa em caso de divergência<input maxLength={250} minLength={8} value={reason}
+        onChange={e=>setReason(e.target.value)}/></label>
+      {error&&<p className="error" role="alert">{error}</p>}
+      <button disabled={busy} className="primary-action">Fechar e conferir caixa</button>
+    </form>
+   </TaskDialog>}
   </>}
   {error&&<p className="error" role="alert">{error}</p>}
   {status&&<p className="notice" role="status">{status}</p>}
