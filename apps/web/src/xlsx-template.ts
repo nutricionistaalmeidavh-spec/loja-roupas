@@ -31,7 +31,7 @@ function checksum(bytes:Uint8Array):number{
  return (crc^0xffffffff)>>>0;
 }
 function archive(entries:[string,string][]):Blob{
- const encoder=new TextEncoder(),parts:BlobPart[]=[],directory:Uint8Array[]=[];
+ const encoder=new TextEncoder(),parts:BlobPart[]=[],directory:Uint8Array<ArrayBuffer>[]=[];
  let offset=0,dirSize=0;
  for(const [filename,content] of entries){
   const name=encoder.encode(filename),bytes=encoder.encode(content);
