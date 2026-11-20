@@ -135,6 +135,70 @@
  .checkout-buttons{position:sticky;bottom:-16px;background:white;padding:12px 0 16px;border-top:1px solid #e9e9e9}
 }
 
+/* Task-focused administration — compact and responsive, no external UI dependency. */
+.products-workspace{display:grid;gap:16px;padding:18px 0 45px}
+.workspace-hero{background:#fff;border:1px solid #e8e8e8;border-radius:16px;padding:22px 24px;
+ display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.workspace-hero h2{margin:0 0 5px;font-size:22px}
+.workspace-hero p{margin:0;color:#676767;max-width:540px}
+.workspace-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.workspace-actions button{min-height:42px}
+.workspace-card{background:#fff;border:1px solid #e8e8e8;border-radius:16px;padding:20px 24px}
+.workspace-search-label{display:grid;gap:8px;font-weight:650;max-width:540px}
+.workspace-search-label input{padding:12px;border:1px solid #d9d9d9;border-radius:10px}
+.catalog-list{display:grid;gap:0;margin-top:17px}
+.catalog-list-item{display:flex;align-items:center;justify-content:space-between;gap:15px;
+ border-top:1px solid #ededed;padding:14px 3px}
+.catalog-list-identity{display:grid;gap:4px;min-width:0}
+.catalog-list-identity strong{font-size:15px}
+.catalog-list-identity span,.catalog-list-meta span{font-size:12px;color:#626262}
+.catalog-list-meta{display:flex;align-items:center;gap:18px}
+.catalog-list-meta .light-button{min-height:36px}
+.workspace-editor .management-form{margin:0;max-width:none}
+.task-dialog-backdrop{position:fixed;inset:0;z-index:60;background:rgba(15,15,15,.58);
+ display:flex;align-items:center;justify-content:center;padding:18px}
+.task-dialog{width:min(100%,600px);max-height:calc(100dvh - 36px);background:#fff;
+ border-radius:16px;box-shadow:0 18px 90px #0003;display:flex;flex-direction:column;overflow:hidden}
+.task-dialog-wide{width:min(100%,980px)}
+.task-dialog:focus{outline:none}
+.task-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:16px;
+ padding:18px 24px;border-bottom:1px solid #e9e9e9}
+.task-dialog-head h2{font-size:20px;margin:0}
+.task-dialog-body{min-height:0;overflow:auto;padding:22px 24px;overscroll-behavior:contain}
+.task-dialog-body>.management-form{border:0;box-shadow:none;margin:0;padding:0;max-width:none}
+.task-dialog-body .form-heading h2{font-size:16px}
+.task-dialog :is(button,input,select,textarea):focus-visible,
+.workspace-card :is(button,input,select):focus-visible{outline:3px solid #96774e;outline-offset:2px}
+.import-steps{display:grid;gap:20px}
+.import-step{border:1px solid #e8e8e8;border-radius:13px;padding:18px;min-width:0}
+.import-step h3{font-size:16px;margin:0 0 7px}
+.import-step p{color:#555;line-height:1.5}
+.import-step label{font-weight:650;display:grid;gap:7px}
+.import-step input[type=file]{padding:11px;border:1px dashed #a7a7a7;border-radius:9px;width:100%}
+.import-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:14px 0}
+.import-stats div{background:#f6f6f6;padding:10px;border-radius:9px;display:grid;gap:4px}
+.import-stats strong{font-size:19px}.import-stats span{color:#666;font-size:12px}
+.import-errors{background:#fff0ee;border:1px solid #edc4be;padding:12px;border-radius:9px}
+.import-errors li{margin-bottom:4px}
+.import-table-scroll{max-width:100%;overflow-x:auto}
+.import-table-scroll table{border-collapse:collapse;width:100%;min-width:600px}
+.import-table-scroll th,.import-table-scroll td{padding:9px;text-align:left;border-bottom:1px solid #e8e8e8;font-size:12px}
+.import-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+@media(max-width:640px){
+ .products-workspace{padding:10px 0 80px}
+ .workspace-hero,.workspace-card{padding:15px}
+ .workspace-hero h2{font-size:19px}
+ .workspace-actions{width:100%}
+ .workspace-actions button{flex:1 1 140px}
+ .task-dialog-backdrop{padding:0;align-items:stretch}
+ .task-dialog,.task-dialog-wide{width:100%;max-height:100dvh;height:100dvh;border-radius:0}
+ .task-dialog-head{padding:14px 16px}
+ .task-dialog-body{padding:16px}
+ .catalog-list-meta{gap:7px}
+ .import-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){.task-dialog{animation:none!important;transition:none!important}}
+
 /* P2: navegação operacional legível e estados de foco consistentes. */
 .icon-rail button{font-family:inherit;font-size:11px;font-weight:750;letter-spacing:.02em}
 .icon-rail button span{display:block;line-height:1.2}
