@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto';
-import type {Pool} from 'pg';
+import type {Pool,QueryResult} from 'pg';
 import sharp from 'sharp';
 import {marketplaceBaseUrl,listingFingerprint,nextListingRevision,normalizeRemoteOrder} from './marketplace-sync-core.ts';
 import type {Listing} from './marketplace-sync-core.ts';
@@ -29,7 +29,7 @@ async function publishPhoto(db:Pool,storeId:string,base:URL,key:string,productId
  }
  const photo=await db.query<{bytes:Buffer}>('SELECT coalesce(thumb_bytes,image_bytes) AS bytes FROM product_photos WHERE store_id=$1 AND product_id=$2',[storeId,productId]);
  if(!photo.rowCount)throw new Error('Foto local removida durante a sincronização');
- let bytes=Buffer.alloc(0);
+ let bytes:Buffer<ArrayBufferLike>=Buffer.alloc(0);
  for(const [width,quality] of [[550,72],[420,65],[300,55],[200,45]]){
   bytes=await sharp(photo.rows[0].bytes,{limitInputPixels:20_000_000}).rotate().resize({width,height:width,fit:'inside',withoutEnlargement:true})
    .webp({quality,effort:2}).toBuffer();
@@ -47,7 +47,7 @@ async function enqueueCatalog(db:Pool,storeId:string,base:URL,key:string,slug:st
  let last:string|null=null;
  const seen=new Set<string>();
  for(let index=0;index<100;index++){
-  const rows=await db.query<Variant>(
+  const rows:QueryResult<Variant>=await db.query<Variant>(
    'SELECT v.id::text,p.id::text AS product_id,p.name,p.category,v.color,v.size,v.price_cents::text,'+
    ' greatest(0,coalesce(b.on_hand,0)-coalesce(b.reserved,0))::text AS available,v.storefront_published,'+
    ' ph.sha256 AS photo_hash,l.revision::text,l.fingerprint,'+

@@ -59,7 +59,7 @@ export function registerMarketplaceBridge(app:FastifyInstance,db:Pool){
    db.query<{count:string}>("SELECT count(*)::text AS count FROM marketplace_orders WHERE store_id=$1 AND status='pending'",[store]),
    db.query<{count:string}>('SELECT count(*)::text AS count FROM marketplace_listings WHERE store_id=$1 AND revision>delivered_revision',[store])
   ]);
-  return {configured:result.rowCount>0,connected:result.rows[0]??null,
+  return {configured:(result.rowCount??0)>0,connected:result.rows[0]??null,
     pending_orders:Number(waiting.rows[0].count),pending_changes:Number(pending.rows[0].count),
     marketplace_url:marketplaceBaseUrl().href};
  });
