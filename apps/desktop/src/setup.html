@@ -1,0 +1,57 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'"/>
+<title>Configurar minha loja</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f6f4;color:#232323;font:15px/1.5 system-ui,'Segoe UI',sans-serif}
+main{width:min(530px,calc(100% - 36px));margin:6vh auto;padding:32px;border:1px solid #e9e7e2;border-radius:20px;background:#fff;box-shadow:0 10px 40px #0000000d}
+.eyebrow{font-size:11px;letter-spacing:.14em;color:#927b58;font-weight:800}h1{margin:10px 0;font-size:27px}p{color:#626262}
+label{display:grid;gap:6px;font-weight:650;margin:16px 0 0}input{min-height:45px;padding:10px 12px;border:1px solid #d6d6d6;border-radius:9px;font:inherit}
+button{cursor:pointer;border-radius:9px;padding:13px 18px;min-height:45px;border:1px solid #dedede;background:#fff;font:inherit}
+button.primary{background:#242424;color:white;border-color:#242424;font-weight:700;width:100%;margin-top:22px}
+button:disabled{opacity:.6;cursor:wait}a,button.text{color:#57514a;background:none;border:0;text-decoration:underline;padding:10px 0}
+progress{width:100%;accent-color:#252525}#status{min-height:42px;font-size:13px}#error{color:#a72c24;font-size:13px}
+small{display:block;margin-top:20px;color:#777}
+</style></head><body><main>
+<div class="eyebrow">LOJA DE ROUPAS · INSTALAÇÃO LOCAL</div>
+<h1 id="title">Preparando sua loja</h1>
+<p id="intro">Tudo funcionará neste computador, sem servidor contratado, Docker ou assinatura.</p>
+<div id="loading"><progress aria-label="Preparando o sistema"></progress><p id="status" role="status">Verificando componentes…</p></div>
+<form id="first" hidden>
+<label>Nome da loja<input name="name" maxlength="120" required placeholder="Ex.: Boutique Central" autocomplete="organization"/></label>
+<label>Usuário administrador<input name="login" maxlength="80" required placeholder="Ex.: gerente" autocomplete="username"/></label>
+<label>Senha inicial<input name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required/></label>
+<p>Use pelo menos 12 caracteres. Os dados e senhas ficarão neste computador. Guarde um backup seguro.</p>
+<p id="error" role="alert"></p>
+<button class="primary" type="submit">Criar loja e começar</button>
+</form>
+<div id="connection"><button class="text" type="button" id="showRemote">Este é um terminal adicional? Conectar a outra máquina</button>
+<form id="remote" hidden>
+<label>Endereço da loja na rede<input name="url" type="url" placeholder="http://192.168.1.10:8080" required/></label>
+<p id="remoteError" role="alert"></p>
+<button class="primary" type="submit">Conectar terminal</button>
+</form></div>
+<small>O PostgreSQL e a API usam somente a rede local deste computador. Nenhuma licença ou serviço pago é necessário.</small>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+function render(state){
+ $('status').textContent=state.status||'Preparando…';
+ if(state.error){$('loading').hidden=true;$('first').hidden=true;$('error').textContent=state.error;$('error').hidden=false;$('title').textContent='Não foi possível iniciar';$('first').hidden=false;return;}
+ if(state.ready){$('loading').hidden=true;$('first').hidden=false;$('title').textContent='Crie sua loja';$('intro').textContent='Seu banco de dados foi preparado. Cadastre o primeiro administrador.';}
+}
+window.lojaSetup.onStatus(message=>render(message));
+window.lojaSetup.state().then(render).catch(error=>{$('status').textContent=error.message});
+$('first').addEventListener('submit',async event=>{
+ event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;$('error').textContent='';
+ const data=Object.fromEntries(new FormData(event.target).entries());
+ try{const result=await window.lojaSetup.create(data);if(!result?.ok)throw Error('Não foi possível concluir');$('status').textContent='Loja criada. Abrindo o PDV…';}
+ catch(error){$('error').textContent=error.message;button.disabled=false;}
+});
+$('showRemote').addEventListener('click',()=>{$('remote').hidden=!$('remote').hidden});
+$('remote').addEventListener('submit',async event=>{
+ event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;
+ try{await window.lojaSetup.remote(new FormData(event.target).get('url'))}
+ catch(error){$('remoteError').textContent=error.message;button.disabled=false;}
+});
+</script></body></html>
