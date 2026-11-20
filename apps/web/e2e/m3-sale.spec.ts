@@ -24,6 +24,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  }
 
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByRole('button',{name:/Novo produto/}).click();
  await page.getByLabel('Nome da peça').fill(productName);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Preto');
@@ -33,7 +34,9 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await page.getByLabel('Código de barras (opcional)').fill(barcode);
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
- await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:productName});
+ await page.getByRole('button',{name:'Fechar Novo produto'}).click();
+  await page.getByRole('button',{name:'Editar produto'}).click();
+await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:productName});
  const variantOption=page.getByRole('combobox',{name:'Variante para preço',exact:true}).locator('option',{hasText:sku});
  await expect(variantOption).toBeAttached();
  await page.getByRole('combobox',{name:'Variante para preço',exact:true}).selectOption((await variantOption.getAttribute('value'))!);
