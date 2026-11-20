@@ -41,6 +41,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  const [lastUpdated,setLastUpdated]=useState('');
  const [stale,setStale]=useState(false);
  const [dirty,setDirty]=useState<string|null>(null);
+ const [selectedId,setSelectedId]=useState<string|null>(null);
  const dirtyRef=useRef<string|null>(null);
  const [saving,setSaving]=useState(false);
  const savingRef=useRef(false);
@@ -51,6 +52,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  const [history,setHistory]=useState<StockMovement[]>([]);
  const [historyError,setHistoryError]=useState('');
  const limit=50;
+ const selectedRow=rows.find(r=>r.variant_id===selectedId)??null;
 
  useEffect(()=>{
   const timer=setTimeout(()=>{setOffset(0);setSearch(query.trim());},270);
@@ -219,13 +221,25 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
     {loading?'Carregando…':lastUpdated?'Sincronizado às '+lastUpdated:'Aguardando conexão'}
    </div>
   </div>
+  <p className="muted small">Selecione qualquer SKU para acessar as ações também em telas pequenas.</p>
   {canEdit&&<p className="muted small">Clique duas vezes em uma célula para editar. Salve ou descarte cada linha antes de passar para outro SKU. Saldo e histórico são somente leitura.</p>}
   {error&&<p role="alert" className="error">{error}</p>}
   {notice&&<p role="status" className="notice">{notice}</p>}
   {stale&&<p role="status" className="notice">Há dados novos no servidor. Conclua a edição atual e atualize a planilha.</p>}
+  {selectedRow&&<div className="sheet-selection-toolbar" role="group" aria-label="Ações da variante selecionada">
+    <div><span className="muted small">Peça selecionada</span><strong>{selectedRow.name} · {selectedRow.sku}</strong></div>
+    <div className="workspace-actions">
+      {canReceive&&<button className="light-button" type="button" onClick={()=>setAction({kind:'receive',row:selectedRow})}
+        aria-label={'Receber selecionado '+selectedRow.sku}>Receber peças</button>}
+      {canEdit&&<button className="light-button" type="button" onClick={()=>setAction({kind:'adjust',row:selectedRow})}
+        aria-label={'Ajustar selecionado '+selectedRow.sku}>Ajustar estoque</button>}
+      <button className="light-button" type="button" onClick={()=>setAction({kind:'history',row:selectedRow})}
+        aria-label={'Histórico selecionado '+selectedRow.sku}>Ver histórico</button>
+    </div>
+  </div>}
   <div className="stock-grid-wrap" role="region" tabIndex={0} aria-label="Planilha de produtos e estoque">
    <DataGrid className="rdg-light stock-grid" columns={columns} rows={rows}
-     onRowsChange={editRows} getRowKey={row=>row.variant_id}
+     onRowsChange={editRows} onCellClick={args=>setSelectedId(args.row.variant_id)} getRowKey={row=>row.variant_id}
      rowHeight={46} headerRowHeight={50}
      style={{blockSize:'min(65dvh,650px)',minBlockSize:260}}/>
   </div>
