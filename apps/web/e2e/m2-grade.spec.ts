@@ -8,13 +8,15 @@ test('M2: ampliar grade existente e atualizar SKU, cor e tamanho',async({page})=
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByRole('button',{name:'Novo produto'}).click();
  await page.getByLabel('Nome da peça').fill(name);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Bege');
  await page.getByLabel('Tamanho').fill('M');
  await page.getByLabel('Preço (R$)').fill('99,90');
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
- await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'Produto cadastrado com sucesso'})).toBeVisible();
+ await page.getByRole('button',{name:'Editar catálogo'}).click();
  await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
  const fieldName='Composição '+suffix;
  await page.getByText('Campos personalizados',{exact:true}).click();
