@@ -23,6 +23,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
  await page.getByRole('button',{name:'Fechar Novo produto'}).click();
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await page.getByRole('button',{name:'Receber estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const option=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(option).toBeAttached();
@@ -30,6 +31,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await page.getByLabel('Quantidade recebida').fill('2');
  await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
  await expect(page.getByText(/Novo saldo em mãos: 2/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
  await page.getByRole('button',{name:'PDV'}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
  const card=page.locator('.product-card').filter({hasText:'Vestido Suspenso QA'});
