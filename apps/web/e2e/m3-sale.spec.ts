@@ -37,6 +37,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await expect(page.getByRole('status').filter({hasText:'Produto cadastrado com sucesso'})).toBeVisible();
  await page.getByRole('button',{name:'Editar catálogo'}).click();
  await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:productName});
+ await page.getByRole('button',{name:'Etiquetas e vitrine',exact:true}).click();
  const variantOption=page.getByRole('combobox',{name:'Variante para preço',exact:true}).locator('option',{hasText:sku});
  await expect(variantOption).toBeAttached();
  await page.getByRole('combobox',{name:'Variante para preço',exact:true}).selectOption((await variantOption.getAttribute('value'))!);
