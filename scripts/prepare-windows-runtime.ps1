@@ -18,7 +18,15 @@ $pgSource=Join-Path $unpack 'pgsql'
 foreach($name in @('initdb.exe','pg_ctl.exe','psql.exe','createdb.exe','postgres.exe')){
  if(!(Test-Path (Join-Path $pgSource "bin/$name"))){throw "Missing PostgreSQL $name"}
 }
-Copy-Item -Recurse -LiteralPath $pgSource -Destination (Join-Path $runtime 'postgres')
+$pgDest=Join-Path $runtime 'postgres'
+New-Item -ItemType Directory -Force -Path $pgDest|Out-Null
+# Excluir pgAdmin, documentação e SDK: PostgreSQL necessita apenas bin/lib/share.
+foreach($folder in @('bin','lib','share')){
+ $source=Join-Path $pgSource $folder
+ if(!(Test-Path -LiteralPath $source)){throw "PostgreSQL folder missing: $folder"}
+ Copy-Item -Recurse -LiteralPath $source -Destination (Join-Path $pgDest $folder)
+}
+
 Write-Host 'PostgreSQL portable component verified'
 
 # Isolated production API deployment including tsx runtime and workspace packages.
