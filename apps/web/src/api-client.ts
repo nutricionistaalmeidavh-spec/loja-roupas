@@ -161,3 +161,46 @@ export function patchSpreadsheetRow(
   body:JSON.stringify(payload)
  },fetchImpl);
 }
+
+/** P2: transactionally apply at most 100 changed SKU rows. */
+export type SpreadsheetBulkRow=SpreadsheetRowPatch&{variant_id:string};
+export function patchSpreadsheetBulk(
+ session:Session,items:readonly SpreadsheetBulkRow[],key:string,fetchImpl:typeof fetch=fetch
+):Promise<{updated:number;products_updated:number;variants_updated:number;replayed:boolean}>{
+ return jsonRequest('/v1/stock/spreadsheet/bulk-edit',{
+  method:'POST',headers:{...headers(session,key),'content-type':'application/json'},
+  body:JSON.stringify({items})
+ },fetchImpl);
+}
+export type InventoryMovement={
+ id:string;variant_id:string;sku:string;product_name:string;movement_kind:string;
+ qty_delta:number;source_type:string;source_id:string;purchase_id:string|null;
+ supplier_id:string|null;supplier_name:string|null;operator_id:string|null;
+ operator_login:string|null;occurred_at:string;
+};
+export type InventoryMovementFilters={
+ variant_id?:string;movement_kind?:string;supplier_id?:string;purchase_id?:string;
+ operator_id?:string;from?:string;to?:string;limit?:number;offset?:number;
+};
+export function listSpreadsheetHistory(
+ session:Session,filters:InventoryMovementFilters={},fetchImpl:typeof fetch=fetch,signal?:AbortSignal
+):Promise<{total:number;limit:number;offset:number;items:InventoryMovement[]}>{
+ const params=new URLSearchParams();
+ for(const [key,val] of Object.entries(filters))if(val!==undefined&&val!==''&&val!==null)
+  params.set(key,String(val));
+ return jsonRequest('/v1/stock/spreadsheet/movements?'+params.toString(),{
+  method:'GET',headers:headers(session),signal
+ },fetchImpl);
+}
+export type InventoryHistoryOptions={
+ suppliers:Array<{id:string;name:string}>;
+ operators:Array<{id:string;login:string}>;
+ purchases:Array<{id:string;sku:string;supplier_name:string}>;
+};
+export function listInventoryHistoryOptions(
+ session:Session,fetchImpl:typeof fetch=fetch
+):Promise<InventoryHistoryOptions>{
+ return jsonRequest('/v1/stock/spreadsheet/filter-options',{
+  method:'GET',headers:headers(session)
+ },fetchImpl);
+}
