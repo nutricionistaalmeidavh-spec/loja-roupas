@@ -41,6 +41,7 @@ function render(state){
  $('failure').hidden=true;
  if(state.activationRequired){$('loading').hidden=true;$('first').hidden=true;$('activation').hidden=false;$('title').textContent='Ative sua licença comercial';$('intro').textContent='Use o código enviado após a liberação na Central ArtiSys. Seu caixa e dados serão locais, inclusive offline após ativação.';return;}
  $('activation').hidden=true;
+ $('loading').hidden=Boolean(state.ready);
  if(state.ready){$('loading').hidden=true;$('first').hidden=false;$('title').textContent='Crie sua loja';$('intro').textContent='Seu banco de dados foi preparado. Cadastre o primeiro administrador.';}
 }
 window.lojaSetup.onStatus(message=>render(message));
