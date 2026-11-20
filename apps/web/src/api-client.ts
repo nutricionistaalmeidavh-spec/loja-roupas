@@ -125,3 +125,39 @@ export function patchVariantAttributes(session:Session,id:string,attributes:Vari
   method:'PATCH',headers:{...headers(session,key),'content-type':'application/json'},body:JSON.stringify(attributes)
  },fetchImpl);
 }
+
+/** Read-only projection of canonical products, balances and movement ledger. */
+export type StockSpreadsheetRow={
+ product_id:string;variant_id:string;name:string;category:string;sku:string;color:string;size:string;
+ barcode:string|null;price_cents:number;product_revision:number;variant_revision:number;
+ stock_revision:number;on_hand:number;reserved:number;available:number;
+ entries:number;sold:number;returns:number;adjustments:number;last_movement_at:string|null;
+};
+export type StockSpreadsheetPage={
+ items:StockSpreadsheetRow[];total:number;offset:number;limit:number;categories:string[];
+};
+export type SpreadsheetRowPatch={
+ name:string;category:string;sku:string;color:string;size:string;
+ barcode:string|null;price_cents:number;
+ expected_product_revision:number;expected_variant_revision:number;
+};
+export function listStockSpreadsheet(
+ session:Session,options:{query?:string;category?:string;limit?:number;offset?:number}={},
+ fetchImpl:typeof fetch=fetch,signal?:AbortSignal
+):Promise<StockSpreadsheetPage>{
+ const params=new URLSearchParams({
+  query:options.query??'',category:options.category??'',
+  limit:String(options.limit??50),offset:String(options.offset??0)
+ });
+ return jsonRequest<StockSpreadsheetPage>('/v1/stock/spreadsheet?'+params.toString(),{
+  method:'GET',headers:headers(session),signal
+ },fetchImpl);
+}
+export function patchSpreadsheetRow(
+ session:Session,variantId:string,payload:SpreadsheetRowPatch,key:string,fetchImpl:typeof fetch=fetch
+):Promise<{id:string;product_id:string;product_revision:number;variant_revision:number;changed:boolean;replayed:boolean}>{
+ return jsonRequest('/v1/stock/spreadsheet/rows/'+encodeURIComponent(variantId),{
+  method:'PATCH',headers:{...headers(session,key),'content-type':'application/json'},
+  body:JSON.stringify(payload)
+ },fetchImpl);
+}
