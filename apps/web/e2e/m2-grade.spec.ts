@@ -25,6 +25,7 @@ test('M2: ampliar grade existente e atualizar SKU, cor e tamanho',async({page})=
  await page.getByLabel(fieldName,{exact:true}).fill('Algodão');
  await page.getByRole('button',{name:'Salvar '+fieldName}).click();
  await expect(page.getByText('Valor do campo salvo.')).toBeVisible();
+ await page.getByRole('button',{name:'Grade',exact:true}).click();
  await page.getByLabel('SKU novo').fill(second);
  await page.getByLabel('Cor nova').fill('Bege');
  await page.getByLabel('Tamanho novo').fill('G');
