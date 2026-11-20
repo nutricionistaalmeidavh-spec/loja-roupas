@@ -6,6 +6,7 @@ test('configura a meta e navega pelo painel em sete larguras',async({page},testI
   await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
   await page.getByRole('button',{name:'Entrar na loja'}).click();
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('button',{name:'Inteligência',exact:true}).click();
   const heading=page.getByRole('heading',{name:'Inteligência comercial'});
   await expect(heading).toBeVisible();
   await page.getByText('Personalizar painel',{exact:true}).focus();
@@ -24,6 +25,7 @@ test('configura a meta e navega pelo painel em sete larguras',async({page},testI
       await page.getByRole('button',{name:'PDV',exact:true}).click();
       await page.getByRole('button',{name:'Gestão',exact:true}).click();
     }
+    await page.getByRole('button',{name:'Inteligência',exact:true}).click();
     await expect(heading).toBeVisible();
     await expect(page.getByRole('definition').filter({hasText:/15\.000,00/}).first()).toBeVisible();
     await heading.scrollIntoViewIfNeeded();
