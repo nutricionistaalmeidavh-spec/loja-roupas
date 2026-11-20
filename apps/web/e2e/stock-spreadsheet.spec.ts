@@ -49,7 +49,7 @@ test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',as
  await expect(row.getByRole('gridcell').nth(9)).toHaveText('6');
  const cell=row.getByRole('gridcell',{name:name,exact:true});
  await cell.dblclick();
- const editor=grid.locator('input.rdg-text-editor');
+ const editor=grid.locator('input').last();
  await expect(editor).toBeVisible();
  await editor.fill(name+' editada');
  await editor.press('Enter');
