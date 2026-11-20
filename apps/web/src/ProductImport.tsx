@@ -5,14 +5,15 @@ import type {Session} from './api-client.ts';
 import {requestId} from './request-id.ts';
 import {CSV_TEMPLATE,parseProductCsv} from './product-import.ts';
 import {readProductXlsx} from './xlsx-reader.ts';
+import {createProductXlsxTemplate} from './xlsx-template.ts';
 import type {ImportPreview} from './product-import.ts';
 
 type ImportResult={products_created:number;variants_created:number;stock_units_received:number;product_ids:string[]};
 
-function downloadTemplate(){
- const blob=new Blob([CSV_TEMPLATE],{type:'text/csv;charset=utf-8'});
+function downloadTemplate(format:'csv'|'xlsx'){
+ const blob=format==='xlsx'?createProductXlsxTemplate():new Blob([CSV_TEMPLATE],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download='modelo-importacao-produtos.csv';
+ const a=document.createElement('a');a.href=url;a.download='modelo-importacao-produtos.'+format;
  document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -58,7 +59,8 @@ export function ProductImport({session,onSaved,onLockChange}:{session:Session;on
   <div className="import-steps">
    <section><strong>1. Baixe o modelo</strong>
     <p>Abra o modelo no Excel ou LibreOffice, substitua os exemplos e salve em CSV UTF-8 ou Excel (.xlsx).</p>
-    <button type="button" className="light-button" onClick={downloadTemplate}>Baixar modelo da planilha (.csv)</button>
+    <div className="hub-actions"><button type="button" className="light-button" onClick={()=>downloadTemplate("xlsx")}>Baixar modelo Excel (.xlsx)</button>
+    <button type="button" className="light-button" onClick={()=>downloadTemplate("csv")}>Baixar modelo da planilha (.csv)</button></div>
    </section>
    <section><strong>2. Envie a planilha preenchida</strong>
     <label className="import-file-label">Selecionar planilha (.csv ou .xlsx)
