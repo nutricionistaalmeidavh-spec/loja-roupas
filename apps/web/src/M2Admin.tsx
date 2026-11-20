@@ -122,7 +122,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
       <button key={id} type="button" className={editorTab===id?'active':''}
        aria-pressed={editorTab===id} onClick={()=>{setEditorTab(id);setError('');}}>{title}</button>)}
    </nav>
-   {editorTab!=='dados'&&editorTab!=='foto'&&    <label>Variante para preço<select aria-label="Variante para preço" value={variantId}
+   <label>Variante para preço<select aria-label="Variante para preço" value={variantId}
       onChange={e=>{
         const next=current.variants.find(v=>v.id===e.target.value);
         setVariantId(e.target.value);setPrice('');setPending(null);
@@ -131,7 +131,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
       }} disabled={busy}>
      <option value="">Selecione</option>
      {current.variants.map(v=><option key={v.id} value={v.id}>{v.sku} · {v.color} · {v.size}</option>)}
-    </select></label>}
+    </select></label>
    {editorTab==='dados'&&<>
    <ProductFields key={current.id} session={session} productId={current.id}/>
    <form onSubmit={e=>void submit('product',e)} className="editor-block">
@@ -151,8 +151,8 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
     <button type="submit" className="light-button" disabled={!variant||busy}>Salvar preço</button>
    </form>}
    {editorTab==='etiquetas'&&variant&&<BarcodeLabel key={variant.id} sku={variant.sku}/>}
-   {editorTab==='etiquetas'&&variant&&<PublishVariant key={variant.id} session={session} id={variant.id}/>}
-   {editorTab==='etiquetas'&&variant&&<StockHolds key={variant.id} session={session} variant={variant} onChanged={onSaved}/>}
+   {variant&&<PublishVariant key={variant.id} session={session} id={variant.id}/>}
+   {variant&&<StockHolds key={variant.id} session={session} variant={variant} onChanged={onSaved}/>}
    {editorTab==='grade'&&<form onSubmit={e=>void submitVariant('add',e)} className="editor-block">
      <h3>Adicionar variante à grade existente</h3>
      <div className="variant-fields">
