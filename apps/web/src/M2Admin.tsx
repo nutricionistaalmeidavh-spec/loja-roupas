@@ -11,8 +11,8 @@ import type { Product } from './catalog-model.ts';
 
 function message(error:unknown){return error instanceof Error?error.message:'Operação indisponível';}
 type Pending={key:string;payload:string};
-export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>void}){
- const [search,setSearch]=useState('');
+export function M2CatalogEditor({session,onSaved,initialProductId,initialProductName}:{session:Session;onSaved:()=>void;initialProductId?:string;initialProductName?:string}){
+ const [search,setSearch]=useState(initialProductName??'');
  const [products,setProducts]=useState<Product[]>([]);
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState('');
@@ -36,7 +36,11 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
   const controller=new AbortController();
   setLoading(true);
   const timer=setTimeout(()=>void listCatalog(session,search,fetch,controller.signal).then(data=>{
-   if(!controller.signal.aborted)setProducts(mapCatalog(data));
+   if(!controller.signal.aborted){
+     const incoming=mapCatalog(data);setProducts(incoming);
+     const chosen=incoming.find(p=>p.id===initialProductId);
+     if(chosen){setProductId(chosen.id);setName(chosen.name);setCategory(chosen.category);}
+   }
   }).catch(err=>{if(!controller.signal.aborted){setProducts([]);setError(message(err));}}).finally(()=>{
    if(!controller.signal.aborted)setLoading(false);
   }),250);
