@@ -10,6 +10,7 @@ type ProductAction='create'|'edit'|'import'|null;
 export function ProductWorkspace({session,onSaved}:{session:Session;onSaved:()=>void}){
  const [action,setAction]=useState<ProductAction>(null);
  const [notice,setNotice]=useState('');
+ const [createLocked,setCreateLocked]=useState(false),[importLocked,setImportLocked]=useState(false);
  function saved(){onSaved();setNotice('Produto cadastrado com sucesso.');if(action==='create')setAction(null);}
  return <section className="workspace-hub" aria-label="Gerenciar produtos">
   <div className="hub-heading">
@@ -35,11 +36,11 @@ export function ProductWorkspace({session,onSaved}:{session:Session;onSaved:()=>
    <div className="hub-heading"><h3>Editar catálogo</h3><button className="light-button" type="button" onClick={()=>setAction(null)}>Voltar ao início</button></div>
    <M2CatalogEditor session={session} onSaved={onSaved}/>
   </div>}
-  {action==='create'&&<AppDialog title="Cadastrar produto" wide onClose={()=>setAction(null)}>
-   <CreateProductForm session={session} onSaved={saved}/>
+  {action==='create'&&<AppDialog title="Cadastrar produto" wide locked={createLocked} onClose={()=>setAction(null)}>
+   <CreateProductForm session={session} onSaved={saved} onLockChange={setCreateLocked}/>
   </AppDialog>}
-  {action==='import'&&<AppDialog title="Importar produtos por planilha" wide onClose={()=>setAction(null)}>
-   <ProductImport session={session} onSaved={()=>{onSaved();setNotice('Importação de produtos concluída.');}}/>
+  {action==='import'&&<AppDialog title="Importar produtos por planilha" wide locked={importLocked} onClose={()=>setAction(null)}>
+   <ProductImport session={session} onLockChange={setImportLocked} onSaved={()=>{onSaved();setNotice('Importação de produtos concluída.');}}/>
   </AppDialog>}
  </section>;
 }
@@ -49,6 +50,7 @@ export function StockWorkspace({session,products,manager,onSaved,query,onSearch,
  query:string;onSearch:(value:string)=>void;loading:boolean;refreshKey:number;
 }){
  const [action,setAction]=useState<StockAction>(null);
+ const [stockLocked,setStockLocked]=useState(false);
  const variants=products.flatMap(product=>product.variants.map(variant=>({
   key:variant.id,name:product.name,sku:variant.sku,color:variant.color,size:variant.size,available:variant.available
  })));
@@ -72,8 +74,8 @@ export function StockWorkspace({session,products,manager,onSaved,query,onSearch,
    </div>}
    <p className="muted small">Até 50 produtos por consulta. Pesquise um SKU para localizar peças de outras páginas.</p>
   </div>
-  {action==='receive'&&<AppDialog title="Entrada de estoque" wide onClose={()=>setAction(null)}>
-   <ReceiveStockForm session={session} products={products} onSaved={onSaved}/>
+  {action==='receive'&&<AppDialog title="Entrada de estoque" wide locked={stockLocked} onClose={()=>setAction(null)}>
+   <ReceiveStockForm session={session} products={products} onSaved={onSaved} onLockChange={setStockLocked}/>
   </AppDialog>}
   {action==='adjust'&&manager&&<AppDialog title="Ajustar saldo de estoque" wide onClose={()=>setAction(null)}>
    <M2StockAdjustment session={session} onSaved={onSaved} refreshKey={refreshKey}/>
