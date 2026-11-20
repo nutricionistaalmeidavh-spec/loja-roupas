@@ -17,8 +17,8 @@ function normalizeStockItem(value){
  const color=String(v.color||'').trim(),size=String(v.size||'').trim();
  const photo_url=v.photo_url==null?null:String(v.photo_url).trim();
  if(!/^[a-zA-Z0-9_-]{3,96}$/.test(id)||!/^[a-zA-Z0-9_-]{2,96}$/.test(product_id)||
-    name.length<1||name.length>180||category.length>100||color.length>60||size.length>60||
-    !Number.isSafeInteger(v.price_cents)||v.price_cents<0||v.price_cents>1000000000||
+    name.length<1||name.length>200||category.length>100||color.length>100||size.length>32||
+    !Number.isSafeInteger(v.price_cents)||v.price_cents<0||v.price_cents>9999999999||
     !Number.isSafeInteger(v.available)||v.available<0||v.available>1000000||
     !Number.isSafeInteger(v.revision)||v.revision<0||typeof v.published!=='boolean')
    throw Error('invalid_catalog_item');
@@ -135,16 +135,63 @@ async function syncCatalog(request,env,tenant){
  await env.DB.batch(statements);
  return json({ok:true,received:items.length});
 }
-async function syncOrders(env,tenant){
- const r=await env.DB.prepare("SELECT id,request_id,customer_name,customer_phone,lines_json,status,created_at FROM pickup_orders WHERE tenant_id=? AND status IN ('pending','accepted') ORDER BY created_at ASC LIMIT 100").bind(tenant.id).all();
- return json({orders:(r.results||[]).map(x=>({...x,lines:JSON.parse(x.lines_json),lines_json:undefined}))});
+async function syncOrders(env,tenant,url){
+ const cursor=String(url.searchParams.get('after')||'');
+ if(cursor&&!/^[0-9a-f-]{36}$/i.test(cursor))return fail(400,'invalid_cursor');
+ let position=null;
+ if(cursor){
+  position=await env.DB.prepare('SELECT created_at,id FROM pickup_orders WHERE tenant_id=? AND id=?').bind(tenant.id,cursor).first();
+  if(!position)return fail(400,'invalid_cursor');
+ }
+ const q="SELECT id,request_id,customer_name,customer_phone,lines_json,status,created_at FROM pickup_orders "+
+  "WHERE tenant_id=? AND status IN ('pending','accepted') AND (? IS NULL OR created_at>? OR (created_at=? AND id>?)) "+
+  "ORDER BY created_at ASC,id ASC LIMIT 101";
+ const r=await env.DB.prepare(q).bind(tenant.id,position?.created_at??null,position?.created_at??null,position?.created_at??null,cursor||null).all();
+ const rows=(r.results||[]),page=rows.slice(0,100);
+ return json({orders:page.map(x=>({...x,lines:JSON.parse(x.lines_json),lines_json:undefined})),
+  next:rows.length>100?page[page.length-1].id:null});
+}
+export function onlineOrderTransition(current,next){
+ return current==='pending'&&(next==='accepted'||next==='rejected')||
+        current==='accepted'&&(next==='rejected'||next==='fulfilled')||
+        current===next;
+}
+async function syncPhoto(request,env,tenant,productId){
+ if(!/^[0-9a-f-]{36}$/i.test(productId))return fail(400,'invalid_photo_id');
+ if(request.method==='DELETE'){
+   await env.DB.prepare('DELETE FROM public_photos WHERE tenant_id=? AND product_id=?').bind(tenant.id,productId).run();
+   return json({ok:true});
+ }
+ if(request.method!=='PUT')return fail(405,'method_not_allowed');
+ const {mime,content_base64,sha256:expectedHash}=await readJson(request);
+ if(mime!=='image/webp'||typeof content_base64!=='string'||content_base64.length>100000||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(content_base64)||typeof expectedHash!=='string'||
+    !/^[a-f0-9]{64}$/i.test(expectedHash))return fail(400,'invalid_photo');
+ const raw=Uint8Array.from(atob(content_base64),c=>c.charCodeAt(0));
+ if(raw.byteLength<24||raw.byteLength>70000)return fail(400,'invalid_photo_size');
+ const magic=String.fromCharCode(...raw.subarray(0,4));
+ const webp=String.fromCharCode(...raw.subarray(8,12));
+ if(magic!=='RIFF'||webp!=='WEBP')return fail(400,'invalid_photo_format');
+ const hash=await crypto.subtle.digest('SHA-256',raw);
+ const actual=[...new Uint8Array(hash)].map(x=>x.toString(16).padStart(2,'0')).join('');
+ if(actual!==expectedHash)return fail(400,'invalid_photo_hash');
+ await env.DB.prepare('INSERT INTO public_photos(tenant_id,product_id,content_base64,sha256,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(tenant_id,product_id) DO UPDATE SET content_base64=excluded.content_base64,sha256=excluded.sha256,updated_at=excluded.updated_at')
+   .bind(tenant.id,productId,content_base64,actual,now()).run();
+ return json({ok:true,sha256:actual});
+}
+async function publicPhoto(env,slug,productId){
+ const tenant=await tenantBySlug(env,slug);if(!tenant||!/^[0-9a-f-]{36}$/i.test(productId))return fail(404,'photo_not_found');
+ const image=await env.DB.prepare('SELECT content_base64 FROM public_photos ph WHERE ph.tenant_id=? AND ph.product_id=? AND EXISTS (SELECT 1 FROM variants v WHERE v.tenant_id=ph.tenant_id AND v.product_id=ph.product_id AND v.published=1)')
+   .bind(tenant.id,productId).first();
+ if(!image)return fail(404,'photo_not_found');
+ return new Response(Uint8Array.from(atob(image.content_base64),c=>c.charCodeAt(0)),{headers:{'content-type':'image/webp','cache-control':'no-store','x-content-type-options':'nosniff'}});
 }
 async function syncOrderStatus(request,env,tenant,id){
  if(!/^[0-9a-f-]{36}$/.test(id))return fail(400,'invalid_order');
  const input=await readJson(request),status=String(input.status||'');
  if(!['accepted','rejected','fulfilled'].includes(status))return fail(400,'invalid_status');
  const date=now();
- const r=await env.DB.prepare("UPDATE pickup_orders SET status=?,updated_at=? WHERE tenant_id=? AND id=? AND ((status='pending' AND ? IN ('accepted','rejected')) OR (status='accepted' AND ?='fulfilled'))")
+ const r=await env.DB.prepare("UPDATE pickup_orders SET status=?,updated_at=? WHERE tenant_id=? AND id=? AND ((status='pending' AND ? IN ('accepted','rejected')) OR (status='accepted' AND ? IN ('fulfilled','rejected')))")
  .bind(status,date,tenant.id,id,status,status).run();
  if(Number(r.meta?.changes||0)>0)return json({id,status});
  const current=await env.DB.prepare('SELECT status FROM pickup_orders WHERE tenant_id=? AND id=?').bind(tenant.id,id).first();
@@ -173,10 +220,14 @@ export default {async fetch(request,env){
  if(method==='GET'&&publicRoute)return publicCatalog(env,publicRoute[1],url);
  const pickupRoute=/^\/v1\/storefront\/([a-z0-9-]{3,48})\/pickup-orders$/.exec(path);
  if(method==='POST'&&pickupRoute)return pickup(request,env,pickupRoute[1]);
+ const photo=/^\/v1\/media\/([a-z0-9-]{3,48})\/([a-f0-9-]{36})$/i.exec(path);
+ if(method==='GET'&&photo)return publicPhoto(env,photo[1],photo[2]);
  if(path.startsWith('/v1/sync/')){
  const tenant=await syncTenant(request,env);if(!tenant)return fail(401,'invalid_license_or_sync_key');
+ const uploadPhoto=/^\/v1\/sync\/photos\/([a-f0-9-]{36})$/i.exec(path);
+ if(uploadPhoto&&(method==='PUT'||method==='DELETE'))return syncPhoto(request,env,tenant,uploadPhoto[1]);
  if(method==='PUT'&&path==='/v1/sync/catalog')return syncCatalog(request,env,tenant);
- if(method==='GET'&&path==='/v1/sync/orders')return syncOrders(env,tenant);
+ if(method==='GET'&&path==='/v1/sync/orders')return syncOrders(env,tenant,url);
  const update=/^\/v1\/sync\/orders\/([0-9a-f-]{36})$/.exec(path);
  if(method==='PATCH'&&update)return syncOrderStatus(request,env,tenant,update[1]);
  return fail(404,'route_not_found');
