@@ -66,7 +66,7 @@ test('arquivo com SHA256 incorreto nunca fica disponível para instalação',asy
  const root=await mkdtemp(path.join(tmpdir(),'loja-update-invalid-'));
  try{
   await assert.rejects(()=>downloadVerified({
-   release:selectRelease(release,'0.1.0'),directory:root,
+   release:selectRelease({...release,assets:[{...release.assets[0],size:Buffer.byteLength('tampered')},release.assets[1]]},'0.1.0'),directory:root,
    fetchImpl:async url=>new Response(url===HASH?'f'.repeat(64)+'  Loja-de-Roupas-Setup-x64.exe\n':Buffer.from('tampered'),{status:200})
   }),/SHA256|integridade/i);
   assert.deepEqual(await readdir(root),[]);

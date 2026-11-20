@@ -1,0 +1,57 @@
+name: Marketplace Desktop Sync — DB, Worker e Contratos
+on:
+  push:
+    branches:
+      - 'feat/marketplace-desktop-sync-*'
+  pull_request:
+    paths:
+      - 'apps/api/src/marketplace*'
+      - 'apps/api/test/marketplace*'
+      - 'apps/web/src/MarketplaceSyncPanel.tsx'
+      - 'cloudflare/loja-roupas-vitrine/**'
+      - 'infra/sql/0017_marketplace_bridge.sql'
+      - '.github/workflows/marketplace-desktop-sync-ci.yml'
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: loja
+          POSTGRES_USER: loja
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loja -d loja"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
+      TEST_DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Instalar pnpm gratuito e dependências fixadas
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+      - name: Typecheck e build
+        run: |
+          pnpm --filter @loja/domain typecheck
+          pnpm --filter @loja/api typecheck
+          pnpm --filter @loja/web typecheck
+          pnpm --filter @loja/web build
+      - name: PostgreSQL e sincronização real
+        run: |
+          pnpm --filter @loja/api migrate
+          node --experimental-strip-types --test apps/api/test/marketplace-sync.test.ts apps/api/test/marketplace-bridge.integration.test.ts
+      - name: Segurança Worker, mídia e pedidos
+        run: node --test cloudflare/loja-roupas-vitrine/test/*.test.mjs
