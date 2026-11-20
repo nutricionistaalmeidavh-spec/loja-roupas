@@ -93,6 +93,7 @@ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectO
  await confirmation.getByRole('button',{name:'Nova venda'}).click();
 
  await page.getByRole('button',{name:'Caixa',exact:true}).click();
+ await page.getByRole('button',{name:'Fechar caixa',exact:true}).click();
  await page.getByLabel('Dinheiro contado (R$)').fill('200,00');
  await page.getByRole('button',{name:'Fechar e conferir caixa'}).click();
  await expect(page.getByText('Caixa fechado.')).toBeVisible();
