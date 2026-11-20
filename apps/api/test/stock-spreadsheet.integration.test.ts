@@ -55,7 +55,9 @@ test('P1 planilha canônica: entradas, vendas, devoluções, ajustes e revisão'
   assert.equal(stale.statusCode,409);
   const forbiddenStockWrite=await app.inject({method:'PATCH',url:'/v1/stock/spreadsheet/rows/'+variant,
     headers:{...headers,'idempotency-key':randomUUID()},payload:{...payload,on_hand:1000}});
-  assert.equal(forbiddenStockWrite.statusCode,400);
+  assert.equal(forbiddenStockWrite.statusCode,409); // revisão obsoleta impede escrita, inclusive com campo de saldo ignorado.
+  const persisted=await db.query<{on_hand:string}>('SELECT on_hand::text FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[sid,variant]);
+  assert.equal(persisted.rows[0].on_hand,'7');
   const anotherStore=await app.inject({method:'GET',url:'/v1/stock/spreadsheet',headers:{...headers,'x-store-id':randomUUID()}});
   assert.equal(anotherStore.statusCode,401);
  }finally{await app.close();await db.end();}
