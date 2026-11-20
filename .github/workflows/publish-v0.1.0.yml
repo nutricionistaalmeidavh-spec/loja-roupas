@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           cd release-assets/windows
-          expected="$(awk '$2=="Loja-de-Roupas-Setup-x64.exe" { print $1 }' SHA256SUMS)"
+          expected="$(tr -d '\r' < SHA256SUMS | awk '$2=="Loja-de-Roupas-Setup-x64.exe" { print tolower($1) }')"
           [[ "$expected" =~ ^[a-f0-9]{64}$ ]]
           actual="$(sha256sum Loja-de-Roupas-Setup-x64.exe | awk '{print $1}')"
           [[ "$actual" == "$expected" ]] || { echo "Checksum do instalador diverge da CI"; exit 1; }
