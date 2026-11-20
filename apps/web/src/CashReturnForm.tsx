@@ -1,4 +1,4 @@
-import { useRef,useState } from 'react';
+import { useEffect,useRef,useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError,headers,jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
@@ -9,8 +9,8 @@ type Result = {id:string;refunded_cents:number};
 const currency = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const message = (error:unknown) => error instanceof Error ? error.message : 'Falha ao consultar a venda';
 
-export function CashReturnForm({session,cashId,onReturned}:{
-  session:Session;cashId:string|null;onReturned:()=>void;
+export function CashReturnForm({session,cashId,onReturned,onLockChange}:{
+  session:Session;cashId:string|null;onReturned:()=>void;onLockChange?:(locked:boolean)=>void;
 }) {
   const [number,setNumber] = useState('');
   const [sale,setSale] = useState<Sale|null>(null);
@@ -21,6 +21,7 @@ export function CashReturnForm({session,cashId,onReturned}:{
   const [busy,setBusy] = useState(false);
   const [uncertain,setUncertain] = useState(false);
   const pending = useRef<{body:string;key:string}|null>(null);
+  useEffect(()=>{onLockChange?.(busy||uncertain);return ()=>onLockChange?.(false);},[busy,uncertain,onLockChange]);
 
   async function lookup(event:FormEvent) {
     event.preventDefault();
