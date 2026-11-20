@@ -236,12 +236,21 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   {selectedRow&&<div className="sheet-selection-toolbar" role="group" aria-label="Ações da variante selecionada">
     <div><span className="muted small">Peça selecionada</span><strong>{selectedRow.name} · {selectedRow.sku}</strong></div>
     <div className="workspace-actions">
-      {canReceive&&<button className="light-button" type="button" onClick={()=>setAction({kind:'receive',row:selectedRow})}
-        aria-label={'Receber selecionado '+selectedRow.sku}>Receber peças</button>}
-      {canEdit&&<button className="light-button" type="button" onClick={()=>setAction({kind:'adjust',row:selectedRow})}
-        aria-label={'Ajustar selecionado '+selectedRow.sku}>Ajustar estoque</button>}
-      <button className="light-button" type="button" onClick={()=>setAction({kind:'history',row:selectedRow})}
-        aria-label={'Histórico selecionado '+selectedRow.sku}>Ver histórico</button>
+      {dirty===selectedRow.variant_id?<>
+        <button type="button" className="primary-action" disabled={saving}
+          onClick={()=>void saveRow(selectedRow)}
+          aria-label={'Salvar selecionado '+selectedRow.sku}>Salvar alterações</button>
+        <button type="button" className="light-button" disabled={saving||Boolean(pending)}
+          onClick={discard}
+          aria-label={'Descartar selecionado '+selectedRow.sku}>Descartar</button>
+      </>:<>
+        {canReceive&&<button className="light-button" type="button" onClick={()=>setAction({kind:'receive',row:selectedRow})}
+          aria-label={'Receber selecionado '+selectedRow.sku}>Receber peças</button>}
+        {canEdit&&<button className="light-button" type="button" onClick={()=>setAction({kind:'adjust',row:selectedRow})}
+          aria-label={'Ajustar selecionado '+selectedRow.sku}>Ajustar estoque</button>}
+        <button className="light-button" type="button" onClick={()=>setAction({kind:'history',row:selectedRow})}
+          aria-label={'Histórico selecionado '+selectedRow.sku}>Ver histórico</button>
+      </>}
     </div>
   </div>}
   <div className="stock-grid-wrap" role="region" tabIndex={0} aria-label="Planilha de produtos e estoque">
