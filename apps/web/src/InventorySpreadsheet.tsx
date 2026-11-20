@@ -2,14 +2,16 @@ import 'react-data-grid/lib/styles.css';
 import {DataGrid,renderTextEditor} from 'react-data-grid';
 import type {Column,RowsChangeData} from 'react-data-grid';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {ApiError,listStockSpreadsheet,patchSpreadsheetRow,listCatalog,listMovements} from './api-client.ts';
-import type {Session,StockSpreadsheetRow,StockMovement} from './api-client.ts';
+import {ApiError,listStockSpreadsheet,patchSpreadsheetRow,listCatalog} from './api-client.ts';
+import type {Session,StockSpreadsheetRow} from './api-client.ts';
 import {reaisToCents,mapCatalog} from './catalog-model.ts';
 import type {Product} from './catalog-model.ts';
 import {requestId} from './request-id.ts';
 import {ReceiveStockForm} from './Management.tsx';
 import {M2StockAdjustment} from './M2Admin.tsx';
 import {TaskDialog} from './TaskDialog.tsx';
+import {SpreadsheetBulkEditor} from './SpreadsheetBulkEditor.tsx';
+import {StockMovementHistory} from './StockMovementHistory.tsx';
 
 const money=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 type SheetRow=Omit<StockSpreadsheetRow,'barcode'> & {barcode:string;price_edit:string};
@@ -56,7 +58,10 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  const [action,setAction]=useState<Action|null>(null);
  const [actionProducts,setActionProducts]=useState<Product[]>([]);
  const [actionLoading,setActionLoading]=useState(false);
- const [history,setHistory]=useState<StockMovement[]>([]);
+ const [bulkOpen,setBulkOpen]=useState(false);
+ const [fullHistoryOpen,setFullHistoryOpen]=useState(false);
+ const [exporting,setExporting]=useState(false);
+ const [exportStatus,setExportStatus]=useState('');
  const [historyError,setHistoryError]=useState('');
  const limit=50;
  const selectedRow=rows.find(r=>r.variant_id===selectedId)??null;
@@ -96,16 +101,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  },[session,search,category,offset,refreshKey]);
 
  useEffect(()=>{
-  if(!action){setActionProducts([]);setHistory([]);setHistoryError('');return;}
-  if(action.kind==='history'){
-   let active=true;
-   setActionLoading(true);setHistoryError('');
-   void listMovements(session,action.row.variant_id).then(data=>{
-    if(active)setHistory(data.items);
-   }).catch(err=>{if(active)setHistoryError(err instanceof Error?err.message:'Não foi possível consultar o histórico');})
-    .finally(()=>{if(active)setActionLoading(false);});
-   return ()=>{active=false;};
-  }
+  if(!action){setActionProducts([]);setHistoryError('');return;}
   if(action.kind==='receive'){
    const ctrl=new AbortController();
    setActionLoading(true);
@@ -209,6 +205,21 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
         .then(m=>m.downloadStockXlsx(rows)).catch(err=>setError(err instanceof Error?err.message:'Falha na exportação'));}}>
       Exportar página XLSX
     </button>
+    {canEdit&&<button type="button" className="light-button" disabled={Boolean(dirty)||saving||loading||rows.length===0}
+      onClick={()=>setBulkOpen(true)}>Edição em lote / Colar Excel</button>}
+    <button type="button" className="light-button" disabled={Boolean(dirty)||saving||exporting}
+      onClick={()=>{
+       setError('');setExportStatus('Consultando resultados filtrados…');setExporting(true);
+       void import('./stock-filtered-export.ts')
+        .then(m=>m.downloadFilteredStockXlsx(session,{query:search,category},(count,total)=>
+         setExportStatus('Preparando '+count+' de '+total+' SKUs…')))
+        .then(count=>setExportStatus(count+' SKUs filtrados exportados em XLSX.'))
+        .catch(err=>{setExportStatus('');setError(err instanceof Error?err.message:'Falha na exportação filtrada');})
+        .finally(()=>setExporting(false));
+      }}>{exporting?'Exportando…':'Exportar resultados filtrados XLSX'}</button>
+    <button type="button" className="light-button" onClick={()=>setFullHistoryOpen(true)}>
+      Histórico completo
+    </button>
     <button type="button" className="light-button" disabled={Boolean(dirty)}
       onClick={()=>setRefreshKey(n=>n+1)}>Atualizar dados</button>
    </div>
@@ -232,6 +243,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   {canEdit&&<p className="muted small">Clique duas vezes em uma célula para editar. Salve ou descarte cada linha antes de passar para outro SKU. Saldo e histórico são somente leitura.</p>}
   {error&&<p role="alert" className="error">{error}</p>}
   {notice&&<p role="status" className="notice">{notice}</p>}
+  {exportStatus&&<p role="status" className="notice">{exportStatus}</p>}
   {stale&&<p role="status" className="notice">Há dados novos no servidor. Conclua a edição atual e atualize a planilha.</p>}
   {selectedRow&&<div className="sheet-selection-toolbar" role="group" aria-label="Ações da variante selecionada">
     <div><span className="muted small">Peça selecionada</span><strong>{selectedRow.name} · {selectedRow.sku}</strong></div>
@@ -269,8 +281,15 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
       onClick={()=>setOffset(x=>x+limit)}>Próxima</button>
    </div>
   </footer>
-  {action&&<TaskDialog
-   title={(action.kind==='receive'?'Receber peças':action.kind==='adjust'?'Ajustar estoque':'Histórico')+' — '+action.row.sku}
+  {bulkOpen&&<SpreadsheetBulkEditor session={session} rows={rows}
+   onClose={()=>setBulkOpen(false)}
+   onSaved={()=>{setBulkOpen(false);setNotice('Edição em lote registrada no servidor.');setRefreshKey(n=>n+1);onSaved();}}/>}
+  {fullHistoryOpen&&<StockMovementHistory session={session} onClose={()=>setFullHistoryOpen(false)}/>}
+  {action?.kind==='history'&&<StockMovementHistory session={session}
+   variantId={action.row.variant_id} sku={action.row.sku}
+   onClose={()=>setAction(null)}/>}
+  {action&&action.kind!=='history'&&<TaskDialog
+   title={(action.kind==='receive'?'Receber peças':'Ajustar estoque')+' — '+action.row.sku}
    wide onClose={()=>{setAction(null);setHistoryError('');}}>
    {action.kind==='receive'?<>
     {actionLoading&&<p role="status">Localizando a variante no catálogo…</p>}
@@ -278,21 +297,9 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
     {!actionLoading&&actionProducts.length>0&&
      <ReceiveStockForm key={action.row.variant_id} session={session}
       products={actionProducts} initialVariantId={action.row.variant_id} onSaved={afterStockChange}/>}
-   </>:action.kind==='adjust'?
-    <M2StockAdjustment key={action.row.variant_id} session={session}
+   </>:<M2StockAdjustment key={action.row.variant_id} session={session}
       initialSku={action.row.sku} initialVariantId={action.row.variant_id}
-      onSaved={afterStockChange} refreshKey={refreshKey}/>:
-    <div className="sheet-history">
-     {actionLoading&&<p role="status">Consultando histórico…</p>}
-     {historyError&&<p role="alert" className="error">{historyError}</p>}
-     {!actionLoading&&!history.length&&!historyError&&<p className="muted">Nenhuma movimentação registrada.</p>}
-     {history.map(item=><div className="sheet-history-item" key={item.id}>
-      <div><strong>{movementLabel(item.movement_kind)}</strong>
-       <span>{new Date(item.occurred_at).toLocaleString('pt-BR')} · {movementSource(item.source_type)}</span></div>
-      <strong>{item.qty_delta>0?'+':''}{item.qty_delta} peças</strong>
-     </div>)}
-     <p className="muted small">Exibindo os últimos 50 movimentos. O histórico é gerado no servidor, não por alterações manuais nas células.</p>
-    </div>}
+      onSaved={afterStockChange} refreshKey={refreshKey}/>}
   </TaskDialog>}
  </div>;
 }
