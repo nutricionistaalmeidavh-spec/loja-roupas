@@ -57,12 +57,12 @@ function parseXml(xml:string):Document{
  return doc;
 }
 function sheetPath(workbook:Document,rels:Document):string|null{
- const sheets=Array.from(workbook.getElementsByTagName('sheet'));
+ const sheets=Array.from(workbook.getElementsByTagNameNS('*','sheet'));
  const choice=sheets.find(sheet=>sheet.getAttribute('name')?.toLocaleLowerCase('pt-BR')==='produtos')??sheets[0];
  if(!choice)return null;
  const id=choice.getAttribute('r:id')??choice.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
  if(!id)return null;
- const rel=Array.from(rels.getElementsByTagName('Relationship')).find(item=>item.getAttribute('Id')===id);
+ const rel=Array.from(rels.getElementsByTagNameNS('*','Relationship')).find(item=>item.getAttribute('Id')===id);
  const target=rel?.getAttribute('Target')??'';
  if(!target||target.includes('..'))return null;
  return target.startsWith('/')?target.replace(/^\/+/, ''):'xl/'+target.replace(/^xl\//,'');
@@ -75,8 +75,8 @@ function columnIndex(reference:string):number{
 }
 function getCellText(cell:Element,shared:string[]):string{
  const t=cell.getAttribute('t');
- if(t==='inlineStr')return Array.from(cell.getElementsByTagName('t')).map(el=>el.textContent??'').join('');
- const v=cell.getElementsByTagName('v')[0]?.textContent??'';
+ if(t==='inlineStr')return Array.from(cell.getElementsByTagNameNS('*','t')).map(el=>el.textContent??'').join('');
+ const v=cell.getElementsByTagNameNS('*','v')[0]?.textContent??'';
  if(t==='s')return shared[Number(v)]??'';
  if(t==='b')return v==='1'?'TRUE':'FALSE';
  return v;
@@ -95,15 +95,15 @@ export async function readProductXlsx(buffer:ArrayBuffer):Promise<string>{
  const shared:string[]=[];
  if(entries.has('xl/sharedStrings.xml')){
   const doc=parseXml(await unzipText(buffer,entries,'xl/sharedStrings.xml'));
-  for(const item of Array.from(doc.getElementsByTagName('si')))
-   shared.push(Array.from(item.getElementsByTagName('t')).map(el=>el.textContent??'').join(''));
+  for(const item of Array.from(doc.getElementsByTagNameNS('*','si')))
+   shared.push(Array.from(item.getElementsByTagNameNS('*','t')).map(el=>el.textContent??'').join(''));
  }
  const doc=parseXml(await unzipText(buffer,entries,worksheet));
  const rows:string[][]=[];
- for(const row of Array.from(doc.getElementsByTagName('row'))){
+ for(const row of Array.from(doc.getElementsByTagNameNS('*','row'))){
   if(rows.length>301)throw new Error('Limite de 300 linhas por importação.');
   const values=Array<string>(8).fill('');
-  for(const cell of Array.from(row.getElementsByTagName('c'))){
+  for(const cell of Array.from(row.getElementsByTagNameNS('*','c'))){
    const col=columnIndex(cell.getAttribute('r')??'');
    if(col>=0&&col<8)values[col]=getCellText(cell,shared);
   }
