@@ -1,7 +1,7 @@
 import { parseProductCsv, PRODUCT_CSV_COLUMNS } from './product-import.ts';
 import type { ImportPreview, ImportIssue } from './product-import.ts';
 
-export type SheetCell=string|number|boolean|Date|null|undefined;
+export type SheetCell=unknown; // read-excel-file representa tipos de célula adicionais; validar todos em runtime.
 
 function csvCell(value:string){
   return /[;"\r\n]/.test(value)?'"'+value.replace(/"/g,'""')+'"':value;
@@ -34,7 +34,7 @@ export function parseProductSheetRows(table:readonly (readonly SheetCell[])[]):I
         issues.push({line:i+1,message:'Código de barras numérico: configure a coluna como texto para preservar zeros à esquerda.'});
         invalid=true;break;
       }
-      if(v instanceof Date||typeof v==='boolean'){
+      if(v instanceof Date||typeof v==='boolean'||(typeof v!=='string'&&typeof v!=='number')){
         issues.push({line:i+1,message:'Tipo de célula inválido para '+expected[j]});
         invalid=true;break;
       }
