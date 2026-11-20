@@ -59,6 +59,7 @@ export function App() {
   const [selected,setSelected] = useState<Record<string,{color:string;size:string}>>({});
   const [draft,setDraft] = useState<DraftLine[]>([]);
   const [recoverable,setRecoverable] = useState<Array<{id:string;quantity:number}>>([]);
+  const [hydratedDraftKey,setHydratedDraftKey] = useState<string|null>(null);
   const [message,setMessage] = useState('');
   const [catalogError,setCatalogError] = useState('');
   const [loading,setLoading] = useState(false);
@@ -75,17 +76,18 @@ export function App() {
   const quantity = draft.reduce((sum,line)=>sum+line.quantity,0);
   const draftKey = session&&cashId ? 'loja:rascunho:'+session.storeId+':'+cashId : null;
   useEffect(()=>{
-    if(!draftKey){setRecoverable([]);return;}
+    if(!draftKey){setRecoverable([]);setHydratedDraftKey(null);return;}
     try{
       const stored=JSON.parse(sessionStorage.getItem(draftKey)||'[]') as Array<{id:string;quantity:number}>;
       setRecoverable(Array.isArray(stored)?stored.filter(x=>typeof x.id==='string'&&Number.isSafeInteger(x.quantity)&&x.quantity>0):[]);
-    }catch{setRecoverable([]);}
+      setHydratedDraftKey(draftKey);
+    }catch{setRecoverable([]);setHydratedDraftKey(draftKey);}
   },[draftKey]);
   useEffect(()=>{
-    if(!draftKey)return;
+    if(!draftKey||hydratedDraftKey!==draftKey)return;
     if(draft.length){sessionStorage.setItem(draftKey,JSON.stringify(draft.map(x=>({id:x.variant.id,quantity:x.quantity}))));}
     else if(!recoverable.length){sessionStorage.removeItem(draftKey);}
-  },[draft,draftKey,recoverable.length]);
+  },[draft,draftKey,recoverable.length,hydratedDraftKey]);
   useEffect(()=>{
     if(!draft.length)return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};

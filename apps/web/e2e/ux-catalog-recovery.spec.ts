@@ -38,6 +38,11 @@ test('categoria é carregada do servidor e carrinho volta após recarregar',asyn
  await page.getByLabel('Usuário').fill('qa-admin');
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
+ await expect(page.getByRole('button',{name:'Recuperar carrinho'})).toBeVisible();
+ await page.reload();
+ await page.getByLabel('Usuário').fill('qa-admin');
+ await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
+ await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Recuperar carrinho'}).click();
  await expect(page.getByText('1 peça adicionada')).toBeVisible();
  await expect(page.getByText('R$ 74,90').first()).toBeVisible();
