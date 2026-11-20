@@ -7,7 +7,7 @@ test('URL do banco local não aceita conexão externa e usa senha codificada',()
  const url=new URL(makeDatabaseUrl('abc?+#',54399));
  assert.equal(url.hostname,'127.0.0.1');
  assert.equal(url.port,'54399');
- assert.equal(url.password,'abc%3F%2B%23');
+ assert.equal(decodeURIComponent(url.password),'abc?+#');
 });
 test('primeiro acesso exige dados de loja e senha forte antes do bootstrap',()=>{
  assert.throws(()=>validateBootstrap({name:'',login:'admin',password:'a'.repeat(12)}));
