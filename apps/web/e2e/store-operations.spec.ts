@@ -25,7 +25,9 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByLabel('Senha').fill(login.password);
   await page.getByRole('button',{name:'Entrar na loja'}).click();
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
-  await page.getByLabel('Nome',{exact:true}).fill(supplier);
+  await page.getByRole('link',{name:'Fornecedores'}).click();
+  await page.getByRole('button',{name:'Novo fornecedor'}).click();
+  await page.getByLabel('Nome do fornecedor',{exact:true}).fill(supplier);
   await page.getByRole('button',{name:'Cadastrar',exact:true}).click();
   await expect(page.getByRole('listitem').filter({hasText:supplier})).toBeVisible();
 
@@ -45,6 +47,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await expect(item.getByText('Esgotado')).toBeVisible();
 
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('link',{name:'Pós-venda'}).click();
   await page.getByRole('listitem').filter({hasText:new RegExp(sku,'i')})
     .getByRole('button',{name:'Liberar reserva'}).click();
   await expect(page.getByText('Reserva liberada.')).toBeVisible();
@@ -83,12 +86,16 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
 
   await page.getByRole('button',{name:'Nova venda',exact:true}).click();
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('link',{name:'Pós-venda'}).click();
+  await page.getByRole('button',{name:'Nova devolução'}).click();
   await page.getByLabel('Número da venda').fill(saleNumber!);
   await page.getByRole('button',{name:'Localizar venda'}).click();
   await page.getByLabel('Motivo da devolução').fill('Cliente devolveu a peça em condições de venda');
   await page.getByLabel('Conferi todas as peças e autorizo a devolução integral').check();
   await page.getByRole('button',{name:'Registrar devolução',exact:true}).click();
   await expect(page.getByText(/Devolução registrada/)).toBeVisible();
+  await page.getByRole('button',{name:'Fechar Registrar devolução'}).click();
+  await page.getByRole('link',{name:'Operações'}).click();
   await storefront.reload();
   await expect(item.getByText('Disponível')).toBeVisible();
 
