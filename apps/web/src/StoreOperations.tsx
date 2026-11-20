@@ -5,6 +5,7 @@ import type { Session } from './api-client.ts';
 import { CashReturnForm } from './CashReturnForm.tsx';
 import { OperationalPanels } from './OperationalPanels.tsx';
 import { CommercialIntelligence } from './CommercialIntelligence.tsx';
+import { AppDialog } from './AppDialog.tsx';
 import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
 
@@ -17,6 +18,8 @@ type Item = {id:string; name:string; color:string; size:string; price_cents:stri
 
 export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
   const [refresh,setRefresh] = useState(0);
+  const [activeSection,setActiveSection]=useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'>('vendas');
+  const [supplierOpen,setSupplierOpen]=useState(false),[returnOpen,setReturnOpen]=useState(false);
   const [days, setDays] = useState<Day[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [name, setName] = useState('');
@@ -59,7 +62,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
       setSuppliers(current => [...current.filter(item => item.id !== supplier.id), supplier]
         .sort((left,right) => left.name.localeCompare(right.name,'pt-BR')));
       setName('');
-      setStatus('Fornecedor cadastrado.');
+      setStatus('Fornecedor cadastrado.');setSupplierOpen(false);
     } catch (error) {
       if (error instanceof ApiError && error.status >= 400 && error.status < 500) pending.current = null;
       setError(message(error));
@@ -68,34 +71,62 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     }
   }
 
-  return <div className="operation-panel">
-    <nav className="management-jump" aria-label="Atalhos da gestão"><a href="#gestao-vendas">Vendas</a><a href="#gestao-fornecedores">Fornecedores</a><a href="#gestao-posvenda">Pós-venda</a><a href="#gestao-operacoes">Operações</a><a href="#gestao-inteligencia">Inteligência</a><a href="#gestao-vitrine">Vitrine</a></nav>
-    <section id="gestao-vendas" className="management-section">
-      <h2>Vendas e devoluções nos últimos 30 dias</h2>
-      {ready && (days.length ? <div className="management-table-scroll" role="region" aria-label="Histórico de vendas" tabIndex={0}><table><thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th><th>Devoluções</th></tr></thead>
+  return <div className="operation-panel management-workspace">
+    <div className="hub-heading">
+     <div><h2>Gestão da loja</h2><p>Consulte indicadores e acesse cada atividade sem misturar formulários.</p></div>
+    </div>
+    <nav className="management-jump management-tabs" aria-label="Áreas da gestão">
+     {([
+       ['vendas','Vendas'],['fornecedores','Fornecedores'],['posvenda','Pós-venda'],
+       ['operacoes','Operações'],['inteligencia','Inteligência'],['vitrine','Vitrine']
+     ] as const).map(([id,label])=><button key={id} type="button" className={activeSection===id?'active':''}
+       aria-pressed={activeSection===id} onClick={()=>setActiveSection(id)}>{label}</button>)}
+    </nav>
+    {activeSection==='vendas'&&<section id="gestao-vendas" className="management-section">
+      <h3>Vendas e devoluções nos últimos 30 dias</h3>
+      {ready && (days.length ? <div className="management-table-scroll" role="region" aria-label="Histórico de vendas" tabIndex={0}><table>
+        <thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th><th>Devoluções</th></tr></thead>
         <tbody>{days.map(day => <tr key={day.day}><td>{day.day.split('-').reverse().join('/')}</td>
-          <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td><td>{money(day.refunded_cents)}</td></tr>)}</tbody></table></div> : <p>Sem vendas no período.</p>)}
-    </section>
-    <section id="gestao-fornecedores" className="management-section">
-      <h2>Fornecedores</h2>
-      <form onSubmit={event => void submit(event)}>
-        <label>Nome <input required maxLength={120} value={name} disabled={busy}
-          onChange={event => setName(event.target.value)} /></label>
-        <button className="primary-action" disabled={busy || !ready}>Cadastrar</button>
+          <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td><td>{money(day.refunded_cents)}</td></tr>)}</tbody></table></div>
+      : <p>Sem vendas no período.</p>)}
+    </section>}
+    {activeSection==='fornecedores'&&<section id="gestao-fornecedores" className="management-section">
+      <div className="hub-heading"><h3>Fornecedores</h3><button className="primary-action" onClick={()=>setSupplierOpen(true)}>Novo fornecedor</button></div>
+      {suppliers.length?<ul className="supplier-list">{suppliers.map(supplier => <li key={supplier.id}>{supplier.name}</li>)}</ul>:
+       <p className="muted">Nenhum fornecedor cadastrado.</p>}
+    </section>}
+    {activeSection==='posvenda'&&<section id="gestao-posvenda" className="management-section">
+     <div className="hub-heading">
+      <div><h3>Pós-venda</h3><p>Devoluções, reservas de estoque e retirada de pedidos.</p></div>
+      <button type="button" className="primary-action" onClick={()=>setReturnOpen(true)}>Registrar devolução</button>
+     </div>
+     <StockHolds session={session}/>
+     <PickupSettings session={session}/>
+    </section>}
+    {activeSection==='operacoes'&&<div id="gestao-operacoes" className="management-section">
+      <OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/>
+    </div>}
+    {activeSection==='inteligencia'&&<div id="gestao-inteligencia" className="management-section">
+      <CommercialIntelligence session={session}/>
+    </div>}
+    {activeSection==='vitrine'&&<section id="gestao-vitrine" className="management-section">
+      <h3>Vitrine online</h3><p>Consulte os produtos e pedidos publicados na vitrine da loja.</p>
+      <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
+    </section>}
+    {supplierOpen&&<AppDialog title="Novo fornecedor" locked={busy||Boolean(pending.current)} onClose={()=>setSupplierOpen(false)}>
+      <form className="cash-action-form" onSubmit={event=>void submit(event)}>
+       <label>Nome do fornecedor<input required maxLength={120} value={name} disabled={busy} onChange={event=>setName(event.target.value)}/></label>
+       {error&&<p className="error" role="alert">{error}</p>}
+       <button type="submit" className="primary-action" disabled={busy||!ready}>Cadastrar fornecedor</button>
       </form>
-      <ul>{suppliers.map(supplier => <li key={supplier.id}>{supplier.name}</li>)}</ul>
-    </section>
-    <div id="gestao-posvenda" className="management-section"><CashReturnForm session={session} cashId={cashId} onReturned={()=>{
-      setRefresh(value=>value+1);
-      onReturned();
-    }}/></div>
-    <StockHolds session={session}/>
-    <PickupSettings session={session}/>
-    <div id="gestao-operacoes" className="management-section"><OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/></div>
-    <div id="gestao-inteligencia" className="management-section"><CommercialIntelligence session={session}/></div>
-    <p id="gestao-vitrine" className="management-section"><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
+    </AppDialog>}
+    {returnOpen&&<AppDialog title="Registrar devolução" wide onClose={()=>setReturnOpen(false)}>
+      <CashReturnForm session={session} cashId={cashId} onReturned={()=>{
+       setRefresh(value=>value+1);onReturned();setReturnOpen(false);
+      }}/>
+    </AppDialog>}
     {status && <p role="status">{status}</p>}
-    {error && <p role="alert" className="error">{error}</p>}
+    {error && !supplierOpen && <p role="alert" className="error">{error}</p>}
   </div>;
 }
 
