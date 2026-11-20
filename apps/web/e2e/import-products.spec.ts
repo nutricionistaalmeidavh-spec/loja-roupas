@@ -29,5 +29,6 @@ test('importa planilha CSV com prévia, variantes, estoque e modelo para baixar'
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku1);
  const card=page.locator('.product-card').filter({hasText:name});
  await expect(card).toBeVisible();
+ await card.getByRole('button',{name:'P',exact:true}).click();
  await expect(card.getByText('2 disponíveis')).toBeVisible();
 });
