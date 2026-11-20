@@ -122,7 +122,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     </AppDialog>}
     {returnOpen&&<AppDialog title="Registrar devolução" wide onClose={()=>setReturnOpen(false)}>
       <CashReturnForm session={session} cashId={cashId} onReturned={()=>{
-       setRefresh(value=>value+1);onReturned();setReturnOpen(false);
+       setRefresh(value=>value+1);onReturned();setReturnOpen(false);setStatus('Devolução registrada.');
       }}/>
     </AppDialog>}
     {status && <p role="status">{status}</p>}
