@@ -16,8 +16,13 @@ try{
  instance=await electron.launch({executablePath,args:['--user-data-dir='+userData],
   chromiumSandbox:true,env,timeout:45000});
  const setup=await instance.firstWindow({timeout:25000});
- try{await setup.getByRole('heading',{name:'Crie sua loja'}).waitFor({timeout:110000});}
- catch(error){
+ try{
+  await Promise.race([
+   setup.getByRole('heading',{name:'Crie sua loja'}).waitFor({timeout:110000}),
+   setup.getByText('Não foi possível iniciar',{exact:true}).waitFor({timeout:110000})
+    .then(()=>{throw new Error('Falha na inicialização do servidor local');})
+  ]);
+ }catch(error){
   console.error('Estado do assistente Windows:',await setup.locator('body').innerText().catch(()=>'<janela encerrada>'));
   throw error;
  }
