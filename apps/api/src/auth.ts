@@ -16,6 +16,12 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
     const path = request.url.split('?')[0];
     if (publicPaths.has(path)) return;
     const route = request.routeOptions.url;
+    // The desktop starts at / before any auth token exists. Only the two
+    // Fastify routes registered by static-ui.ts are anonymous; registered
+    // /v1 endpoints continue to use the existing session/RBAC guard.
+    // Static UI itself rejects /v1/* and missing JS assets with HTTP 404.
+    if ((request.method === 'GET' || request.method === 'HEAD') &&
+        (route === '/' || route === '/*')) return;
     if (request.method === 'GET' &&
         (route === '/v1/storefront/:id' || route === '/v1/storefront/:id/products/:productId/photo')) return;
     if (request.method === 'POST' && route === '/v1/storefront/:id/pickup-orders') return;

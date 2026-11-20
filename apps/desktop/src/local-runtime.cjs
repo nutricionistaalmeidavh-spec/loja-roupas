@@ -119,12 +119,25 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
   await node('migrate.ts');
   const hasUsers=(await execute(bin('psql'),['-d','loja','-At','-c','SELECT EXISTS(SELECT 1 FROM users)'],{env})).trim()==='t';
   progress('Iniciando o aplicativo…');
+  // Preserve diagnostic stderr only on startup failure. Never log DATABASE_URL or credentials.
+  let apiDiagnostic='';
   apiChild=spawn(exe,['--import','tsx',path.join(apiRoot,'src','main.ts')],{
-   cwd:apiRoot,env:appEnv,windowsHide:true,stdio:'ignore'
+   cwd:apiRoot,env:appEnv,windowsHide:true,stdio:['ignore','pipe','pipe']
   });
-  apiChild.on('error',error=>progress('Erro ao iniciar a API: '+error.message));
+  const capture=data=>{apiDiagnostic=(apiDiagnostic+String(data)).slice(-12000);};
+  apiChild.stderr.on('data',capture);
+  apiChild.stdout.on('data',capture);
+  apiChild.on('error',error=>capture('Erro ao iniciar a API: '+error.message));
   const url='http://127.0.0.1:'+config.apiPort;
-  await ready(url,apiChild);
+  try{
+   await ready(url,apiChild);
+  }catch(error){
+   const diagnostic=apiDiagnostic
+     .replace(/postgres(?:ql)?:\/\/[^\s]+/gi,'[DATABASE_URL redacted]')
+     .split(/\r?\n/).filter(line=>/error|cannot find|ERR_|failed/i.test(line)).slice(0,4)
+     .join(' ').slice(0,1200);
+   throw new Error('API local não iniciou: '+(diagnostic||error.message));
+  }
   return {
    url,firstRun:!hasUsers,stop,
    async bootstrap(input){
