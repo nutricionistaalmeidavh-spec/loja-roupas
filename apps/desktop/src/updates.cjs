@@ -120,7 +120,7 @@ async function pgDump(binary,args,env){
   child.once('exit',code=>code===0?resolve():reject(new Error('Backup PostgreSQL falhou (código '+code+'): '+diagnostic.replace(/postgres(?:ql)?:\/\/\S+/gi,'[URL redigida]'))));
  });
 }
-async function backupBeforeUpdate({resources,userData,onProgress=()=>{}}){
+async function backupBeforeUpdate({resources,userData,onProgress=()=>{},runDump=pgDump}){
  const configFile=path.join(userData,'local-runtime.json');
  let config;
  try{config=JSON.parse(await fs.readFile(configFile,'utf8'));}
@@ -136,7 +136,7 @@ async function backupBeforeUpdate({resources,userData,onProgress=()=>{}}){
  const final=path.join(backupDir,name+'.dump');
  onProgress({phase:'backup'});
  try{
-  await pgDump(binary,['-h','127.0.0.1','-p',String(config.pgPort),'-U','postgres','-d','loja','-Fc','-f',temp],
+  await runDump(binary,['-h','127.0.0.1','-p',String(config.pgPort),'-U','postgres','-d','loja','-Fc','-f',temp],
    {...process.env,PGPASSWORD:config.password,PGCONNECT_TIMEOUT:'10'});
   const stat=await fs.stat(temp);
   if(!stat.size)throw new Error('Backup PostgreSQL vazio');
