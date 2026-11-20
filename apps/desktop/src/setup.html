@@ -17,7 +17,7 @@ small{display:block;margin-top:20px;color:#777}
 <h1 id="title">Preparando sua loja</h1>
 <p id="intro">Tudo funcionará neste computador, sem servidor contratado, Docker ou assinatura.</p>
 <div id="loading"><progress aria-label="Preparando o sistema"></progress><p id="status" role="status">Verificando componentes…</p></div>
-<form id="first" hidden>
+<div id="failure" hidden><p id="failureMessage" role="alert"></p><button type="button" id="retry">Tentar novamente</button></div><form id="first" hidden>
 <label>Nome da loja<input name="name" maxlength="120" required placeholder="Ex.: Boutique Central" autocomplete="organization"/></label>
 <label>Usuário administrador<input name="login" maxlength="80" required placeholder="Ex.: gerente" autocomplete="username"/></label>
 <label>Senha inicial<input name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required/></label>
@@ -37,7 +37,8 @@ small{display:block;margin-top:20px;color:#777}
 const $=id=>document.getElementById(id);
 function render(state){
  $('status').textContent=state.status||'Preparando…';
- if(state.error){$('loading').hidden=true;$('first').hidden=true;$('error').textContent=state.error;$('error').hidden=false;$('title').textContent='Não foi possível iniciar';$('first').hidden=false;return;}
+ if(state.error){$('loading').hidden=true;$('first').hidden=true;$('failure').hidden=false;$('failureMessage').textContent=state.error;$('title').textContent='Não foi possível iniciar';return;}
+ $('failure').hidden=true;
  if(state.ready){$('loading').hidden=true;$('first').hidden=false;$('title').textContent='Crie sua loja';$('intro').textContent='Seu banco de dados foi preparado. Cadastre o primeiro administrador.';}
 }
 window.lojaSetup.onStatus(message=>render(message));
@@ -48,6 +49,7 @@ $('first').addEventListener('submit',async event=>{
  try{const result=await window.lojaSetup.create(data);if(!result?.ok)throw Error('Não foi possível concluir');$('status').textContent='Loja criada. Abrindo o PDV…';}
  catch(error){$('error').textContent=error.message;button.disabled=false;}
 });
+$('retry').addEventListener('click',()=>{ $('failure').hidden=true;$('loading').hidden=false;window.lojaSetup.retry().catch(error=>{$('failure').hidden=false;$('failureMessage').textContent=error.message;}); });
 $('showRemote').addEventListener('click',()=>{$('remote').hidden=!$('remote').hidden});
 $('remote').addEventListener('submit',async event=>{
  event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;

@@ -22,5 +22,5 @@ test('gestor recebe guia completo e pode pular e reabrir sem alterar vendas',asy
  await page.getByRole('button',{name:'Reabrir tour'}).click();
  await expect(tour).toBeVisible();
  for(let i=0;i<4;i++)await tour.getByRole('button',{name:'Próximo'}).click();
- await expect(page.getByRole('heading',{name:'Produtos'})).toBeVisible();
+ await expect(page.locator('.topbar h1').getByText('Produtos')).toBeVisible();
 });
