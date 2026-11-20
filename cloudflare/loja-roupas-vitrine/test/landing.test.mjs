@@ -2,14 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../worker.mjs';
 
-test('a raiz mostra landing premium, responsiva e dialog real de acesso',async()=>{
+test('a raiz oferece marketplace público e dialog real de acesso',async()=>{
  const response=await worker.fetch(new Request('https://loja-roupas-vitrine.example/'),{});
  assert.equal(response.status,200);
  assert.match(response.headers.get('content-type')||'',/text\/html/);
  const html=await response.text();
  assert.match(html,/Loja Roupas/i);
  assert.match(html,/<dialog\b[^>]*id="accessDialog"/);
- assert.match(html,/Acessar minha loja/);
+ assert.match(html,/Entrar como lojista/);
+ assert.match(html,/Moda para descobrir/);
+ assert.match(html,/Buscar peças/);
+ assert.match(html,/v1\/marketplace/);
+ assert.match(html,/Vitrines em destaque/);
+ assert.match(html,/id="marketplaceProducts"/);
  assert.match(html,/name="storeSlug"/);
  assert.match(html,/name="email"/);
  assert.match(html,/name="password"/);
