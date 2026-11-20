@@ -1,10 +1,10 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {mkdtemp,readFile,readdir,rm}=require('node:fs/promises');
+const {mkdtemp,readFile,writeFile,mkdir,readdir,rm}=require('node:fs/promises');
 const {tmpdir}=require('node:os');
 const path=require('node:path');
 const {createHash}=require('node:crypto');
-const {compareVersions,selectRelease,checkForUpdate,downloadVerified,parseSha256}=require('../src/updates.cjs');
+const {compareVersions,selectRelease,checkForUpdate,downloadVerified,parseSha256,backupBeforeUpdate}=require('../src/updates.cjs');
 const RELEASE='https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/download/v0.2.0/Loja-de-Roupas-Setup-x64.exe';
 const HASH='https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/download/v0.2.0/SHA256SUMS';
 const API='https://api.github.com/repos/nutricionistaalmeidavh-spec/loja-roupas/releases/latest';
@@ -70,5 +70,53 @@ test('arquivo com SHA256 incorreto nunca fica disponível para instalação',asy
    fetchImpl:async url=>new Response(url===HASH?'f'.repeat(64)+'  Loja-de-Roupas-Setup-x64.exe\n':Buffer.from('tampered'),{status:200})
   }),/SHA256|integridade/i);
   assert.deepEqual(await readdir(root),[]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+
+test('backup pré-update arquiva PostgreSQL, registra SHA e nunca usa rede remota',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'loja-updater-backup-'));
+ const resources=path.join(root,'resources'),userData=path.join(root,'user-data');
+ try{
+  const binary=path.join(resources,'runtime','postgres','bin','pg_dump.exe');
+  await mkdir(path.dirname(binary),{recursive:true});
+  await mkdir(userData,{recursive:true});
+  await writeFile(binary,'fixture executable');
+  await writeFile(path.join(userData,'local-runtime.json'),JSON.stringify({pgPort:54299,password:'local-fake-secret'}));
+  const calls=[];
+  const report=await backupBeforeUpdate({resources,userData,runDump:async(file,args,env)=>{
+   calls.push({file,args,host:args[args.indexOf('-h')+1],password:env.PGPASSWORD});
+   await writeFile(args[args.indexOf('-f')+1],Buffer.from('PGDMP test consistent snapshot'));
+  }});
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].host,'127.0.0.1');
+  assert.equal(calls[0].password,'local-fake-secret');
+  assert.ok(report.file.includes(path.join('backups','before-update')));
+  const data=await readFile(report.file);
+  assert.equal(report.sha256,sha(data));
+  assert.match(await readFile(report.file+'.sha256','utf8'),new RegExp(report.sha256));
+  assert.equal((await readdir(path.dirname(report.file))).some(name=>name.endsWith('.part')),false);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+test('falha no backup interrompe atualização sem arquivos parciais',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'loja-updater-fail-'));
+ const resources=path.join(root,'resources'),userData=path.join(root,'user-data');
+ try{
+  const binary=path.join(resources,'runtime','postgres','bin','pg_dump.exe');
+  await mkdir(path.dirname(binary),{recursive:true});await mkdir(userData,{recursive:true});
+  await writeFile(binary,'fixture executable');
+  await writeFile(path.join(userData,'local-runtime.json'),JSON.stringify({pgPort:54299,password:'fake'}));
+  await assert.rejects(()=>backupBeforeUpdate({resources,userData,runDump:async(_binary,args)=>{
+   await writeFile(args[args.indexOf('-f')+1],'incomplete');
+   throw new Error('PostgreSQL não disponível');
+  }}),/PostgreSQL não disponível/);
+  assert.deepEqual(await readdir(path.join(userData,'backups','before-update')),[]);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
+test('terminal LAN não tenta gerar backup de banco local inexistente',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'loja-remote-update-'));
+ try{
+  const backup=await backupBeforeUpdate({resources:path.join(root,'nothing'),userData:root,
+   runDump:async()=>{throw new Error('Não deveria executar pg_dump');}});
+  assert.equal(backup,null);
  }finally{await rm(root,{recursive:true,force:true});}
 });
