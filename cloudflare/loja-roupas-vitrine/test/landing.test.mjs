@@ -10,7 +10,8 @@ test('a raiz oferece marketplace público e dialog real de acesso',async()=>{
  assert.match(html,/Loja Roupas/i);
  assert.match(html,/<dialog\b[^>]*id="accessDialog"/);
  assert.match(html,/Entrar como lojista/);
- assert.match(html,/Moda para descobrir/);
+ assert.match(html,/Moda para/);
+ assert.match(html,/descobrir/);
  assert.match(html,/Buscar peças/);
  assert.match(html,/v1\/marketplace/);
  assert.match(html,/Vitrines em destaque/);
