@@ -1,9 +1,10 @@
 import { requestId } from './request-id.ts';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
-import { ApiError, listCatalog, scanCatalog, revokeSession } from './api-client.ts';
+import { ApiError, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
+import { colorSwatch } from './visual-colors.ts';
 import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
@@ -52,6 +53,9 @@ export function App() {
   const [search,setSearch] = useState('');
   const [debouncedSearch,setDebouncedSearch] = useState('');
   const [category,setCategory] = useState('Todos');
+  const [categories,setCategories] = useState<string[]>(['Todos']);
+  const [recoveryBusy,setRecoveryBusy] = useState(false);
+  const cartDialogRef=useRef<HTMLElement>(null);
   const [selected,setSelected] = useState<Record<string,{color:string;size:string}>>({});
   const [draft,setDraft] = useState<DraftLine[]>([]);
   const [recoverable,setRecoverable] = useState<Array<{id:string;quantity:number}>>([]);
@@ -66,8 +70,7 @@ export function App() {
   const canReceive = manager || (session?.roles.includes('stocker')??false);
   const canCash = manager || (session?.roles.includes('cashier')??false);
   const cashId = cashState?.active ? cashState.id : null;
-  const categories = useMemo(()=>['Todos',...new Set(products.map(p=>p.category))],[products]);
-  const filtered = useMemo(()=>products.filter(p=>category==='Todos'||p.category===category),[products,category]);
+  const filtered = products;
   const total = draftTotalCents(draft);
   const quantity = draft.reduce((sum,line)=>sum+line.quantity,0);
   const draftKey = session&&cashId ? 'loja:rascunho:'+session.storeId+':'+cashId : null;
@@ -89,16 +92,55 @@ export function App() {
     window.addEventListener('beforeunload',warn);
     return ()=>window.removeEventListener('beforeunload',warn);
   },[draft.length]);
-  function recoverDraft(){
-    if(!draftKey||draft.length)return;
-    const variants=products.flatMap(p=>p.variants);
-    const recovered=recoverable.flatMap(line=>{
-      const variant=variants.find(v=>v.id===line.id);
-      return variant?[{variant,quantity:line.quantity}]:[];
-    });
-    if(recovered.length!==recoverable.length){setMessage('Algumas peças não estão no catálogo carregado. Pesquise-as antes de recuperar.');return;}
-    setDraft(recovered);setRecoverable([]);setMessage('Carrinho recuperado. Preço e estoque serão conferidos no checkout.');
+  async function recoverDraft(){
+    if(!session||!draftKey||draft.length||!recoverable.length||recoveryBusy)return;
+    setRecoveryBusy(true);setMessage('');
+    try{
+      const catalog=mapCatalog(await lookupDraftVariants(session,recoverable.map(item=>item.id)));
+      const variants=catalog.flatMap(p=>p.variants);
+      const recovered=recoverable.flatMap(line=>{
+        const variant=variants.find(v=>v.id===line.id);
+        return variant?[{variant,quantity:line.quantity}]:[];
+      });
+      if(recovered.length!==recoverable.length){
+        setMessage('Algumas peças foram removidas do catálogo. Revise o carrinho antes de recuperar.');
+        return;
+      }
+      setDraft(recovered);setRecoverable([]);
+      setMessage('Carrinho recuperado do servidor. Preços e estoque serão conferidos no checkout.');
+    }catch(error){setMessage(error instanceof Error?error.message:'Não foi possível recuperar o carrinho.');}
+    finally{setRecoveryBusy(false);}
   }
+
+  useEffect(()=>{
+    if(!session){setCategories(['Todos']);return;}
+    const controller=new AbortController();
+    void listCategories(session,fetch,controller.signal).then(result=>{
+      if(!controller.signal.aborted)setCategories(['Todos',...result.categories]);
+    }).catch(error=>{
+      if(!controller.signal.aborted)setCatalogError(error instanceof Error?error.message:'Falha ao carregar categorias');
+    });
+    return ()=>controller.abort();
+  },[session,refetch]);
+
+  useEffect(()=>{
+    if(!cartOpen)return;
+    const dialog=cartDialogRef.current;
+    const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    dialog?.focus();
+    function onKeyDown(event:globalThis.KeyboardEvent){
+      if(event.key==='Escape'){event.preventDefault();setCartOpen(false);return;}
+      if(event.key!=='Tab'||!dialog)return;
+      const focusables=[...dialog.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')]
+        .filter(element=>element.getClientRects().length>0);
+      if(!focusables.length){event.preventDefault();dialog.focus();return;}
+      const first=focusables[0],last=focusables[focusables.length-1];
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===dialog)){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    }
+    document.addEventListener('keydown',onKeyDown);
+    return ()=>{document.removeEventListener('keydown',onKeyDown);previous?.focus();};
+  },[cartOpen]);
 
   useEffect(()=>{
     const timer=setTimeout(()=>setDebouncedSearch(search),250);
@@ -108,7 +150,7 @@ export function App() {
     if(!session){setProducts([]);setCursor(null);return;}
     const controller=new AbortController();
     setLoading(true);setCatalogError('');
-    void listCatalog(session,debouncedSearch,fetch,controller.signal)
+    void listCatalog(session,debouncedSearch,fetch,controller.signal,undefined,category==='Todos'?undefined:category)
       .then(data=>{if(!controller.signal.aborted){setProducts(mapCatalog(data));setCursor(data.next_cursor);}})
       .catch(error=>{
         if(controller.signal.aborted)return;
@@ -118,7 +160,7 @@ export function App() {
       })
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return ()=>controller.abort();
-  },[session,debouncedSearch,refetch]);
+  },[session,debouncedSearch,refetch,category]);
   useEffect(()=>{
     if(!session||page!=='estoque'){setAllProducts([]);return;}
     const controller=new AbortController();
@@ -135,7 +177,7 @@ export function App() {
     if(!session||!cursor||paging)return;
     setPaging(true);setCatalogError('');
     try{
-      const data=await listCatalog(session,debouncedSearch,fetch,undefined,cursor);
+      const data=await listCatalog(session,debouncedSearch,fetch,undefined,cursor,category==='Todos'?undefined:category);
       const appended=mapCatalog(data);
       setProducts(current=>{
         const ids=new Set(current.map(p=>p.id));
@@ -284,7 +326,7 @@ export function App() {
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
-        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" onClick={recoverDraft}>Recuperar carrinho</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
+        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" disabled={recoveryBusy} onClick={()=>void recoverDraft()}>{recoveryBusy?'Recuperando…':'Recuperar carrinho'}</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
           <strong>Vendas suspensas ({savedDrafts.length})</strong>
           {savedDrafts.map(item=><button key={item.id} className="light-button"
@@ -318,9 +360,9 @@ export function App() {
                 </div>
                 <div className="card-bottom">
                   <div className="swatches" role="group" aria-label={'Cores de '+p.name}>
-                    {colors.map(c=><button type="button" key={c} aria-label={'Selecionar cor '+c} aria-pressed={ready&&color===c}
+                    {colors.map(c=>{const visual=colorSwatch(c);return <button type="button" key={c} aria-label={'Selecionar cor '+c} aria-pressed={ready&&color===c}
                       title={c} className={ready&&color===c?'selected':''} onClick={()=>selectVariant(p,c,size)}>
-                      <span className={'swatch '+(c==='Azul'?'azul':c==='Preto'?'preto':c==='Areia'?'areia':c==='Bege'?'bege':'cinza')}/></button>)}
+                      <span className={'swatch'+(!visual.known?' unknown':'')} style={{backgroundColor:visual.background}}>{visual.label}</span></button>;})}
                   </div>
                   <button className="add" aria-label={'Adicionar '+p.name} disabled={!ready||!selectedVariant||selectedVariant.available===0}
                     onClick={()=>{if(selectedVariant)addVariant(selectedVariant);}}>+</button>
@@ -366,7 +408,7 @@ export function App() {
       </section>
     </div>}
     {page==='pdv'&&cartOpen&&<div className="drawer-backdrop" onMouseDown={()=>setCartOpen(false)}>
-      <aside className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
+      <aside ref={cartDialogRef} tabIndex={-1} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
         <button className="close-drawer" onClick={()=>setCartOpen(false)}>Fechar ×</button>{cart}
       </aside></div>}
   </div>;

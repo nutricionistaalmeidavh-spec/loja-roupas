@@ -145,3 +145,14 @@
 .checkout-totals{position:relative;background:#f7f5f1;border-color:#e5dfd5}
 .product-card:focus-within{outline:2px solid #a68b67;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.checkout-modal,.product-card,.management-jump a{animation:none!important;transition:none!important}}
+
+/* UX: cor desconhecida explícita, menu de gestão e foco previsível. */
+.swatch.unknown{display:grid;place-items:center;color:#475569;font-size:11px;font-weight:700}
+.mobile-drawer:focus{outline:none}
+.management-jump{position:sticky;top:8px;z-index:4;display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin;max-width:100%;padding:10px;background:#f7f7f7;border:1px solid #eaeaea;border-radius:12px}
+.management-jump a{display:inline-flex;align-items:center;min-height:40px;flex-shrink:0;padding:9px 13px;border:1px solid #e5e7eb;border-radius:8px;color:#222;text-decoration:none;background:white;font-weight:650}
+.management-jump a:focus-visible,.management-jump a:hover{outline:2px solid #555;outline-offset:1px}
+.management-section{scroll-margin-top:95px;min-width:0}
+.management-table-scroll{overflow-x:auto;max-width:100%}
+.management-table-scroll table{min-width:470px}
+@media(max-width:600px){.operation-panel{padding:8px;gap:14px}.management-jump{top:0;padding:6px;gap:4px}.management-jump a{padding:7px 9px;font-size:12px}.operation-panel section{padding:12px}}

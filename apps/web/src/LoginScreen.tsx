@@ -45,6 +45,6 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
       {error&&<p className="error" role="alert">{error}</p>}
       <button className="primary-action" disabled={pending}>{pending?'Entrando…':'Entrar na loja'}</button>
     </form>}
-    <p className="login-help">Primeiro acesso: configure o PostgreSQL e execute o bootstrap administrativo documentado no repositório.</p>
+    <p className="login-help">Primeiro acesso: execute bash scripts/install-lan.sh na pasta do projeto, no computador servidor. O assistente de terminal configura PostgreSQL, loja e administrador e verifica a conexão.</p>
   </section></div>;
 }
