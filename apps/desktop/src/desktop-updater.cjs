@@ -21,8 +21,11 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
   }
  }
  function registerWindow(window,origin){
-  clients.set(window.webContents,new URL(origin).origin);
-  window.on('closed',()=>clients.delete(window.webContents));
+  const contents=window.webContents;
+  clients.set(contents,new URL(origin).origin);
+  // The BrowserWindow is already destroyed when 'closed' fires; never
+  // dereference native webContents from that callback.
+  window.once('closed',()=>clients.delete(contents));
  }
  function allowed(event){
   const origin=clients.get(event.sender);
