@@ -85,7 +85,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
    // when the API and PostgreSQL are already stopped by the existing quit flow.
    const args=['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
     '-File',script,'-ParentPid',String(process.pid),'-Installer',installer,
-    '-ExpectedSha256',expectedHash,'-InstallDir',installedRoot,
+    '-ExpectedSha256',expectedHash,'-ExpectedVersion',version,'-InstallDir',installedRoot,
     '-RollbackDir',rollback,'-ResultFile',resultFile];
    const child=spawn('powershell.exe',args,{detached:true,stdio:'ignore',windowsHide:true});
    await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
