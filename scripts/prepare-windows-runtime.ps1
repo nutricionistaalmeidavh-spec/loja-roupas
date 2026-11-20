@@ -38,6 +38,21 @@ try {
 $api=Join-Path $runtime 'api'
 if(!(Test-Path (Join-Path $api 'src/main.ts'))){throw 'Packaged API missing'}
 if(!(Test-Path (Join-Path $api 'node_modules/tsx'))){throw 'Packaged TS runtime missing'}
+# pnpm deploy --legacy pode deixar a dependência transitiva esbuild de tsx de fora.
+# Copiar os pacotes OSS fixados no lockfile (incluindo o binário nativo Windows).
+# Nenhuma instalação ou download ocorre no computador do cliente.
+$esbuildVersion='0.28.2'
+$pnpmModules=Join-Path $repo 'node_modules/.pnpm'
+$esbuildSource=Join-Path $pnpmModules "esbuild@$esbuildVersion/node_modules/esbuild"
+$esbuildNative=Join-Path $pnpmModules "@esbuild+win32-x64@$esbuildVersion/node_modules/@esbuild/win32-x64"
+if(!(Test-Path (Join-Path $esbuildSource 'lib/main.js'))){throw 'esbuild runtime missing from pnpm store'}
+if(!(Test-Path (Join-Path $esbuildNative 'esbuild.exe'))){throw 'esbuild Windows binary missing from pnpm store'}
+Copy-Item -Recurse -Force -LiteralPath $esbuildSource -Destination (Join-Path $api 'node_modules/esbuild')
+$esbuildScope=Join-Path $api 'node_modules/@esbuild'
+New-Item -ItemType Directory -Force -Path $esbuildScope|Out-Null
+Copy-Item -Recurse -Force -LiteralPath $esbuildNative -Destination (Join-Path $esbuildScope 'win32-x64')
+if(!(Test-Path (Join-Path $api 'node_modules/@esbuild/win32-x64/esbuild.exe'))){throw 'Bundled esbuild binary missing'}
+
 if(!(Test-Path (Join-Path $api 'node_modules/@loja/domain'))){throw 'Packaged domain missing'}
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'apps/web/dist') -Destination (Join-Path $runtime 'web')
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'infra/sql') -Destination (Join-Path $resources 'infra/sql')
