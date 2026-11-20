@@ -6,6 +6,7 @@ import { requestId } from './request-id.ts';
 import { parseProductCsv, PRODUCT_CSV_TEMPLATE } from './product-import.ts';
 import type { ImportPreview } from './product-import.ts';
 import { TaskDialog } from './TaskDialog.tsx';
+import { MAX_XLSX_FILE_SIZE } from './product-xlsx-file.ts';
 
 type Result={products_created:number;variants_created:number;stock_units:number;replayed:boolean};
 
@@ -27,6 +28,7 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
   const [fileName,setFileName]=useState('');
   const [preview,setPreview]=useState<ImportPreview|null>(null);
   const [loading,setLoading]=useState(false);
+  const [downloading,setDownloading]=useState(false);
   const [busy,setBusy]=useState(false);
   const [uncertain,setUncertain]=useState(false);
   const [pending,setPending]=useState<{key:string;body:string}|null>(null);
@@ -37,14 +39,17 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
     if(!file)return;
     setPreview(null);setResult(null);setError('');setPending(null);setUncertain(false);
     setFileName(file.name);
-    if(!file.name.toLowerCase().endsWith('.csv')){
-      setError('Envie um CSV UTF-8. No Excel, use Salvar como > CSV UTF-8 (delimitado por ponto e vírgula).');
-      return;
+    const xlsx=file.name.toLowerCase().endsWith('.xlsx');
+    const csv=file.name.toLowerCase().endsWith('.csv');
+    if(!xlsx&&!csv){setError('Formato não aceito. Selecione um arquivo XLSX ou CSV UTF-8.');return;}
+    if(file.size>(xlsx?MAX_XLSX_FILE_SIZE:1024*1024)){
+      setError('Limite por arquivo: 5 MB para XLSX ou 1 MB para CSV. Divida em lotes menores.');return;
     }
-    if(file.size>1024*1024){setError('O arquivo deve ter no máximo 1 MB. Divida em lotes menores.');return;}
     setLoading(true);
     try{
-      const parsed=parseProductCsv(await file.text());
+      const parsed=xlsx
+        ?await (await import('./product-xlsx-file.ts')).readProductXlsx(file)
+        :parseProductCsv(await file.text());
       setPreview(parsed);
     }catch(err){setError(err instanceof Error?err.message:'Não foi possível ler o arquivo');}
     finally{setLoading(false);}
@@ -78,15 +83,24 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
       <section className="import-step">
         <h3>1. Baixe e preencha o modelo</h3>
         <p>Uma linha por combinação de roupa, cor e tamanho. Repita o nome do produto para cada variante. Use código de barras opcional e estoque inicial inteiro.</p>
-        <button type="button" className="light-button" onClick={downloadCsv}>Baixar modelo CSV para Excel</button>
-        <p className="muted small">Funciona sem serviço externo. O Excel permite editar e salvar em CSV UTF-8.</p>
+        <div className="workspace-actions">
+          <button type="button" className="primary-action" disabled={downloading}
+            onClick={()=>{setDownloading(true);setError('');
+              void import('./product-xlsx-file.ts').then(m=>m.downloadProductXlsxTemplate()).catch(err=>{
+                setError(err instanceof Error?err.message:'Falha ao gerar modelo XLSX');
+              }).finally(()=>setDownloading(false));
+            }}>{downloading?'Gerando XLSX…':'Baixar modelo XLSX'}</button>
+          <button type="button" className="light-button" onClick={downloadCsv}>Baixar modelo CSV</button>
+        </div>
+        <p className="muted small">Os dois modelos funcionam sem servidor externo. Mantenha o código de barras como texto para preservar zeros à esquerda.</p>
       </section>
       <section className="import-step">
         <h3>2. Selecione o arquivo preenchido</h3>
-        <label>Arquivo CSV UTF-8
-          <input type="file" accept=".csv,text/csv" onChange={event=>void chooseFile(event)}
+        <label>Arquivo XLSX ou CSV UTF-8
+          <input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={event=>void chooseFile(event)}
             disabled={locked||Boolean(result)} />
         </label>
+        <p className="muted small">Limite: XLSX até 5 MB; CSV até 1 MB. Até 100 produtos e 2.000 variantes por importação.</p>
         {fileName&&<p className="muted small">Arquivo: {fileName}</p>}
         {loading&&<p role="status">Lendo planilha localmente…</p>}
       </section>
