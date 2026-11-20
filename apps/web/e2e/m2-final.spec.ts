@@ -25,11 +25,13 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name+' atual'});
  const variantOption=page.getByRole('combobox',{name:'Variante para preço'}).locator('option',{hasText:sku});
  await expect(variantOption).toBeAttached();
+ await page.getByRole('button',{name:'Preços',exact:true}).click();
  await page.getByRole('combobox',{name:'Variante para preço'}).selectOption((await variantOption.getAttribute('value'))!);
  await page.getByLabel('Novo preço (R$)').fill('229,90');
  await page.getByRole('button',{name:'Salvar preço'}).click();
  await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPcMrGYAQaYGJAAbg4AVzUBwNOahA4AAAAASUVORK5CYII=','base64');
+ await page.getByRole('button',{name:'Fotos',exact:true}).click();
  await page.getByLabel('Selecionar fotografia').setInputFiles({name:'peca.png',mimeType:'image/png',buffer:png});
  await page.getByRole('button',{name:'Enviar fotografia local'}).click();
  await expect.poll(async()=>{
