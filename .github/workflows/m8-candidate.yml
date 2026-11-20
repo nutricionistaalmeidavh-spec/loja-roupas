@@ -27,6 +27,7 @@ jobs:
       - name: Compilar e empacotar cliente portátil
         run: |
           pnpm --filter @loja/web build
+          pnpm --filter @loja/desktop test
           pnpm --filter @loja/desktop build
           test -x dist/desktop-linux-x64/electron
           test -s dist/desktop-linux-x64/resources/app/main.cjs
@@ -70,6 +71,7 @@ jobs:
           pnpm install --frozen-lockfile
       - name: Empacotar cliente portátil Windows
         run: |
+          pnpm --filter @loja/desktop test
           pnpm --filter @loja/desktop build
           pnpm --filter @loja/web build
           pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1

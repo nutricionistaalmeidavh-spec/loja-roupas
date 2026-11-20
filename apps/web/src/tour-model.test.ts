@@ -25,3 +25,10 @@ test('progresso é local por loja e perfil, nunca contém token',()=>{
  assert.equal(shouldShowTour('complete'),false);
  assert.equal(shouldShowTour('skipped'),false);
 });
+
+test('tour incompleto continua de onde o operador parou',async()=>{
+ const {restoredTourStep}=await import('./tour-model.ts');
+ assert.equal(restoredTourStep('step:5',11),5);
+ assert.equal(restoredTourStep('step:999',11),0);
+ assert.equal(restoredTourStep('complete',11),0);
+});

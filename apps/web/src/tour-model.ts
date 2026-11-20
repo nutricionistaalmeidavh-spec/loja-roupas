@@ -26,3 +26,9 @@ export function tourStorageKey(storeId:string,roles:string[]):string{
  return 'loja:tour:v1:'+storeId+':'+[...new Set(roles)].sort().join(',');
 }
 export function shouldShowTour(value:string|null):boolean{return value!=='complete'&&value!=='skipped';}
+
+export function restoredTourStep(value:string|null,count:number):number{
+ const match=/^step:(\d+)$/.exec(value??'');
+ const number=match?Number(match[1]):0;
+ return Number.isSafeInteger(number)&&number>=0&&number<count?number:0;
+}

@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {shouldShowTour,tourStepsFor,tourStorageKey} from './tour-model.ts';
+import {restoredTourStep,shouldShowTour,tourStepsFor,tourStorageKey} from './tour-model.ts';
 import type {TourPage} from './tour-model.ts';
 
 function readFlag(key:string){
@@ -14,7 +14,7 @@ export function FirstRunTour({storeId,roles,replayToken,onNavigate}:{
  const steps=tourStepsFor(roles);
  const key=tourStorageKey(storeId,roles);
  const [open,setOpen]=useState(()=>shouldShowTour(readFlag(key)));
- const [index,setIndex]=useState(0);
+ const [index,setIndex]=useState(()=>restoredTourStep(readFlag(key),steps.length));
  const [targetFound,setTargetFound]=useState(false);
  const titleRef=useRef<HTMLHeadingElement>(null);
  const navigatorRef=useRef(onNavigate);
@@ -24,6 +24,7 @@ export function FirstRunTour({storeId,roles,replayToken,onNavigate}:{
   if(!replayToken)return;
   setIndex(0);setOpen(true);
  },[replayToken]);
+ useEffect(()=>{if(open)saveFlag(key,'step:'+index);},[open,index,key]);
  useEffect(()=>{
   if(!open||!step)return;
   navigatorRef.current(step.page);
