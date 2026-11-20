@@ -51,3 +51,14 @@ test('P2: rejeita blocos de copiar/colar acima de 100 linhas',()=>{
  const rows=buildBulkClipboard(items).split('\n');
  assert.ok(parseBulkClipboard([rows[0],...Array(101).fill(rows[1])].join('\n'),items).issues.some(x=>/100/.test(x.message)));
 });
+
+test('P2: celula de codigo de barras vazia do grid nao cria edicao fantasma',()=>{
+ const gridRows=items.map(row=>({...row,barcode:row.barcode??''}));
+ const untouched=parseBulkClipboard(buildBulkClipboard(gridRows),gridRows);
+ assert.deepEqual(untouched.issues,[]);
+ assert.equal(untouched.updates.length,0);
+ const changed=parseBulkClipboard(buildBulkClipboard(gridRows).replace('100,00','109,90'),gridRows);
+ assert.deepEqual(changed.issues,[]);
+ assert.equal(changed.updates.length,1);
+ assert.equal(changed.updates[0].price_cents,10990);
+});
