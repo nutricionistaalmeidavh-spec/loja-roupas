@@ -36,7 +36,9 @@ test('P2: copiar/colar Excel, desfazer, lote atômico, exportar filtro e histór
  await bulk.getByRole('button',{name:'Selecionar tabela para copiar'}).click();
  const length=await textarea.evaluate(input=>(input as HTMLTextAreaElement).selectionEnd);
  expect(length).toBe(original.length);
- const modified=original.replace('99,90','109,90');
+ const modified=original.split(/\r?\n/).map(line=>line.startsWith(sku+'\t')
+  ?line.replace('99,90','109,90'):line).join('\r\n');
+ expect(modified).not.toBe(original);
  await textarea.fill(modified);
  await expect(bulk.getByRole('button',{name:'Salvar 1 alterações juntas'})).toBeEnabled();
  await bulk.getByRole('button',{name:'Desfazer alterações não salvas'}).click();
