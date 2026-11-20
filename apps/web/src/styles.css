@@ -209,3 +209,40 @@
  .stock-overview{padding:14px}
 }
 @media(prefers-reduced-motion:reduce){.hub-tile{transition:none}}
+
+
+/* Caixa e navegação da gestão: informação essencial no primeiro nível */
+.cash-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:stretch;padding:20px;background:#fff;border:1px solid #e7e7e7;border-radius:14px}
+.cash-status{display:flex;align-items:center;justify-content:center;min-height:80px;background:#f4f3f1;border-radius:10px;font-weight:700;color:#6d6254}
+.cash-status.active{background:#e8f2e9;color:#27633d}
+.cash-stat{display:flex;flex-direction:column;justify-content:center;gap:6px}
+.cash-stat>span{font-size:12px;color:#777}
+.cash-stat>strong{font-size:clamp(15px,1.6vw,20px)}
+.cash-action-form{display:flex;flex-direction:column;gap:16px}
+.cash-action-form p{margin:0;color:#666}
+.cash-action-form label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:650}
+.cash-action-form :is(input:not([type="checkbox"]),select){min-height:44px;border:1px solid #d8d8d8;padding:10px 12px;border-radius:8px;width:100%}
+.cash-action-form .primary-action{min-height:45px}
+.cash-action-form .cash-confirm{display:flex;flex-direction:row;gap:10px;align-items:flex-start}
+.cash-confirm input{margin-top:4px;min-width:18px;min-height:18px}
+.management-workspace{max-width:1440px}
+.management-tabs{position:static;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.management-tabs button{border:1px solid #dcdcdc;background:#fff;border-radius:9px;min-height:44px;padding:9px 15px;font-weight:650;color:#3a3a3a}
+.management-tabs button.active{background:#242424;border-color:#242424;color:#fff}
+.management-workspace .management-section{min-width:0}
+.management-workspace .management-section h3{margin-top:0;font-size:19px}
+.management-workspace .hub-heading h2{font-size:25px}
+.management-workspace .management-table-scroll{max-width:100%;overflow:auto}
+.supplier-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;padding:0;margin:18px 0 0;list-style:none}
+.supplier-list li{border:1px solid #e5e5e5;padding:13px;background:#fafafa;border-radius:9px}
+.product-card .qty button,.qty button{min-width:36px;min-height:36px}
+.muted.small,.small,.stock-hint{font-size:12px}
+.cart-line>strong,.cart-description strong{font-size:13px}
+.cart-description span{font-size:12px}
+@media(max-width:600px){
+ .cash-summary{grid-template-columns:1fr 1fr;padding:13px}
+ .cash-status{grid-column:1/-1;min-height:50px}
+ .management-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .management-tabs button{width:100%}
+ .management-workspace .management-section h3{font-size:18px}
+}
