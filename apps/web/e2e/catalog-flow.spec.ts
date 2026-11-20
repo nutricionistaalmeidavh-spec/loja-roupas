@@ -12,6 +12,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await expect(page.getByRole('heading', {name:'Nova venda'})).toBeVisible();
 
   await page.getByRole('button', {name:'Cadastrar produtos'}).click();
+  await page.getByRole('button',{name:/Novo produto/}).click();
   await page.getByLabel('Nome da peça').fill(name);
   await page.getByLabel('SKU').fill(sku);
   await page.getByLabel('Cor').fill('Azul');
@@ -19,6 +20,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await page.getByLabel('Preço (R$)').fill('129,90');
   await page.getByRole('button', {name:'Cadastrar produto', exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'Produto cadastrado'})).toBeVisible();
+  await page.getByRole('button',{name:'Fechar Novo produto'}).click();
 
   await page.getByRole('button', {name:'Entrada de estoque'}).click();
   const select = page.getByLabel('Variante (SKU)');
