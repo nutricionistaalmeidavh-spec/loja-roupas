@@ -49,9 +49,11 @@ test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',as
  await expect(row.getByRole('gridcell').nth(9)).toHaveText('6');
  const cell=row.getByRole('gridcell',{name:name,exact:true});
  await cell.dblclick();
- await cell.locator('input').fill(name+' editada');
- await cell.locator('input').press('Enter');
- await row.getByRole('button',{name:'Salvar alterações de '+sku}).click();
+ const editor=grid.locator('input.rdg-text-editor');
+ await expect(editor).toBeVisible();
+ await editor.fill(name+' editada');
+ await editor.press('Enter');
+ await page.getByRole('button',{name:'Salvar selecionado '+sku}).click();
  await expect(page.getByRole('status').filter({hasText:'Alterações salvas'})).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('planilha-p1-desktop.png'),fullPage:true});
  await page.setViewportSize({width:390,height:844});
