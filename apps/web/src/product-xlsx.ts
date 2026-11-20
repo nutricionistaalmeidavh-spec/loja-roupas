@@ -1,6 +1,7 @@
 import { parseProductCsv, PRODUCT_CSV_COLUMNS } from './product-import.ts';
 import type { ImportPreview, ImportIssue } from './product-import.ts';
 
+export const MAX_XLSX_FILE_SIZE=5*1024*1024;
 export type SheetCell=unknown; // read-excel-file representa tipos de célula adicionais; validar todos em runtime.
 
 function csvCell(value:string){
