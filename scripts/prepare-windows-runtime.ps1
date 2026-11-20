@@ -56,7 +56,7 @@ Copy-Item -Recurse -LiteralPath $nativeSrc -Destination (Join-Path $api 'node_mo
 # Importar apenas as versões fixadas do pnpm store construído no CI, sem download no cliente.
 $requiredPgModules=@('pg-cloudflare','pg-connection-string','pg-pool','pg-protocol',
  'pg-types','pgpass','pg-int8','postgres-array','postgres-bytea','postgres-date',
- 'postgres-interval','split2')
+ 'postgres-interval','split2','xtend')
 foreach($name in $requiredPgModules) {
  $matches=@(Get-ChildItem -LiteralPath $store -Directory -Filter ($name+'@*'))
  if($matches.Count -ne 1){throw "Dependency missing or ambiguous in pinned store: $name"}
@@ -74,6 +74,12 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Packaged API missing runtime dependencies'}
 }finally{Pop-Location}
 
+# postgres-interval@1.2.0 depends on xtend. In CI the repository node_modules
+# can mask a missing module, while the installed desktop has no parent workspace.
+if(!(Test-Path (Join-Path $api 'node_modules/xtend/immutable.js')) -and
+   !(Test-Path (Join-Path $api 'node_modules/xtend/index.js'))){
+ throw 'Isolated PostgreSQL driver dependency xtend is missing from installed runtime'
+}
 if(!(Test-Path (Join-Path $api 'node_modules/@loja/domain'))){throw 'Packaged domain missing'}
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'apps/web/dist') -Destination (Join-Path $runtime 'web')
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'infra/sql') -Destination (Join-Path $resources 'infra/sql')
