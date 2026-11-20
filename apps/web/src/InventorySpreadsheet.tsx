@@ -23,6 +23,13 @@ function safePrice(value:string){
 function movementLabel(kind:string){
  return ({receipt:'Recebimento',sale:'Venda',return:'Devolução',adjustment:'Ajuste'} as Record<string,string>)[kind]??kind;
 }
+function movementSource(source:string){
+ return ({
+  manual_receipt:'Entrada manual',spreadsheet_import:'Importação de planilha',
+  purchase:'Pedido de compra',sale:'Venda confirmada',
+  sale_return:'Devolução de venda',manager_adjustment:'Conferência gerencial'
+ } as Record<string,string>)[source]??source;
+}
 
 export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive}:{
  session:Session;onSaved:()=>void;canEdit:boolean;canReceive:boolean;
@@ -272,7 +279,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
      {!actionLoading&&!history.length&&!historyError&&<p className="muted">Nenhuma movimentação registrada.</p>}
      {history.map(item=><div className="sheet-history-item" key={item.id}>
       <div><strong>{movementLabel(item.movement_kind)}</strong>
-       <span>{new Date(item.occurred_at).toLocaleString('pt-BR')}</span></div>
+       <span>{new Date(item.occurred_at).toLocaleString('pt-BR')} · {movementSource(item.source_type)}</span></div>
       <strong>{item.qty_delta>0?'+':''}{item.qty_delta} peças</strong>
      </div>)}
      <p className="muted small">Exibindo os últimos 50 movimentos. O histórico é gerado no servidor, não por alterações manuais nas células.</p>
