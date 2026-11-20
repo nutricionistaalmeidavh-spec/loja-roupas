@@ -1,47 +1,125 @@
-const { app, BrowserWindow, dialog, shell } = require('electron');
-const { readFileSync } = require('node:fs');
-const path = require('node:path');
+const {app,BrowserWindow,dialog,shell,ipcMain}=require('electron');
+const {readFileSync} =require('node:fs');
+const fs=require('node:fs/promises');
+const path=require('node:path');
+const {launchLocalRuntime}=require('./local-runtime.cjs');
 
-function serverUrl() {
-  const file = path.join(app.getPath('userData'), 'server-url.txt');
-  let configured = process.env.LOJA_SERVER_URL;
-  if (!configured) {
-    try {
-      configured = readFileSync(file, 'utf8').trim();
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-    }
-  }
-  const url = new URL(configured || (process.defaultApp ? 'http://127.0.0.1:5173' : 'http://127.0.0.1:8080'));
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/'
-      || url.search || url.hash) throw new Error('Informe a origem HTTP/HTTPS da loja, com porta quando necessária.');
-  return url;
-}
-
-function openWindow() {
-  const url = serverUrl();
-  const window = new BrowserWindow({
-    width: 1440, height: 900, minWidth: 760, minHeight: 560,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, webSecurity: true },
-  });
-  window.webContents.setWindowOpenHandler(({url:target}) => {
-    const next = new URL(target);
-    if (next.origin === url.origin && /^\/vitrine\/[0-9a-f-]{36}$/i.test(next.pathname)
-        && !next.username && !next.password && !next.search && !next.hash) {
-      void shell.openExternal(next.href).catch(error => dialog.showErrorBox('Abrir vitrine',error.message));
-    }
-    return {action:'deny'};
-  });
-  for (const eventName of ['will-navigate', 'will-redirect']) {
-    window.webContents.on(eventName, (event, next) => {
-      if (new URL(next).origin !== url.origin) event.preventDefault();
-    });
-  }
-  return window.loadURL(url.href);
-}
-
-app.whenReady().then(openWindow).catch(error => {
-  dialog.showErrorBox('Conexão com a Loja de Roupas', error.message);
-  app.quit();
+let runtime=null,setupWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
+let quitting=false;
+const single=app.requestSingleInstanceLock();
+if(!single)app.quit();
+app.on('second-instance',()=>{
+ const win=BrowserWindow.getAllWindows()[0];
+ if(win){if(win.isMinimized())win.restore();win.focus();}
 });
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
+function validateOrigin(value){
+ const url=new URL(value);
+ if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'
+  ||url.search||url.hash)throw new Error('Informe apenas o endereço HTTP/HTTPS da loja, com porta se necessário.');
+ return url;
+}
+function configuredUrl(){
+ let configured=process.env.LOJA_SERVER_URL;
+ if(!configured){
+  try{configured=readFileSync(path.join(app.getPath('userData'),'server-url.txt'),'utf8').trim();}
+  catch(error){if(error.code!=='ENOENT')throw error;}
+ }
+ return configured?validateOrigin(configured):null;
+}
+function openWindow(url){
+ const window=new BrowserWindow({
+  width:1440,height:900,minWidth:760,minHeight:560,
+  webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
+ });
+ window.webContents.setWindowOpenHandler(({url:target})=>{
+  try{
+   const next=new URL(target);
+   if(next.origin===url.origin&&/^\/vitrine\/[0-9a-f-]{36}$/i.test(next.pathname)
+      &&!next.username&&!next.password&&!next.search&&!next.hash){
+    void shell.openExternal(next.href).catch(error=>dialog.showErrorBox('Abrir vitrine',error.message));
+   }
+  }catch{}
+  return {action:'deny'};
+ });
+ for(const name of ['will-navigate','will-redirect']){
+  window.webContents.on(name,(event,target)=>{
+   try{if(new URL(target).origin!==url.origin)event.preventDefault();}
+   catch{event.preventDefault();}
+  });
+ }
+ void window.loadURL(url.href).catch(error=>dialog.showErrorBox('Conexão com a loja',error.message));
+ return window;
+}
+function status(message){
+ setupState={...setupState,status:message};
+ if(setupWindow&&!setupWindow.isDestroyed())setupWindow.webContents.send('loja:setup-status',setupState);
+}
+function showError(error){
+ setupState={...setupState,error:error instanceof Error?error.message:'Falha ao iniciar os componentes locais'};
+ status('Instalação local não iniciada');
+}
+function setupAllowed(event){
+ if(!setupWindow||event.sender!==setupWindow.webContents||
+  !event.sender.getURL().startsWith('file://'))throw new Error('Operação não permitida fora do assistente local.');
+}
+function transition(url){
+ openWindow(url);
+ if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
+ setupWindow=null;
+}
+async function startLocal(){
+ setupState={status:'Preparando PostgreSQL e interface local…',ready:false,error:''};
+ status(setupState.status);
+ try{
+  runtime=await launchLocalRuntime({resources:process.resourcesPath,
+   userData:app.getPath('userData'),exe:process.execPath,progress:status});
+  if(!runtime.firstRun){transition(validateOrigin(runtime.url));return;}
+  setupState={status:'Banco e API prontos. Cadastre o administrador.',ready:true,error:''};
+  status(setupState.status);
+ }catch(error){showError(error);}
+}
+function registerSetupHandlers(){
+ ipcMain.handle('loja:setup-state',event=>{setupAllowed(event);return setupState;});
+ ipcMain.handle('loja:setup-create',async(event,input)=>{
+  setupAllowed(event);
+  if(!runtime||!setupState.ready)throw new Error('O banco ainda não está pronto.');
+  const result=await runtime.bootstrap(input);
+  transition(validateOrigin(runtime.url));
+  return result;
+ });
+ ipcMain.handle('loja:setup-remote',async(event,raw)=>{
+  setupAllowed(event);
+  const url=validateOrigin(String(raw||''));
+  const response=await fetch(url.href+'v1/ready',{signal:AbortSignal.timeout(4000)});
+  if(!response.ok)throw new Error('A loja indicada não respondeu. Verifique endereço e rede LAN.');
+  const target=path.join(app.getPath('userData'),'server-url.txt');
+  await fs.writeFile(target,url.href,{encoding:'utf8',mode:0o600});
+  if(runtime){await runtime.stop();runtime=null;}
+  transition(url);
+  return {ok:true};
+ });
+ ipcMain.handle('loja:setup-retry',async(event)=>{
+  setupAllowed(event);if(runtime)await runtime.stop();runtime=null;
+  void startLocal();return {ok:true};
+ });
+}
+async function start(){
+ if(!single)return;
+ const url=configuredUrl();
+ if(url){openWindow(url);return;}
+ if(process.platform!=='win32'){openWindow(validateOrigin('http://127.0.0.1:'+(process.defaultApp?'5173':'8080')));return;}
+ registerSetupHandlers();
+ setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,
+  webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
+   contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
+ await setupWindow.loadFile(path.join(__dirname,'setup.html'));
+ await startLocal();
+}
+app.whenReady().then(start).catch(error=>{dialog.showErrorBox('Iniciar Loja de Roupas',error.message);app.quit();});
+app.on('before-quit',event=>{
+ if(!runtime||quitting)return;
+ event.preventDefault();quitting=true;
+ void runtime.stop().finally(()=>{runtime=null;app.quit();});
+});
+app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});

@@ -57,7 +57,7 @@ jobs:
           retention-days: 7
   candidate-windows:
     runs-on: windows-latest
-    timeout-minutes: 18
+    timeout-minutes: 38
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,6 +71,10 @@ jobs:
       - name: Empacotar cliente portátil Windows
         run: |
           pnpm --filter @loja/desktop build
+          pnpm --filter @loja/web build
+          pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
+          if (!(Test-Path dist/desktop-win32-x64/resources/runtime/postgres/bin/initdb.exe)) { throw 'Banco portátil ausente' }
+          if (!(Test-Path dist/desktop-win32-x64/resources/runtime/api/src/main.ts)) { throw 'API local ausente' }
           if (!(Test-Path dist/desktop-win32-x64/electron.exe -PathType Leaf)) { throw 'Executável ausente' }
           if (!(Test-Path dist/desktop-win32-x64/resources/app/main.cjs -PathType Leaf)) { throw 'Entrada do aplicativo ausente' }
           Set-Location dist
@@ -95,6 +99,8 @@ jobs:
           if ($process.ExitCode -ne 0 -or !(Test-Path "$install/app/electron.exe")) { throw 'Instalação falhou' }
           node scripts/smoke-installed-desktop.mjs "$install/app/electron.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Cliente instalado falhou no smoke test' }
+          node scripts/smoke-single-machine.mjs "$install/app/electron.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Modo computador único falhou no smoke test' }
           $process = Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw 'Remoção falhou' }
           $deadline = (Get-Date).AddSeconds(30)

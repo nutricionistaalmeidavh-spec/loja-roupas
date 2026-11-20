@@ -31,6 +31,12 @@ Sistema para boutique física inicialmente única, com **desktop Electron, Web/P
 
 **Governança:** branch e PR, contrato versionado, testes e documentação. Merge e release requerem autorizações **separadas**. Nenhuma publicação automática.
 
+## Instalação Windows autônoma e primeiro acesso
+
+O instalador Windows x64 inclui a aplicação Electron, PostgreSQL portátil e API local. Ao abrir pela primeira vez, o próprio aplicativo prepara o banco, pede nome da loja e credenciais de administrador e abre o sistema. Depois do login, o tour apresenta os módulos permitidos e pode ser reaberto pelo botão **Ajuda · Tour**. Não exige Docker, hospedagem nem assinatura. Os dados residem fora da pasta do programa e permanecem após desinstalar (backup obrigatório antes de migração). Para computadores adicionais, conecte explicitamente ao servidor LAN existente.
+
+**Atenção:** esta implementação ainda exige testes físicos em Windows, backup/restauração e periféricos para homologação comercial. A base fica disponível em 127.0.0.1 na instalação de computador único, não exposta automaticamente à rede.
+
 ## Primeiro acesso sem serviços pagos
 No computador servidor (Linux com Docker Compose, Node 22+ e OpenSSL), execute `bash scripts/install-lan.sh`. O assistente de terminal solicita o endereço local, cria credenciais de banco, migra a base, solicita loja e administrador e verifica `/v1/ready`. O endereço padrão `127.0.0.1` só permite acesso no próprio servidor; uso multioperador exige configuração da LAN e revisão de segurança. Não pressupõe conta em nuvem, API paga nem assinatura.
 
