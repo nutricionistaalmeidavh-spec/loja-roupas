@@ -20,3 +20,13 @@ A integração desktop automática só pode ser habilitada após o cliente ativa
 A central existente `pdv-artisys` libera `LOJA_ROUPAS`, envia e-mail de boas-vindas por `oficina-mail.artisys.dev/welcome` e valida o código de seis dígitos por 48 horas. A edição livre não realiza consultas de licença.
 
 Para gerar explicitamente a edição comercial: `LOJA_COMMERCIAL_EDITION=true pnpm --filter @loja/desktop build` (Windows: `$env:LOJA_COMMERCIAL_EDITION='true'`). O manifesto `commercial-edition.json` é embarcado somente neste caso. Na primeira abertura, o assistente exige e-mail e código **antes** do bootstrap local. Depois, a operação continua offline utilizando a licença local previamente validada; a revogação é consultada ao reconectar. Nenhuma chave da Central entra no instalador. A distribuição comercial precisa incluir PostgreSQL e API conforme `scripts/prepare-windows-runtime.ps1`.
+
+## Marketplace público e portal do lojista
+
+O endereço raiz `/` apresenta marketplace responsivo com **catálogo de dados reais** no D1: `/v1/marketplace?q=...&category=...` lista somente variantes publicadas, por loja e sem contatos privados. Cada card aponta para `/loja/{slug}`. Com 0 lojas publicadas, o site mostra vitrines em preparação, sem dados fictícios.
+
+Acesso: botão **Entrar como lojista** abre `<dialog>` nativo, com identificador da loja, e-mail e senha. Autenticação via `/v1/portal/login`, sessão HttpOnly/Secure/SameSite=Strict com hash no D1, `/v1/portal/me`, `/v1/portal/orders`, `/v1/portal/logout`. O painel inicial é somente leitura; confirmação de pedidos e estoque permanecem no desktop.
+
+Na criação administrativa `POST /v1/admin/tenants`, passe também `ownerEmail`, além de `slug`, `name` e `installationId` previamente licenciado. A resposta devolve uma **senha aleatória temporária do portal** e `syncKey` **uma única vez**. Não enviar esses valores em logs nem reutilizar o código de ativação como senha. A senha do lojista fica armazenada apenas por PBKDF2 com sal aleatório no D1. Não há cadastro público ou inscrição que dispense a aprovação/licença.
+
+Migração aditiva `portal-schema.sql` deve ser aplicada antes de atualizar o Worker; sem isso não há login de lojista. Nenhum dado de outros produtos/licenças deve ser alterado. Em produção, realizar cadastro de teste com licença válida e conferir isolamento por tenant, logout, sessão expirada e navegação no celular.

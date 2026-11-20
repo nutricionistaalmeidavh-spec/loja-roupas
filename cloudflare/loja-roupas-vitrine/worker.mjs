@@ -1,4 +1,7 @@
 // Loja Roupas — Vitrine online opcional, multi-tenant e sem dependências pagas.
+import {marketplaceRoute} from './marketplace.mjs';
+import {renderMarketplace} from './marketplace-page.mjs';
+import {portalRoute,createOwnerCredentials,normalizeOwnerEmail} from './portal.mjs';
 const HEAD={'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:HEAD});
 const fail=(status,error)=>json({error},status);
@@ -102,16 +105,21 @@ async function adminTenants(request,env){
  }
  if(request.method!=='POST')return fail(405,'method_not_allowed');
  const input=await readJson(request),slug=normalizeSlug(input.slug),name=String(input.name||'').trim(),
- installationId=String(input.installationId||'').trim();
- if(!slug||name.length<2||name.length>120||!/^[A-Za-z0-9._:-]{8,128}$/.test(installationId))return fail(400,'invalid_tenant');
+ installationId=String(input.installationId||'').trim(),ownerEmail=normalizeOwnerEmail(input.ownerEmail);
+ if(!slug||name.length<2||name.length>120||!/^[A-Za-z0-9._:-]{8,128}$/.test(installationId)||!ownerEmail)return fail(400,'invalid_tenant');
  if(!await activeLicense(env,installationId))return fail(403,'license_inactive');
  if(await env.DB.prepare('SELECT id FROM tenants WHERE slug=? OR installation_id=?').bind(slug,installationId).first())return fail(409,'tenant_exists');
  const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
  const syncKey=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
  const id=crypto.randomUUID(),date=now();
- await env.DB.prepare('INSERT INTO tenants(id,slug,name,installation_id,sync_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
- .bind(id,slug,name,installationId,await sha256(syncKey),date,date).run();
- return json({tenant:{id,slug,name},syncKey,warning:'Guarde esta chave no computador principal. Ela não será exibida novamente.'},201);
+ const owner=await createOwnerCredentials();
+ await env.DB.batch([
+  env.DB.prepare('INSERT INTO tenants(id,slug,name,installation_id,sync_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?)')
+   .bind(id,slug,name,installationId,await sha256(syncKey),date,date),
+  env.DB.prepare('INSERT INTO tenant_owners(tenant_id,email_normalized,password_salt,password_hash,created_at) VALUES(?,?,?,?,?)')
+   .bind(id,ownerEmail,owner.salt,owner.hash,date)
+ ]);
+ return json({tenant:{id,slug,name},syncKey,ownerAccess:{email:ownerEmail,initialPassword:owner.initialPassword},warning:'Guarde a senha do portal e a chave de sincronização em lugares separados; ambas são exibidas somente agora. O código de ativação não é compartilhado com o portal.'},201);
 }
 async function syncCatalog(request,env,tenant){
  const body=await readJson(request);
@@ -153,8 +161,11 @@ function uiHtml(slug){
 export default {async fetch(request,env){
  const url=new URL(request.url),path=url.pathname,method=request.method;
  if(method==='GET'&&path==='/health')return json({ok:true,service:'loja-roupas-vitrine',version:1});
+ if(method==='GET'&&path==='/')return renderMarketplace();
  if(!env.DB)return fail(503,'storefront_not_configured');
  try{
+ const market=await marketplaceRoute(request,env,url);if(market)return market;
+ const portal=await portalRoute(request,env,url,activeLicense);if(portal)return portal;
  if(path==='/v1/admin/tenants')return adminTenants(request,env);
  const webpage=/^\/loja\/([a-z0-9-]{3,48})\/?$/.exec(path);
  if(method==='GET'&&webpage)return new Response(uiHtml(webpage[1]),{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-store','content-security-policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' https:; base-uri 'none'; form-action 'self'",'x-content-type-options':'nosniff'}});
@@ -173,7 +184,7 @@ export default {async fetch(request,env){
  return fail(404,'route_not_found');
  }catch(error){
  const code=String(error?.message||'');
- if(['invalid_catalog_item','invalid_photo_url','invalid_pickup_lines','invalid_pickup_order','invalid_batch','duplicate_variants','json_required','body_too_large'].includes(code)||error instanceof SyntaxError)return fail(400,code||'invalid_json');
+ if(['invalid_catalog_item','invalid_photo_url','invalid_pickup_lines','invalid_pickup_order','invalid_batch','duplicate_variants','json_required','body_too_large','too_large'].includes(code)||error instanceof SyntaxError)return fail(400,code||'invalid_json');
  return fail(500,'internal_error');
  }
 }};
