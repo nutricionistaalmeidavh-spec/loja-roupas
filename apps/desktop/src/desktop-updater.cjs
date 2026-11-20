@@ -98,6 +98,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
    throw error;
   }finally{busy=false;}
  }
+ ipcMain.handle('loja:updates:info',event=>{allowed(event);return {supported:installSupported,currentVersion:app.getVersion()};});
  ipcMain.handle('loja:updates:check',async event=>{allowed(event);return check();});
  ipcMain.handle('loja:updates:last-result',async event=>{allowed(event);return lastResult();});
  ipcMain.handle('loja:updates:install',async event=>{allowed(event);return install(event);});
