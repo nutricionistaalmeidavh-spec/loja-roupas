@@ -6,7 +6,7 @@ import { requestId } from './request-id.ts';
 import { parseProductCsv, PRODUCT_CSV_TEMPLATE } from './product-import.ts';
 import type { ImportPreview } from './product-import.ts';
 import { TaskDialog } from './TaskDialog.tsx';
-import { MAX_XLSX_FILE_SIZE } from './product-xlsx-file.ts';
+import { MAX_XLSX_FILE_SIZE } from './product-xlsx.ts';
 
 type Result={products_created:number;variants_created:number;stock_units:number;replayed:boolean};
 
