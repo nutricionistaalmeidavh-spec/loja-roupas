@@ -55,6 +55,14 @@ export function listCatalog(session: Session, query = '', fetchImpl: typeof fetc
     (category ? '&category=' + encodeURIComponent(category) : '');
   return jsonRequest<CatalogPage>(path, {method:'GET',headers:headers(session),signal}, fetchImpl);
 }
+export function listCategories(session:Session,fetchImpl:typeof fetch=fetch,signal?:AbortSignal):Promise<{categories:string[]}>{
+ return jsonRequest('/v1/catalog/categories',{method:'GET',headers:headers(session),signal},fetchImpl);
+}
+export function lookupDraftVariants(session:Session,ids:string[],fetchImpl:typeof fetch=fetch):Promise<CatalogPage>{
+ if(!ids.length||ids.length>50)throw new Error('Carrinho deve conter de 1 a 50 variantes');
+ return jsonRequest('/v1/catalog/draft-variants?ids='+encodeURIComponent(ids.join(',')),
+  {method:'GET',headers:headers(session)},fetchImpl);
+}
 export function scanCatalog(session:Session,code:string,fetchImpl:typeof fetch=fetch): Promise<CatalogPage> {
   const path='/v1/catalog/products?exact=true&limit=2&query='+encodeURIComponent(code.trim());
   return jsonRequest<CatalogPage>(path,{method:'GET',headers:headers(session)},fetchImpl);
