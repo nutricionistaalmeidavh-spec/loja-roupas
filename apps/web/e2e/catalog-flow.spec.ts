@@ -12,6 +12,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await expect(page.getByRole('heading', {name:'Nova venda'})).toBeVisible();
 
   await page.getByRole('button', {name:'Cadastrar produtos'}).click();
+ await page.getByRole('button',{name:'Novo produto'}).click();
   await page.getByLabel('Nome da peça').fill(name);
   await page.getByLabel('SKU').fill(sku);
   await page.getByLabel('Cor').fill('Azul');
