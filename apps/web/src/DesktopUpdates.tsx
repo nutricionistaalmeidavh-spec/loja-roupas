@@ -6,6 +6,7 @@ type State={supported:boolean;currentVersion:string;available:Release|null;messa
 type Progress={phase:string;bytes?:number;total?:number;message?:string;version?:string;backupCreated?:boolean};
 type LastResult={status:string;message:string}|null;
 type Bridge={
+ info():Promise<{supported:boolean;currentVersion:string}>;
  check():Promise<State>;
  install():Promise<{started:boolean;cancelled?:boolean;backupCreated?:boolean}>;
  lastResult():Promise<LastResult>;
