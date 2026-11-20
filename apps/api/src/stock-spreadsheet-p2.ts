@@ -172,13 +172,13 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
    "(m.source_type='purchase' AND a.action='purchase.receive' AND a.aggregate_id=m.source_id) OR "+
    "(m.source_type='spreadsheet_import' AND a.action='catalog.product.import' AND a.aggregate_id=m.source_id) "+
    ') ORDER BY a.occurred_at DESC,a.id DESC LIMIT 1) audit_actor ON true '+
-   'LEFT JOIN users operator ON operator.id=coalesce(sale.cashier_id,refunded.actor_id,audit_actor.actor_id) '+
+   'LEFT JOIN users staff ON staff.id=coalesce(sale.cashier_id,refunded.actor_id,audit_actor.actor_id) '+
    'WHERE m.store_id=$1 '+
    'AND ($2::uuid IS NULL OR m.variant_id=$2::uuid) '+
    "AND ($3::text='' OR m.movement_kind=$3) "+
    'AND ($4::uuid IS NULL OR po.supplier_id=$4::uuid) '+
    'AND ($5::uuid IS NULL OR po.id=$5::uuid) '+
-   'AND ($6::uuid IS NULL OR operator.id=$6::uuid) '+
+   'AND ($6::uuid IS NULL OR staff.id=$6::uuid) '+
    'AND ($7::date IS NULL OR (m.occurred_at AT TIME ZONE st.timezone)::date >= $7::date) '+
    'AND ($8::date IS NULL OR (m.occurred_at AT TIME ZONE st.timezone)::date <= $8::date)';
   const [count,rows]=await Promise.all([
@@ -191,7 +191,7 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
    }>('SELECT m.id::text,m.variant_id::text,v.sku,p.name AS product_name,m.movement_kind,'+
     'm.qty_delta::text,m.source_type,m.source_id::text,po.id::text AS purchase_id,'+
     'supplier.id::text AS supplier_id,supplier.name AS supplier_name,'+
-    'operator.id::text AS operator_id,operator.login AS operator_login,m.occurred_at '+
+    'staff.id::text AS operator_id,staff.login AS operator_login,m.occurred_at '+
     joins+' ORDER BY m.occurred_at DESC,m.id DESC LIMIT $9 OFFSET $10',[...args,limit,offset])
   ]);
   return {total:numberSafe(count.rows[0]?.total??'0','total'),limit,offset,
