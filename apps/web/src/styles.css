@@ -145,3 +145,67 @@
 .checkout-totals{position:relative;background:#f7f5f1;border-color:#e5dfd5}
 .product-card:focus-within{outline:2px solid #a68b67;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.checkout-modal,.product-card,.management-jump a{animation:none!important;transition:none!important}}
+
+
+/* UX loja: tarefas pontuais em janelas, consultas em páginas completas. */
+.workspace-hub{padding:clamp(16px,3vw,32px);display:grid;gap:22px;min-width:0}
+.hub-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.hub-heading h2,.hub-heading h3{margin:0 0 5px;font-size:clamp(21px,2vw,27px);letter-spacing:-.025em}
+.hub-heading p{margin:0;color:#6d6d6d;max-width:64ch}
+.hub-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.hub-actions button{min-height:44px}
+.hub-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.hub-tile{display:flex;flex-direction:column;text-align:left;align-items:flex-start;gap:9px;padding:20px;min-height:175px;border:1px solid #dedede;border-radius:14px;background:#fff;color:#171717;transition:border-color .15s,box-shadow .15s}
+.hub-tile:hover{border-color:#9d8568;box-shadow:0 4px 15px #0000000a}
+.hub-tile strong{font-size:17px;font-weight:700}
+.hub-tile>span:last-child{font-size:13px;color:#666;line-height:1.5}
+.hub-icon{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:38px;border-radius:9px;background:#f2efe9;color:#534333;font-size:20px;font-weight:700}
+.hub-editor{margin-top:2px;padding:18px;background:#fff;border:1px solid #e6e6e6;border-radius:15px;min-width:0}
+.hub-editor .management-form{margin-top:16px}
+.stock-overview{border:1px solid #e6e6e6;background:#fff;border-radius:14px;padding:22px;min-width:0}
+.stock-overview label{display:flex;flex-direction:column;gap:8px;font-weight:600;max-width:620px}
+.stock-overview input{padding:12px;border:1px solid #d8d8d8;border-radius:9px}
+.stock-overview .management-table-scroll,.import-preview .management-table-scroll{max-width:100%;overflow:auto;margin-top:16px}
+.stock-overview table,.import-preview table{border-collapse:collapse;width:100%;min-width:560px}
+.stock-overview th,.stock-overview td,.import-preview th,.import-preview td{padding:11px 12px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
+.stock-overview th,.import-preview th{background:#f7f6f3;color:#4e4e4e;font-size:12px;letter-spacing:.02em}
+.app-dialog-backdrop{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:clamp(8px,3vw,32px);background:rgba(21,21,21,.58)}
+.app-dialog{width:min(100%,560px);max-height:calc(100dvh - 32px);background:white;display:flex;flex-direction:column;border-radius:16px;box-shadow:0 22px 80px #0003;overflow:hidden;min-width:0}
+.app-dialog-wide{width:min(100%,950px)}
+.app-dialog-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:19px 24px;border-bottom:1px solid #ededed;flex-shrink:0}
+.app-dialog-header h2{font-size:20px;letter-spacing:-.02em;margin:0}
+.app-dialog-header button{min-height:40px}
+.app-dialog-content{padding:22px 24px;overflow:auto;overscroll-behavior:contain;min-height:0}
+.app-dialog-content .management-form{background:transparent;border:0;padding:0;margin:0;max-width:none;width:100%}
+.app-dialog-content .form-heading h2{display:none}
+.app-dialog-content .variant-row{min-width:0}
+.app-dialog-content input,.app-dialog-content select{max-width:100%}
+.import-workflow{display:grid;gap:18px}
+.import-workflow>p{margin:0}
+.import-steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.import-steps section{padding:18px;border:1px solid #e6e6e6;border-radius:12px;background:#fcfcfb;min-width:0}
+.import-steps section strong{font-size:15px}
+.import-steps p{color:#656565;font-size:13px;line-height:1.5}
+.import-file-label{margin-top:12px;display:flex;align-items:flex-start;flex-direction:column;gap:9px;font-weight:650}
+.import-file-label input{font-size:13px;max-width:100%}
+.import-preview{border-top:1px solid #ebebeb;padding-top:14px;min-width:0}
+.import-preview h3{margin:0 0 12px}
+.import-stats{display:flex;gap:10px;flex-wrap:wrap}
+.import-stats span{padding:8px 11px;background:#f2f0ec;border-radius:9px;font-size:13px;font-weight:700;color:#423d36}
+.import-preview>.primary-action{margin-top:18px;min-height:44px}
+.app-dialog :is(button,input,select,textarea):focus-visible,.hub-tile:focus-visible,
+.stock-overview input:focus-visible,.management-jump button:focus-visible{outline:3px solid #9c7950;outline-offset:3px}
+@media(max-width:850px){.hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){
+ .workspace-hub{padding:14px 4px;gap:16px}
+ .hub-grid,.import-steps{grid-template-columns:1fr}
+ .hub-tile{min-height:112px;padding:14px}
+ .hub-heading,.hub-actions{width:100%}
+ .hub-actions button{flex:1}
+ .app-dialog-backdrop{padding:0;align-items:flex-end}
+ .app-dialog,.app-dialog-wide{width:100%;max-height:96dvh;border-radius:16px 16px 0 0}
+ .app-dialog-header{padding:14px 16px}
+ .app-dialog-content{padding:14px 16px 24px}
+ .stock-overview{padding:14px}
+}
+@media(prefers-reduced-motion:reduce){.hub-tile{transition:none}}
