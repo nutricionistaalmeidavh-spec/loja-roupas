@@ -209,3 +209,27 @@
 .checkout-totals{position:relative;background:#f7f5f1;border-color:#e5dfd5}
 .product-card:focus-within{outline:2px solid #a68b67;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.checkout-modal,.product-card,.management-jump a{animation:none!important;transition:none!important}}
+
+/* Gestão: uma área de trabalho por vez, menus com seleção explícita. */
+.management-jump a.active,.management-jump a[aria-current="page"]{
+ background:#242424;color:#fff;border-color:#242424
+}
+.management-section-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.management-section-head h2{margin:0 0 4px}
+.management-section-head p{margin:0;color:#666}
+.management-surface{display:grid;gap:16px}
+.management-surface>section{min-width:0}
+.cash-quick-actions{display:flex;gap:12px;flex-wrap:wrap}
+.cash-quick-actions button{min-height:44px}
+.stock-task-layout{display:grid;gap:15px}
+.stock-task-layout>.management-form{margin:0;max-width:none}
+.stock-task-layout .management-form:first-child{background:#f8f8f8}
+.cart-line .qty button{min-width:36px;min-height:36px}
+.product-card .sizes button{min-height:36px}
+.small,.stock-hint,.cart-description span{font-size:12px}
+@media(max-width:600px){
+ .management-section-head{align-items:stretch}
+ .management-section-head>button{width:100%;min-height:44px}
+ .cash-quick-actions button{flex:1 1 140px}
+ .cart-line .qty button{min-width:40px;min-height:40px}
+}
