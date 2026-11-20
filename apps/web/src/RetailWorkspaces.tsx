@@ -77,8 +77,8 @@ export function StockWorkspace({session,products,manager,onSaved,query,onSearch,
   {action==='receive'&&<AppDialog title="Entrada de estoque" wide locked={stockLocked} onClose={()=>setAction(null)}>
    <ReceiveStockForm session={session} products={products} onSaved={onSaved} onLockChange={setStockLocked}/>
   </AppDialog>}
-  {action==='adjust'&&manager&&<AppDialog title="Ajustar saldo de estoque" wide onClose={()=>setAction(null)}>
-   <M2StockAdjustment session={session} onSaved={onSaved} refreshKey={refreshKey}/>
+  {action==='adjust'&&manager&&<AppDialog title="Ajustar saldo de estoque" wide locked={stockLocked} onClose={()=>setAction(null)}>
+   <M2StockAdjustment session={session} onSaved={onSaved} refreshKey={refreshKey} onLockChange={setStockLocked}/>
   </AppDialog>}
  </section>;
 }
