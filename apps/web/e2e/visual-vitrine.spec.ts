@@ -5,6 +5,7 @@ test('captura vitrine publica',async({page,context},info)=>{
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Gestão',exact:true}).click();
+ await page.getByRole('link',{name:'Vitrine',exact:true}).click();
  const href=await page.getByRole('link',{name:'Abrir vitrine da loja'}).getAttribute('href');
  expect(href).toBeTruthy();
  const storefront=await context.newPage();
