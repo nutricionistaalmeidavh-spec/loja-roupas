@@ -2,6 +2,7 @@ param(
  [Parameter(Mandatory=$true)][int]$ParentPid,
  [Parameter(Mandatory=$true)][string]$Installer,
  [Parameter(Mandatory=$true)][string]$ExpectedSha256,
+ [Parameter(Mandatory=$true)][string]$ExpectedVersion,
  [Parameter(Mandatory=$true)][string]$InstallDir,
  [Parameter(Mandatory=$true)][string]$RollbackDir,
  [Parameter(Mandatory=$true)][string]$ResultFile
@@ -39,6 +40,10 @@ try {
   !(Test-Path -LiteralPath (Join-Path $appPath 'resources/app/main.cjs'))){
   throw 'A instalação falhou, restaurar versão anterior'
  }
+ $installedPackage=Join-Path $appPath 'resources/app/package.json'
+ if(!(Test-Path -LiteralPath $installedPackage)){throw 'Metadados de versão não instalados'}
+ $installedVersion=(Get-Content -LiteralPath $installedPackage -Raw | ConvertFrom-Json).version
+ if($installedVersion -ne $ExpectedVersion){throw 'Versão instalada difere da release aprovada'}
  Save-Result $true 'Programa atualizado; backup do banco e snapshot anterior preservados'
  Start-Process -FilePath (Join-Path $appPath 'electron.exe')
  exit 0
