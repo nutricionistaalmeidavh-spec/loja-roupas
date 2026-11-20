@@ -4,6 +4,7 @@ import { registerAuth } from './auth.ts';
 import { registerCatalog } from './catalog.ts';
 import { registerMutations } from './mutations.ts';
 import { registerCatalogAdmin } from './catalog-admin.ts';
+import { registerCatalogImport } from './catalog-import.ts';
 import { registerCashReturns } from './cash-returns.ts';
 import { registerCash } from './cash.ts';
 import { registerSales } from './sales.ts';
@@ -31,6 +32,7 @@ export function buildApp(db: Pool) {
   registerCatalog(app, db);
   registerMutations(app, db);
   registerCatalogAdmin(app, db);
+  registerCatalogImport(app, db);
   registerCash(app, db);
   registerCashReturns(app, db);
   registerSales(app, db);
