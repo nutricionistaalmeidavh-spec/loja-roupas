@@ -68,6 +68,30 @@ test('P2: lote atômico, repetição idempotente, conflitos e histórico filtrad
   assert.equal(movement.statusCode,200,movement.body);
   assert.ok(movement.json().total>=1);
   assert.equal(movement.json().items[0].operator_id,uid);
+  const supplier=(await db.query<{id:string}>(
+   'INSERT INTO suppliers(store_id,name) VALUES($1,$2) RETURNING id::text',[sid,'Fornecedor P2 '+random])).rows[0].id;
+  const purchase=(await db.query<{id:string}>(
+   'INSERT INTO purchase_orders(store_id,supplier_id,variant_id,quantity,unit_cost_cents) '+
+   'VALUES($1,$2,$3,4,3500) RETURNING id::text',[sid,supplier,variants[0].id])).rows[0].id;
+  const received=await app.inject({method:'POST',
+   url:'/v1/management/purchases/'+purchase+'/receive',
+   headers:{...headers,'idempotency-key':randomUUID()}});
+  assert.equal(received.statusCode,200,received.body);
+  const purchaseHistory=await app.inject({method:'GET',
+   url:'/v1/stock/spreadsheet/movements?supplier_id='+supplier+'&purchase_id='+purchase+
+     '&operator_id='+uid+'&from=1990-01-01&to=2100-01-01',headers});
+  assert.equal(purchaseHistory.statusCode,200,purchaseHistory.body);
+  assert.equal(purchaseHistory.json().total,1);
+  assert.equal(purchaseHistory.json().items[0].supplier_id,supplier);
+  assert.equal(purchaseHistory.json().items[0].purchase_id,purchase);
+  assert.equal(purchaseHistory.json().items[0].operator_id,uid);
+  const filters=await app.inject({method:'GET',url:'/v1/stock/spreadsheet/filter-options',headers});
+  assert.equal(filters.statusCode,200,filters.body);
+  assert.ok(filters.json().suppliers.some((x:{id:string})=>x.id===supplier));
+  assert.ok(filters.json().purchases.some((x:{id:string})=>x.id===purchase));
+  const reversed=await app.inject({method:'GET',
+   url:'/v1/stock/spreadsheet/movements?from=2100-01-01&to=1990-01-01',headers});
+  assert.equal(reversed.statusCode,422);
   const none=await app.inject({method:'GET',url:'/v1/stock/spreadsheet/movements?operator_id='+randomUUID(),headers});
   assert.equal(none.statusCode,200);
   assert.equal(none.json().total,0);
