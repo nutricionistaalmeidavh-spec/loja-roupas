@@ -92,8 +92,8 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     <StockHolds session={session}/>
     <PickupSettings session={session}/>
     <div id="gestao-operacoes" className="management-section"><OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/></div>
-    <div id="gestao-inteligencia" className="management-section"><CommercialIntelligence session={session}/></div>
-    <p id="gestao-vitrine" className="management-section"><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
+    <div id="gestao-inteligencia" data-tour="intelligence" className="management-section"><CommercialIntelligence session={session}/></div>
+    <p id="gestao-vitrine" data-tour="storefront" className="management-section"><a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a></p>
     {status && <p role="status">{status}</p>}
     {error && <p role="alert" className="error">{error}</p>}
   </div>;

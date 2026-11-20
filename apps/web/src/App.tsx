@@ -9,6 +9,7 @@ import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
+import { FirstRunTour } from './FirstRunTour.tsx';
 import { CreateProductForm, ReceiveStockForm } from './Management.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
 import { M2CatalogEditor, M2StockAdjustment } from './M2Admin.tsx';
@@ -34,6 +35,7 @@ type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao';
 export function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [page,setPage] = useState<Page>('pdv');
+  const [tourReplay,setTourReplay] = useState(0);
   const [products,setProducts] = useState<Product[]>([]);
   const [allProducts,setAllProducts] = useState<Product[]>([]);
   const [cursor,setCursor] = useState<string|null>(null);
@@ -307,12 +309,13 @@ export function App() {
       <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><span aria-hidden="true">Sair</span></button>
     </nav>
     <main className="workspace">
-      <header className="topbar">
+      <header className="topbar" data-tour="overview">
         <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':'Estoque'}</h1>
           <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
             {catalogError?'Servidor indisponível':cashId?'Caixa aberto · PostgreSQL':'Catálogo conectado · Sem caixa'}</span>
+          <button className="help-tour" type="button" aria-label="Reabrir tour" onClick={()=>setTourReplay(n=>n+1)}>Ajuda · Tour</button>
           <button className="mobile-logout" onClick={logout}>Sair</button>
         </div>
       </header>
@@ -335,7 +338,7 @@ export function App() {
             onClick={()=>void resumeCurrent(item)}>Retomar venda · {item.lines.length} itens</button>)}
         </section>}
         {cashId&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
-        <div className="search-row"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
+        <div className="search-row" data-tour="search"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
           <input id="search" value={search} autoComplete="off" onChange={e=>setSearch(e.target.value)} onKeyDown={keySearch} placeholder="Pesquisar produto, SKU ou código…"/>
           <button type="button" className="scan-button" disabled={scanBusy||!search.trim()} onClick={()=>void scan()}>{scanBusy?'Consultando…':'Confirmar código'}</button>
         </div>
@@ -345,7 +348,7 @@ export function App() {
         {message&&<p role="alert" className="error">{message}</p>}
         {catalogError&&<div className="error" role="alert">{catalogError} <button onClick={refreshed}>Tentar novamente</button></div>}
         {loading&&<p className="notice" role="status">Carregando produtos da loja…</p>}
-        {!loading&&!catalogError&&<div className="product-grid">
+        {!loading&&!catalogError&&<div className="product-grid" data-tour="variants">
           {filtered.map(p=>{
             const colors=[...new Set(p.variants.map(v=>v.color))];
             const choice=selected[p.id],color=choice?.color??colors[0]??'';
@@ -377,11 +380,11 @@ export function App() {
         </div>}
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
-      </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
-      {page==='gestao'&&manager&&<StoreOperations session={session} cashId={cashId} onReturned={refreshed}/>}
-      {page==='produtos'&&manager&&<><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></>}
-      {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
-      {page==='estoque'&&canReceive&&<>
+      </section><aside className="cart-panel" data-tour="cart" aria-label="Carrinho da venda">{cart}</aside></div>}
+      {page==='gestao'&&manager&&<div data-tour="management"><StoreOperations session={session} cashId={cashId} onReturned={refreshed}/></div>}
+      {page==='produtos'&&manager&&<div data-tour="products"><CreateProductForm session={session} onSaved={refreshed}/><M2CatalogEditor session={session} onSaved={refreshed}/></div>}
+      {page==='caixa'&&canCash&&<div data-tour="cash"><CashPanel session={session} onChanged={cashUpdated}/></div>}
+      {page==='estoque'&&canReceive&&<div data-tour="stock">
         <div className="management-form">
           <label>Localizar peça para recebimento (nome ou SKU)
             <input value={stockSearch} onChange={e=>setStockSearch(e.target.value)} placeholder="Buscar no servidor"/>
@@ -391,9 +394,9 @@ export function App() {
         </div>
         <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
         {manager&&<M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>}
-      </>}
+      </div>}
     </main>
-    {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
+    {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
       draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
     {lastSale&&<div className="checkout-overlay" role="presentation">
@@ -409,6 +412,7 @@ export function App() {
         </div>
       </section>
     </div>}
+    <FirstRunTour key={session.storeId+session.roles.join(',')} storeId={session.storeId} roles={session.roles} replayToken={tourReplay} onNavigate={setCurrentPage}/>
     {page==='pdv'&&cartOpen&&<div className="drawer-backdrop" onMouseDown={()=>setCartOpen(false)}>
       <aside ref={cartDialogRef} tabIndex={-1} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
         <button className="close-drawer" onClick={()=>setCartOpen(false)}>Fechar ×</button>{cart}
