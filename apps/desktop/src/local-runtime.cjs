@@ -133,8 +133,8 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
    await ready(url,apiChild);
   }catch(error){
    const diagnostic=apiDiagnostic
-     .replace(/postgres(?:ql)?:\\/\\/[^\\s]+/gi,'[DATABASE_URL redacted]')
-     .split(/\\r?\\n/).filter(line=>/error|cannot find|ERR_|failed/i.test(line)).slice(0,4)
+     .replace(/postgres(?:ql)?:\/\/[^\s]+/gi,'[DATABASE_URL redacted]')
+     .split(/\r?\n/).filter(line=>/error|cannot find|ERR_|failed/i.test(line)).slice(0,4)
      .join(' ').slice(0,1200);
    throw new Error('API local não iniciou: '+(diagnostic||error.message));
   }
