@@ -182,9 +182,9 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
   {notice&&<p role="status" className="notice">{notice}</p>}
  </section>;
 }
-export function M2StockAdjustment({session,onSaved,refreshKey}:{session:Session;onSaved:()=>void;refreshKey:number}){
- const [q,setQ]=useState('');const [products,setProducts]=useState<Product[]>([]);
- const [variantId,setVariantId]=useState('');const [count,setCount]=useState('');const [reason,setReason]=useState('');
+export function M2StockAdjustment({session,onSaved,refreshKey,initialSku='',initialVariantId=''}:{session:Session;onSaved:()=>void;refreshKey:number;initialSku?:string;initialVariantId?:string}){
+ const [q,setQ]=useState(initialSku);const [products,setProducts]=useState<Product[]>([]);
+ const [variantId,setVariantId]=useState(initialVariantId);const [count,setCount]=useState('');const [reason,setReason]=useState('');
  const [movements,setMovements]=useState<StockMovement[]>([]);
  const [status,setStatus]=useState('');const [error,setError]=useState('');
  const [pending,setPending]=useState<Pending|null>(null);

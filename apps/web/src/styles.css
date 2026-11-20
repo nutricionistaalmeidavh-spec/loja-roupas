@@ -233,3 +233,56 @@
  .cash-quick-actions button{flex:1 1 140px}
  .cart-line .qty button{min-width:40px;min-height:40px}
 }
+
+
+/* Planilha operacional: grade editável e leitura contextual do estoque canônico. */
+.stock-spreadsheet{background:#fff;border:1px solid #e5e5e5;border-radius:16px;padding:20px;min-width:0;display:grid;gap:15px}
+.sheet-toolbar{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.sheet-toolbar h2{font-size:20px;letter-spacing:-.03em;margin:0 0 3px}
+.sheet-toolbar p{margin:0;color:#666;max-width:680px}
+.sheet-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.sheet-controls label{display:grid;gap:6px;color:#454545;font-size:12px;font-weight:650;min-width:190px}
+.sheet-controls label:first-child{flex:1 1 240px}
+.sheet-controls input,.sheet-controls select{min-height:44px;max-width:100%;padding:9px 12px;border-radius:9px;border:1px solid #d9d9d9;background:#fff;color:#202020}
+.sheet-updated{margin-left:auto;font-size:12px;color:#666;padding:11px 0}
+.stock-grid-wrap{min-width:0;width:100%;overflow:auto;overscroll-behavior-x:contain;border-radius:12px;border:1px solid #e5e5e5}
+.stock-grid{color-scheme:light;--rdg-font-size:13px;--rdg-background-color:#fff;--rdg-header-background-color:#f5f5f5;
+ --rdg-border-color:#e4e4e4;--rdg-selection-color:#96774e;--rdg-row-hover-background-color:#f8f7f5;
+ --rdg-color:#1d1d1d;--rdg-row-selected-background-color:#f4eee4}
+.stock-grid :is(input,button):focus-visible{outline:3px solid #96774e;outline-offset:1px}
+.stock-grid .rdg-cell{align-content:center}
+.stock-grid .rdg-header-cell{font-weight:700}
+.sheet-low{color:#9e6111;font-weight:750}.sheet-empty{color:#9e2b27;font-weight:750}
+.sheet-row-actions{display:flex;align-items:center;gap:4px;min-height:44px;flex-wrap:nowrap}
+.sheet-row-actions button{padding:6px 9px;background:#fff;border:1px solid #d6d6d6;border-radius:6px;
+ color:#333;min-height:34px;font-size:12px;font-weight:650;white-space:nowrap}
+.sheet-row-actions button:first-child{background:#242424;color:#fff;border-color:#242424}
+.sheet-row-actions button:disabled{opacity:.5;cursor:not-allowed}
+.sheet-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:#606060;font-size:12px}
+.sheet-footer button{min-height:40px}
+.sheet-history{display:grid;gap:10px}
+.sheet-history-item{display:flex;justify-content:space-between;align-items:center;gap:14px;
+ padding:12px;border-radius:9px;border:1px solid #eee}
+.sheet-history-item div{display:grid;gap:3px}
+.sheet-history-item span{color:#777;font-size:12px}
+@media(max-width:720px){
+ .stock-spreadsheet{padding:14px;gap:12px;border-radius:12px}
+ .sheet-controls label{flex:1 1 100%;min-width:0}
+ .sheet-controls label:first-child{flex-basis:100%}
+ .sheet-updated{margin:0;padding:0}
+ .sheet-toolbar .workspace-actions{width:100%}
+ .sheet-toolbar .workspace-actions button{flex:1 1 130px}
+ .sheet-footer .workspace-actions{width:100%}
+ .sheet-footer .workspace-actions button{flex:1}
+}
+
+/* Ações da peça selecionada visíveis mesmo com colunas virtualizadas. */
+.sheet-selection-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+ padding:12px 14px;border:1px solid #dfd7c9;border-radius:10px;background:#faf8f5}
+.sheet-selection-toolbar>div:first-child{display:grid;gap:3px;min-width:0}
+.sheet-selection-toolbar strong{font-size:13px;overflow-wrap:anywhere}
+.sheet-selection-toolbar button{min-height:40px}
+@media(max-width:720px){
+ .sheet-selection-toolbar>.workspace-actions{width:100%}
+ .sheet-selection-toolbar>.workspace-actions button{flex:1 1 125px}
+}

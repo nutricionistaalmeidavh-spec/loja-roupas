@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { Session } from './api-client.ts';
 import { listCatalog } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
@@ -8,12 +8,14 @@ import { M2CatalogEditor } from './M2Admin.tsx';
 import { TaskDialog } from './TaskDialog.tsx';
 import { ProductSpreadsheetImport } from './ProductSpreadsheetImport.tsx';
 
+const InventorySpreadsheet=lazy(()=>import('./InventorySpreadsheet.tsx'));
+
 export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=>void}){
   const [search,setSearch]=useState('');
   const [products,setProducts]=useState<Product[]>([]);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
-  const [mode,setMode]=useState<'list'|'edit'>('list');
+  const [mode,setMode]=useState<'list'|'edit'|'sheet'>('list');
   const [selectedProduct,setSelectedProduct]=useState<{id:string;name:string}|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
   const [importOpen,setImportOpen]=useState(false);
@@ -38,13 +40,16 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
       </div>
       <div className="workspace-actions">
         <button type="button" className="primary-action" onClick={()=>setCreateOpen(true)}>+ Novo produto</button>
+        <button type="button" className="light-button" onClick={()=>setMode('sheet')}>Planilha editável</button>
         <button type="button" className="light-button" onClick={()=>setImportOpen(true)}>Importar planilha</button>
         <button type="button" className="light-button" onClick={()=>{setSelectedProduct(null);setMode(x=>x==='edit'?'list':'edit');}}>
           {mode==='edit'?'Voltar ao catálogo':'Editar produto'}
         </button>
       </div>
     </section>
-    {mode==='list'?<section className="workspace-card">
+    {mode==='sheet'?<Suspense fallback={<p role="status">Abrindo planilha de produtos…</p>}>
+      <InventorySpreadsheet session={session} onSaved={refreshed} canEdit canReceive/>
+    </Suspense>:mode==='list'?<section className="workspace-card">
       <label className="workspace-search-label">Pesquisar no catálogo
         <input value={search} onChange={e=>setSearch(e.target.value)}
           placeholder="Nome, SKU ou código de barras"/>

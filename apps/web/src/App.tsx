@@ -1,5 +1,5 @@
 import { requestId } from './request-id.ts';
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
@@ -31,6 +31,7 @@ function Garment({kind}:{kind:Product['kind']}) {
     <path d="M37 13L10 37l14 24 13-10v57h46V51l13 10 14-24-27-24-12-4Q60 27 49 9z" fill="currentColor"/>}
   </svg>;
 }
+const InventorySpreadsheet=lazy(()=>import('./InventorySpreadsheet.tsx'));
 type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao';
 export function App() {
   const [session,setSession] = useState<Session|null>(null);
@@ -348,10 +349,10 @@ export function App() {
             {manager&&<button className="light-button" onClick={()=>setStockAction('adjust')}>Ajustar estoque</button>}
           </div>
         </section>
-        <section className="workspace-card">
-          <p>Entrada de mercadorias aumenta o saldo disponível. Ajustes são registrados com motivo e histórico de auditoria.</p>
-          <p className="muted small">As operações conferem a peça e a variante antes da confirmação.</p>
-        </section>
+        <Suspense fallback={<p role="status">Carregando planilha de estoque…</p>}>
+          <InventorySpreadsheet session={session} onSaved={refreshed}
+            canEdit={manager} canReceive={canReceive}/>
+        </Suspense>
       </div>}
     </main>
     {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide
