@@ -39,6 +39,7 @@ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({labe
    return errors.length?'API ERROR: '+errors.join(' | '):'waiting';
  },{timeout:10000}).toBe('ok');
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await page.getByRole('button',{name:'Receber estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(item).toBeAttached();
@@ -46,6 +47,8 @@ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({labe
  await page.getByLabel('Quantidade recebida').fill('6');
  await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
  await expect(page.getByText(/Novo saldo em mãos: 6/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
+ await page.getByRole('button',{name:'Ajustar estoque'}).click();
  await page.getByLabel('Localizar SKU para conferência').fill(sku);
  const adjustment=page.getByLabel('Variante para ajustar').locator('option',{hasText:sku});
  await expect(adjustment).toBeAttached();
@@ -55,6 +58,7 @@ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({labe
  await page.getByRole('button',{name:'Confirmar ajuste gerencial'}).click();
  await expect(page.getByText(/Saldo total em mãos: 4/)).toBeVisible();
  await expect(page.getByText(/adjustment/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Ajustar estoque'}).click();
 
  await page.getByRole('button',{name:'PDV'}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
