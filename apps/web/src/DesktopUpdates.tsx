@@ -88,6 +88,7 @@ export function UpdateStartupDialog(){
 }
 export function UpdateSettings(){
  const [state,setState]=useState<State|null>(null);
+ const [installedVersion,setInstalledVersion]=useState('');
  const [progress,setProgress]=useState<Progress|null>(null);
  const [last,setLast]=useState<LastResult>(null);
  const [busy,setBusy]=useState(false);
@@ -97,6 +98,7 @@ export function UpdateSettings(){
   if(!bridge)return;
   let alive=true;
   const unsubscribe=bridge.onProgress(value=>{if(alive)setProgress(value);});
+  void bridge.info().then(info=>{if(alive)setInstalledVersion(info.currentVersion);}).catch(()=>{});
   void bridge.lastResult().then(result=>{if(alive)setLast(result);}).catch(()=>{});
   return ()=>{alive=false;unsubscribe();};
  },[]);
@@ -123,7 +125,7 @@ export function UpdateSettings(){
    <p>Consulte novas versões oficiais do GitHub. Nenhum instalador será baixado sem sua autorização.</p></div>
   </div>
   {!window.lojaUpdates?<p className="update-footnote">A atualização do aplicativo Windows é gerenciada no computador onde o programa está instalado. Acesso pelo navegador não instala atualizações.</p>:<>
-   <p className="update-footnote">Versão instalada: <strong>{state?.currentVersion?'v'+state.currentVersion:'consulte abaixo'}</strong></p>
+   <p className="update-footnote">Versão instalada: <strong>{(installedVersion||state?.currentVersion)?'v'+(installedVersion||state?.currentVersion):'indisponível'}</strong></p>
    <button type="button" className="update-secondary" disabled={busy} onClick={()=>void check()}>
     {busy?'Verificando…':'Verificar atualizações agora'}
    </button>
