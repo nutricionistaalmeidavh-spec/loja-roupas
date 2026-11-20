@@ -22,6 +22,8 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await expect(page.getByRole('status').filter({hasText:'Produto cadastrado'})).toBeVisible();
 
   await page.getByRole('button', {name:'Entrada de estoque'}).click();
+  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
+  await page.getByRole('button',{name:'Registrar entrada'}).click();
   const select = page.getByLabel('Variante (SKU)');
   const option = select.locator('option', {hasText:sku});
   await expect(option).toBeAttached();
@@ -32,6 +34,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await page.getByRole('button', {name:'Registrar entrada de estoque'}).click();
   await expect(page.getByRole('status').filter({hasText:'Novo saldo em mãos: 3'})).toBeVisible();
 
+  await page.getByRole('button',{name:'Fechar Entrada de estoque'}).click();
   await page.getByRole('button', {name:'PDV'}).click();
   const card=page.locator('.product-card').filter({hasText:name});
   await expect(card).toBeVisible();
