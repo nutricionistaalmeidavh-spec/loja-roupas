@@ -275,3 +275,14 @@
  .sheet-footer .workspace-actions{width:100%}
  .sheet-footer .workspace-actions button{flex:1}
 }
+
+/* Ações da peça selecionada visíveis mesmo com colunas virtualizadas. */
+.sheet-selection-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+ padding:12px 14px;border:1px solid #dfd7c9;border-radius:10px;background:#faf8f5}
+.sheet-selection-toolbar>div:first-child{display:grid;gap:3px;min-width:0}
+.sheet-selection-toolbar strong{font-size:13px;overflow-wrap:anywhere}
+.sheet-selection-toolbar button{min-height:40px}
+@media(max-width:720px){
+ .sheet-selection-toolbar>.workspace-actions{width:100%}
+ .sheet-selection-toolbar>.workspace-actions button{flex:1 1 125px}
+}
