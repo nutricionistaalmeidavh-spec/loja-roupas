@@ -1,0 +1,33 @@
+name: Marketplace Cloudflare — Live Smoke
+on:
+  push:
+    branches:
+      - 'feat/landing-dialog-portal-*'
+  pull_request:
+    paths:
+      - 'cloudflare/loja-roupas-vitrine/**'
+      - '.github/workflows/marketplace-live-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  live-marketplace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Worker de produção — homepage, catálogo, sessão e CSP
+        shell: bash
+        env:
+          BASE: https://loja-roupas-vitrine.sistema-artisys.workers.dev
+        run: |
+          set -euo pipefail
+          curl -fsS --retry 3 --retry-delay 2 -D "$RUNNER_TEMP/headers" "$BASE/" -o "$RUNNER_TEMP/home.html"
+          grep -q 'id="accessDialog"' "$RUNNER_TEMP/home.html"
+          grep -q 'marketplaceProducts' "$RUNNER_TEMP/home.html"
+          grep -qi 'content-security-policy' "$RUNNER_TEMP/headers"
+          curl -fsS "$BASE/v1/marketplace" -o "$RUNNER_TEMP/catalog.json"
+          node -e 'const d=require(process.argv[1]);if(!Array.isArray(d.items)||!Array.isArray(d.stores)||!Array.isArray(d.categories))process.exit(1)' "$RUNNER_TEMP/catalog.json"
+          curl -fsS "$BASE/health" | grep -q '"ok":true'
+          status="$(curl -sS -o "$RUNNER_TEMP/no-session.json" -w '%{http_code}' "$BASE/v1/portal/me")"
+          test "$status" = 401
+          echo 'Marketplace e acesso de lojistas verificados.'

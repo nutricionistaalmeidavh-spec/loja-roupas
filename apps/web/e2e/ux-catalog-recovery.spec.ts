@@ -1,0 +1,56 @@
+import {test,expect} from '@playwright/test';
+
+test('categoria é carregada do servidor e carrinho volta após recarregar',async({page})=>{
+ const sku='RESTORE-'+Math.random().toString(36).slice(2,10).toUpperCase();
+ const name='Saia Restauro '+sku;
+ await page.goto('/');
+ await page.getByLabel('Usuário').fill('qa-admin');
+ await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
+ await page.getByRole('button',{name:'Entrar na loja'}).click();
+ await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByLabel('Nome da peça').fill(name);
+ await page.getByLabel('SKU',{exact:true}).fill(sku);
+ await page.getByLabel('Cor',{exact:true}).fill('Vermelho');
+ await page.getByLabel('Tamanho',{exact:true}).fill('M');
+ await page.getByLabel('Preço (R$)').fill('74,90');
+ await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
+ await expect(page.getByRole('status').filter({hasText:'Produto cadastrado'})).toBeVisible();
+ await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
+ const opt=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
+ await expect(opt).toBeAttached();
+ await page.getByLabel('Variante (SKU)').selectOption((await opt.getAttribute('value'))!);
+ await page.getByLabel('Quantidade recebida').fill('2');
+ await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
+ await expect(page.getByText(/Novo saldo em mãos: 2/)).toBeVisible();
+ await page.getByRole('button',{name:'Caixa',exact:true}).click();
+ if(await page.getByRole('button',{name:'Abrir caixa',exact:true}).count()){
+  await page.getByLabel('Valor inicial (R$)').fill('100,00');
+  await page.getByRole('button',{name:'Abrir caixa',exact:true}).click();
+ }
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
+ await page.getByPlaceholder('Pesquisar produto, SKU ou código…').fill(sku);
+ const card=page.locator('.product-card').filter({hasText:name});
+ await expect(card).toBeVisible();
+ await card.getByRole('button',{name:'Adicionar '+name}).click();
+ await expect(page.getByText('1 peça adicionada')).toBeVisible();
+ await page.reload();
+ await page.getByLabel('Usuário').fill('qa-admin');
+ await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
+ await page.getByRole('button',{name:'Entrar na loja'}).click();
+ await expect(page.getByRole('button',{name:'Recuperar carrinho'})).toBeVisible();
+ await page.reload();
+ await page.getByLabel('Usuário').fill('qa-admin');
+ await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
+ await page.getByRole('button',{name:'Entrar na loja'}).click();
+ await page.getByRole('button',{name:'Recuperar carrinho'}).click();
+ await expect(page.getByText('1 peça adicionada')).toBeVisible();
+ await expect(page.getByText('R$ 74,90').first()).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ await page.getByRole('button',{name:/Ver carrinho/}).click();
+ const dialog=page.getByRole('dialog',{name:'Carrinho'});
+ await expect(dialog).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(dialog).toBeHidden();
+ await expect(page.getByRole('button',{name:/Ver carrinho/})).toBeFocused();
+});

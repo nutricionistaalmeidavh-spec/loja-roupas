@@ -64,3 +64,18 @@ test('foto original usa PUT /photo, miniatura privada usa GET /thumbnail',async(
   assert.equal(received[0].authorization,'Bearer '+session.token);
   assert.equal(received[1].authorization,'Bearer '+session.token);
 });
+
+test('categorias e variantes recuperadas respeitam escopo e IDs exatos',async()=>{
+ const {listCategories,lookupDraftVariants}=await import('./api-client.ts');
+ const id='82df5fca-2c59-49f7-8ac8-38cd1996c229';
+ const urls:string[]=[];
+ const fake:typeof fetch=async(input,init)=>{
+  urls.push(String(input));
+  assert.equal((init?.headers as Record<string,string>)['x-store-id'],session.storeId);
+  assert.equal((init?.headers as Record<string,string>)['authorization'],'Bearer '+session.token);
+  return Response.json(urls.length===1?{categories:['Masculino']}:{items:[],next_cursor:null});
+ };
+ assert.deepEqual(await listCategories(session,fake),{categories:['Masculino']});
+ await lookupDraftVariants(session,[id],fake);
+ assert.deepEqual(urls,['/v1/catalog/categories','/v1/catalog/draft-variants?ids='+id]);
+});
