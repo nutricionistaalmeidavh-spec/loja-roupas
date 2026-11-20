@@ -7,6 +7,7 @@ test('P0: gestao nao amplia viewport de 390px',async({page})=>{
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByLabel('Página',{exact:true}).selectOption('gestao');
+ await page.getByRole('link',{name:'Inteligência',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Inteligência comercial'})).toBeVisible();
  await expect(page.getByRole('navigation',{name:'Atalhos da gestão'})).toBeVisible();
  await expect(page.getByRole('link',{name:'Inteligência',exact:true})).toHaveAttribute('href','#gestao-inteligencia');

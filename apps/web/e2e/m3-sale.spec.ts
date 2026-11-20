@@ -24,6 +24,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  }
 
  await page.getByRole('button',{name:'Cadastrar produtos'}).click();
+ await page.getByRole('button',{name:/Novo produto/}).click();
  await page.getByLabel('Nome da peça').fill(productName);
  await page.getByLabel('SKU').fill(sku);
  await page.getByLabel('Cor').fill('Preto');
@@ -33,7 +34,9 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await page.getByLabel('Código de barras (opcional)').fill(barcode);
  await page.getByRole('button',{name:'Cadastrar produto',exact:true}).click();
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
- await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:productName});
+ await page.getByRole('button',{name:'Fechar Novo produto'}).click();
+  await page.getByRole('button',{name:'Editar produto'}).click();
+await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectOption({label:productName});
  const variantOption=page.getByRole('combobox',{name:'Variante para preço',exact:true}).locator('option',{hasText:sku});
  await expect(variantOption).toBeAttached();
  await page.getByRole('combobox',{name:'Variante para preço',exact:true}).selectOption((await variantOption.getAttribute('value'))!);
@@ -46,6 +49,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await page.evaluate(()=>delete document.documentElement.dataset.printLabel);
 
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await page.getByRole('button',{name:'Receber estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(item).toBeAttached();
@@ -53,6 +57,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await page.getByLabel('Quantidade recebida').fill('5');
  await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
  await expect(page.getByText(/Novo saldo em mãos: 5/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
 
  await page.getByRole('button',{name:'PDV'}).click();
  const scannerInput=page.getByLabel('Buscar nome, SKU ou código');
@@ -88,6 +93,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await confirmation.getByRole('button',{name:'Nova venda'}).click();
 
  await page.getByRole('button',{name:'Caixa',exact:true}).click();
+ await page.getByRole('button',{name:'Fechar caixa',exact:true}).click();
  await page.getByLabel('Dinheiro contado (R$)').fill('200,00');
  await page.getByRole('button',{name:'Fechar e conferir caixa'}).click();
  await expect(page.getByText('Caixa fechado.')).toBeVisible();

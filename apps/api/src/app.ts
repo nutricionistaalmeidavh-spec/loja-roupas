@@ -14,6 +14,7 @@ import { registerPickupOrders } from './pickup-orders.ts';
 import { registerOperationalCompletion } from './operational-completion.ts';
 import { registerIntelligence } from './intelligence.ts';
 import { registerProductFields } from './product-fields.ts';
+import { registerProductImport } from './import-products.ts';
 import { registerStockHolds } from './stock-holds.ts';
 
 export function buildApp(db: Pool) {
@@ -30,6 +31,7 @@ export function buildApp(db: Pool) {
   });
   registerCatalog(app, db);
   registerMutations(app, db);
+  registerProductImport(app, db);
   registerCatalogAdmin(app, db);
   registerCash(app, db);
   registerCashReturns(app, db);

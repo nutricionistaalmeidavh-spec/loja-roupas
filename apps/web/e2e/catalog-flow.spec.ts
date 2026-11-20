@@ -12,6 +12,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await expect(page.getByRole('heading', {name:'Nova venda'})).toBeVisible();
 
   await page.getByRole('button', {name:'Cadastrar produtos'}).click();
+  await page.getByRole('button',{name:/Novo produto/}).click();
   await page.getByLabel('Nome da peça').fill(name);
   await page.getByLabel('SKU').fill(sku);
   await page.getByLabel('Cor').fill('Azul');
@@ -19,8 +20,10 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await page.getByLabel('Preço (R$)').fill('129,90');
   await page.getByRole('button', {name:'Cadastrar produto', exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'Produto cadastrado'})).toBeVisible();
+  await page.getByRole('button',{name:'Fechar Novo produto'}).click();
 
   await page.getByRole('button', {name:'Entrada de estoque'}).click();
+  await page.getByRole('button',{name:'Receber estoque'}).click();
   const select = page.getByLabel('Variante (SKU)');
   const option = select.locator('option', {hasText:sku});
   await expect(option).toBeAttached();
@@ -30,6 +33,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await page.getByLabel('Quantidade recebida').fill('3');
   await page.getByRole('button', {name:'Registrar entrada de estoque'}).click();
   await expect(page.getByRole('status').filter({hasText:'Novo saldo em mãos: 3'})).toBeVisible();
+  await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
 
   await page.getByRole('button', {name:'PDV'}).click();
   const card=page.locator('.product-card').filter({hasText:name});
