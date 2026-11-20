@@ -186,7 +186,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
   {notice&&<p role="status" className="notice">{notice}</p>}
  </section>;
 }
-export function M2StockAdjustment({session,onSaved,refreshKey}:{session:Session;onSaved:()=>void;refreshKey:number}){
+export function M2StockAdjustment({session,onSaved,refreshKey,onLockChange}:{session:Session;onSaved:()=>void;refreshKey:number;onLockChange?:(locked:boolean)=>void}){
  const [q,setQ]=useState('');const [products,setProducts]=useState<Product[]>([]);
  const [variantId,setVariantId]=useState('');const [count,setCount]=useState('');const [reason,setReason]=useState('');
  const [movements,setMovements]=useState<StockMovement[]>([]);
@@ -194,6 +194,7 @@ export function M2StockAdjustment({session,onSaved,refreshKey}:{session:Session;
  const [pending,setPending]=useState<Pending|null>(null);
  const [reference,setReference]=useState(()=>requestId());
  const [busy,setBusy]=useState(false);const [refresh,setRefresh]=useState(0);
+ useEffect(()=>{onLockChange?.(busy||Boolean(pending));return ()=>onLockChange?.(false);},[busy,pending,onLockChange]);
  const variants=products.flatMap(p=>p.variants.map(v=>({...v,name:p.name})));
  const selected=variants.find(v=>v.id===variantId);
  useEffect(()=>{
