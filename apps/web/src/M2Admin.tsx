@@ -30,6 +30,7 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
  const [pending,setPending]=useState<Pending|null>(null);
  const [busy,setBusy]=useState(false);
  const [refresh,setRefresh]=useState(0);
+ const [editorTab,setEditorTab]=useState<'dados'|'precos'|'grade'|'etiquetas'|'foto'>('dados');
  const current=useMemo(()=>products.find(p=>p.id===productId),[products,productId]);
  const variant=current?.variants.find(v=>v.id===variantId);
  useEffect(()=>{
@@ -116,18 +117,12 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
     <option value="">Selecione</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
   </select></label>
   {current&&<>
-   <ProductFields key={current.id} session={session} productId={current.id}/>
-   <form onSubmit={e=>void submit('product',e)} className="editor-block">
-     <h3>Informações</h3>
-     <div className="fields-two"><label>Nome do produto<input required maxLength={200} value={name} disabled={busy||Boolean(pending)}
-       onChange={e=>setName(e.target.value)}/></label>
-       <label>Categoria do produto<input required maxLength={100} value={category} disabled={busy||Boolean(pending)}
-       onChange={e=>setCategory(e.target.value)}/></label></div>
-     <button type="submit" disabled={busy} className="light-button">Salvar informações</button>
-   </form>
-   <form onSubmit={e=>void submit('price',e)} className="editor-block">
-    <h3>Preço por variante</h3>
-    <label>Variante para preço<select aria-label="Variante para preço" value={variantId}
+   <nav className="product-editor-tabs" aria-label="Áreas de edição do produto">
+    {([['dados','Dados'],['precos','Preços'],['grade','Grade'],['etiquetas','Etiquetas e vitrine'],['foto','Fotos']] as const).map(([id,title])=>
+      <button key={id} type="button" className={editorTab===id?'active':''}
+       aria-pressed={editorTab===id} onClick={()=>{setEditorTab(id);setError('');}}>{title}</button>)}
+   </nav>
+   {editorTab!=='dados'&&editorTab!=='foto'&&    <label>Variante para preço<select aria-label="Variante para preço" value={variantId}
       onChange={e=>{
         const next=current.variants.find(v=>v.id===e.target.value);
         setVariantId(e.target.value);setPrice('');setPending(null);
@@ -136,16 +131,29 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
       }} disabled={busy}>
      <option value="">Selecione</option>
      {current.variants.map(v=><option key={v.id} value={v.id}>{v.sku} · {v.color} · {v.size}</option>)}
-    </select></label>
+    </select></label>}
+   {editorTab==='dados'&&<>
+   <ProductFields key={current.id} session={session} productId={current.id}/>
+   <form onSubmit={e=>void submit('product',e)} className="editor-block">
+     <h3>Informações</h3>
+     <div className="fields-two"><label>Nome do produto<input required maxLength={200} value={name} disabled={busy||Boolean(pending)}
+       onChange={e=>setName(e.target.value)}/></label>
+       <label>Categoria do produto<input required maxLength={100} value={category} disabled={busy||Boolean(pending)}
+       onChange={e=>setCategory(e.target.value)}/></label></div>
+     <button type="submit" disabled={busy} className="light-button">Salvar informações</button>
+   </form></>}
+   {editorTab==='precos'&&<form onSubmit={e=>void submit('price',e)} className="editor-block">
+    <h3>Preço por variante</h3>
+
     {variant&&<p className="muted small">Preço atual: {(variant.priceCents/100).toFixed(2).replace('.',',')} · revisão {variant.variantRevision}</p>}
     <label>Novo preço (R$)<input required inputMode="decimal" placeholder="149,90" value={price} disabled={busy||Boolean(pending)}
       onChange={e=>setPrice(e.target.value)}/></label>
     <button type="submit" className="light-button" disabled={!variant||busy}>Salvar preço</button>
-   </form>
-   {variant&&<BarcodeLabel key={variant.id} sku={variant.sku}/>}
-   {variant&&<PublishVariant key={variant.id} session={session} id={variant.id}/>}
-   {variant&&<StockHolds key={variant.id} session={session} variant={variant} onChanged={onSaved}/>}
-   <form onSubmit={e=>void submitVariant('add',e)} className="editor-block">
+   </form>}
+   {editorTab==='etiquetas'&&variant&&<BarcodeLabel key={variant.id} sku={variant.sku}/>}
+   {editorTab==='etiquetas'&&variant&&<PublishVariant key={variant.id} session={session} id={variant.id}/>}
+   {editorTab==='etiquetas'&&variant&&<StockHolds key={variant.id} session={session} variant={variant} onChanged={onSaved}/>}
+   {editorTab==='grade'&&<form onSubmit={e=>void submitVariant('add',e)} className="editor-block">
      <h3>Adicionar variante à grade existente</h3>
      <div className="variant-fields">
        <label>SKU novo<input required maxLength={64} value={newSku} onChange={e=>setNewSku(e.target.value)}/></label>
@@ -155,8 +163,8 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
        <label>Código novo (opcional)<input value={newBarcode} onChange={e=>setNewBarcode(e.target.value)}/></label>
      </div>
      <button className="light-button" type="submit" disabled={busy}>Adicionar variante</button>
-   </form>
-   {variant&&<form onSubmit={e=>void submitVariant('edit',e)} className="editor-block">
+   </form>}
+   {editorTab==='grade'&&variant&&<form onSubmit={e=>void submitVariant('edit',e)} className="editor-block">
     <h3>Editar SKU, cor, tamanho e código</h3>
     <div className="variant-fields">
       <label>SKU existente<input required value={editSku} onChange={e=>setEditSku(e.target.value)}/></label>
@@ -166,13 +174,13 @@ export function M2CatalogEditor({session,onSaved}:{session:Session;onSaved:()=>v
     </div>
     <button className="light-button" type="submit" disabled={busy}>Salvar atributos da variante</button>
    </form>}
-   <form onSubmit={e=>void submit('photo',e)} className="editor-block">
+   {editorTab==='foto'&&<form onSubmit={e=>void submit('photo',e)} className="editor-block">
     <h3>Fotografia da peça</h3>
     <p className="muted small">Uma foto principal por produto; PNG, JPEG ou WebP até 2 MiB.</p>
     <label>Selecionar fotografia<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||Boolean(pending)}
        onChange={e=>setPhoto(e.target.files?.[0]??null)}/></label>
     <button type="submit" className="light-button" disabled={!photo||busy}>Enviar fotografia local</button>
-   </form>
+   </form>}
   </>}
   {error&&<p role="alert" className="error">{error}</p>}
   {notice&&<p role="status" className="notice">{notice}</p>}
