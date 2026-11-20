@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ChangeEvent} from 'react';
 import {headers,jsonRequest,ApiError} from './api-client.ts';
 import type {Session} from './api-client.ts';
@@ -16,12 +16,13 @@ function downloadTemplate(){
  document.body.append(a);a.click();a.remove();
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-export function ProductImport({session,onSaved}:{session:Session;onSaved:()=>void}){
+export function ProductImport({session,onSaved,onLockChange}:{session:Session;onSaved:()=>void;onLockChange?:(locked:boolean)=>void}){
  const [filename,setFilename]=useState('');
  const [preview,setPreview]=useState<ImportPreview|null>(null);
  const [busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false);
  const [pending,setPending]=useState<{body:string;key:string}|null>(null);
  const [notice,setNotice]=useState(''),[error,setError]=useState('');
+ useEffect(()=>{onLockChange?.(busy||uncertain);return ()=>onLockChange?.(false);},[busy,uncertain,onLockChange]);
  async function choose(event:ChangeEvent<HTMLInputElement>){
   const file=event.target.files?.[0];event.target.value='';
   if(!file||busy||uncertain)return;
