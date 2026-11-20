@@ -95,8 +95,8 @@ export function CreateProductForm({ session, onSaved }: { session: Session; onSa
   </form>;
 }
 
-export function ReceiveStockForm({ session, products, onSaved }: { session: Session; products: Product[]; onSaved: () => void }) {
-  const [variantId, setVariantId] = useState('');
+export function ReceiveStockForm({ session, products, onSaved, initialVariantId = '' }: { session: Session; products: Product[]; onSaved: () => void; initialVariantId?: string }) {
+  const [variantId, setVariantId] = useState(initialVariantId);
   const [quantity, setQuantity] = useState('1');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
