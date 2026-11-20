@@ -5,12 +5,14 @@ const path=require('node:path');
 const {launchLocalRuntime}=require('./local-runtime.cjs');
 const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
+const {createDesktopUpdater}=require('./desktop-updater.cjs');
 
 let runtime=null,setupWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
 let commercialLicense=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();
+const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog});
 if(!single)app.quit();
 app.on('second-instance',()=>{
  const win=BrowserWindow.getAllWindows()[0];
@@ -34,7 +36,8 @@ function configuredUrl(){
 function openWindow(url){
  const window=new BrowserWindow({
   width:1440,height:900,minWidth:760,minHeight:560,
-  webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
+  webPreferences:{preload:path.join(__dirname,'update-preload.cjs'),
+   contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
  });
  window.webContents.setWindowOpenHandler(({url:target})=>{
   try{
@@ -52,6 +55,7 @@ function openWindow(url){
    catch{event.preventDefault();}
   });
  }
+ desktopUpdater.registerWindow(window,url.href);
  void window.loadURL(url.href).catch(error=>dialog.showErrorBox('Conexão com a loja',error.message));
  return window;
 }

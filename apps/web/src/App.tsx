@@ -9,6 +9,7 @@ import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { FirstRunTour } from './FirstRunTour.tsx';
+import { UpdateSettings } from './DesktopUpdates.tsx';
 import { colorSwatch } from './visual-colors.ts';
 import { ReceiveStockForm } from './Management.tsx';
 import { ProductsWorkspace } from './ProductsWorkspace.tsx';
@@ -34,7 +35,7 @@ function Garment({kind}:{kind:Product['kind']}) {
   </svg>;
 }
 const InventorySpreadsheet=lazy(()=>import('./InventorySpreadsheet.tsx'));
-type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao';
+type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao'|'configuracoes';
 export function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [page,setPage] = useState<Page>('pdv');
@@ -311,11 +312,12 @@ export function App() {
       {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque"><span aria-hidden="true">EST</span></button>}
       {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa"><span aria-hidden="true">CX</span></button>}
       {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão"><span aria-hidden="true">GES</span></button>}
+      <button className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')} aria-label="Configurações" title="Configurações"><span aria-hidden="true">CFG</span></button>
       <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><span aria-hidden="true">Sair</span></button>
     </nav>
     <main className="workspace">
       <header className="topbar" data-tour="overview">
-        <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':'Estoque'}</h1>
+        <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':page==='configuracoes'?'Configurações':'Estoque'}</h1>
           <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
@@ -332,6 +334,7 @@ export function App() {
           {canReceive&&<option value="estoque">Estoque</option>}
           {canCash&&<option value="caixa">Caixa</option>}
           {manager&&<option value="gestao">Gestão</option>}
+          <option value="configuracoes">Configurações</option>
         </select>
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
@@ -387,6 +390,7 @@ export function App() {
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside data-tour="cart" className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
       {page==='gestao'&&manager&&<div data-tour="management"><StoreOperations session={session} cashId={cashId} onReturned={refreshed}/></div>}
+      {page==='configuracoes'&&<UpdateSettings/>}
       {page==='produtos'&&manager&&<div data-tour="products"><ProductsWorkspace session={session} onSaved={refreshed}/></div>}
       {page==='caixa'&&canCash&&<div data-tour="cash"><CashPanel session={session} onChanged={cashUpdated}/></div>}
       {page==='estoque'&&canReceive&&<div className="products-workspace" data-tour="stock">

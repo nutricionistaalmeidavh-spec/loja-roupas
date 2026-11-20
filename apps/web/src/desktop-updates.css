@@ -1,0 +1,26 @@
+.update-dialog{width:min(560px,calc(100% - 26px));max-height:calc(100dvh - 36px);overflow:auto;border:1px solid #e5e3df;border-radius:20px;background:#fff;color:#222;box-shadow:0 30px 90px #0003;padding:0;font:inherit}
+.update-dialog::backdrop{background:rgba(16,18,22,.55);backdrop-filter:blur(5px)}
+.update-dialog-top{padding:28px 30px 18px;background:linear-gradient(145deg,#f9f8f6,#fff);border-bottom:1px solid #efede9}
+.update-kicker{font-size:11px;font-weight:800;letter-spacing:.13em;color:#7b705f;margin:0 0 12px}
+.update-dialog-top h2{font-size:24px;line-height:1.25;margin:0 0 9px;color:#202020;letter-spacing:-.02em}
+.update-dialog-top>p:last-child,.update-settings-heading p:last-child{color:#666;font-size:13px;line-height:1.6;margin:0}
+.update-release{padding:22px 30px 16px}
+.update-version-line{display:flex;justify-content:space-between;gap:18px;align-items:center;border:1px solid #e8e5df;background:#fbfaf8;border-radius:12px;padding:12px 15px}
+.update-version-line span{font-size:13px;color:#666}.update-version-line strong{font-size:16px}
+.update-release h3{font-size:15px;margin:22px 0 8px}
+.update-notes{white-space:pre-wrap;overflow-wrap:anywhere;max-height:158px;overflow:auto;color:#4b4b4b;line-height:1.6;font-size:13px}
+.update-footnote{font-size:12px;color:#747474;line-height:1.65;margin:18px 0 0}
+.update-actions{display:flex;justify-content:flex-end;gap:10px;align-items:center;padding:18px 30px 24px;border-top:1px solid #eee}
+.update-primary,.update-secondary{border-radius:9px;min-height:44px;padding:12px 18px;font:inherit;font-weight:700}
+.update-primary{border:1px solid #262626;background:#252525;color:#fff}
+.update-secondary{border:1px solid #d9d9d9;background:#fff;color:#333}
+.update-primary:disabled,.update-secondary:disabled{cursor:wait;opacity:.65}
+.update-progress,.update-error{margin:10px 30px;color:#514a41;padding:10px 12px;background:#f7f5f1;border:1px solid #e9e5de;border-radius:9px}
+.update-error{color:#9d2b22;background:#fff2f0;border-color:#f0cac4}
+.update-settings{margin-top:16px;padding:28px;background:#fff;border:1px solid #e8e8e8;border-radius:16px;max-width:850px}
+.update-settings-heading h2{font-size:22px;margin:0 0 8px}
+.update-settings>.update-secondary{margin-top:20px}
+.update-settings>.update-release{padding:18px 0}
+.update-settings>.update-primary{margin:0}
+.update-settings>.update-progress,.update-settings>.update-error{margin:14px 0}
+@media(max-width:600px){.update-dialog-top{padding:22px 20px 16px}.update-dialog-top h2{font-size:21px}.update-release{padding:17px 20px}.update-actions{padding:16px 20px 22px;flex-wrap:wrap}.update-actions button{flex:1}.update-settings{padding:18px}.update-progress,.update-error{margin:10px 20px}}
