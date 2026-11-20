@@ -51,6 +51,29 @@ New-Item -ItemType Directory -Force -Path (Join-Path $api 'node_modules/@esbuild
 Copy-Item -Recurse -LiteralPath $src -Destination (Join-Path $api 'node_modules/esbuild')
 Copy-Item -Recurse -LiteralPath $nativeSrc -Destination (Join-Path $api 'node_modules/@esbuild/win32-x64')
 
+
+# pnpm deploy --legacy pode não materializar dependências transitivas CJS do pg.
+# Importar apenas as versões fixadas do pnpm store construído no CI, sem download no cliente.
+$requiredPgModules=@('pg-cloudflare','pg-connection-string','pg-pool','pg-protocol',
+ 'pg-types','pgpass','pg-int8','postgres-array','postgres-bytea','postgres-date',
+ 'postgres-interval','split2')
+foreach($name in $requiredPgModules) {
+ $matches=@(Get-ChildItem -LiteralPath $store -Directory -Filter ($name+'@*'))
+ if($matches.Count -ne 1){throw "Dependency missing or ambiguous in pinned store: $name"}
+ $source=Join-Path $matches[0].FullName "node_modules/$name"
+ if(!(Test-Path -LiteralPath $source)){throw "Dependency missing from store: $name"}
+ $target=Join-Path $api "node_modules/$name"
+ if(!(Test-Path -LiteralPath $target)){
+  Copy-Item -Recurse -Force -LiteralPath $source -Destination $target
+ }
+}
+# Falhar no CI antes de compilar o instalador se módulos essenciais faltarem.
+Push-Location $api
+try {
+ node -e "require('pg');require('fastify');require('sharp')"
+ if($LASTEXITCODE -ne 0){throw 'Packaged API missing runtime dependencies'}
+}finally{Pop-Location}
+
 if(!(Test-Path (Join-Path $api 'node_modules/@loja/domain'))){throw 'Packaged domain missing'}
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'apps/web/dist') -Destination (Join-Path $runtime 'web')
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'infra/sql') -Destination (Join-Path $resources 'infra/sql')
