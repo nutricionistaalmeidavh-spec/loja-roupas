@@ -2,10 +2,10 @@
 
 Sistema para boutique física inicialmente única, com **desktop Electron, Web/PWA e servidor PostgreSQL canônico em rede local**. Core obrigatório **R$ 0, open source (AGPLv3) e self-hosted**. Serviços pagos são opcionais explícitos, nunca dependências silenciosas.
 
-## Situação em 18/11/2026
+## Situação e validação de novembro/2026
 
 - **M0–M3 incorporados à main:** documentação D0–D6, fundação, catálogo/estoque e PDV/caixa transacional.
-- **M4–M8 permanecem planejados**, acompanhados nas [issues #7–#11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues).
+- **M4–M8 têm implementações parciais integradas**, mas a homologação em hardware e operação real ainda está pendente. Consulte [status de execução](docs/06-roadmap/status-execucao.md).
 - O pagamento por Pix e cartão é **registrado manualmente após conferência externa**; não há cobrança automática, TEF, PSP ou emissão fiscal integrada.
 - **Ainda não homologado para clientes. Nenhuma release publicada.** CI verde não equivale a instalador, impressão física, segurança de produção nem backup/restauração validados.
 
@@ -30,3 +30,14 @@ Sistema para boutique física inicialmente única, com **desktop Electron, Web/P
 | M8 — QA global e release candidate | Planejado | [#11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
 **Governança:** branch e PR, contrato versionado, testes e documentação. Merge e release requerem autorizações **separadas**. Nenhuma publicação automática.
+
+## Instalação Windows autônoma e primeiro acesso
+
+O instalador Windows x64 inclui a aplicação Electron, PostgreSQL portátil e API local. Ao abrir pela primeira vez, o próprio aplicativo prepara o banco, pede nome da loja e credenciais de administrador e abre o sistema. Depois do login, o tour apresenta os módulos permitidos e pode ser reaberto pelo botão **Ajuda · Tour**. Não exige Docker, hospedagem nem assinatura. Os dados residem fora da pasta do programa e permanecem após desinstalar (backup obrigatório antes de migração). Para computadores adicionais, conecte explicitamente ao servidor LAN existente.
+
+**Atenção:** esta implementação ainda exige testes físicos em Windows, backup/restauração e periféricos para homologação comercial. A base fica disponível em 127.0.0.1 na instalação de computador único, não exposta automaticamente à rede.
+
+## Primeiro acesso sem serviços pagos
+No computador servidor (Linux com Docker Compose, Node 22+ e OpenSSL), execute `bash scripts/install-lan.sh`. O assistente de terminal solicita o endereço local, cria credenciais de banco, migra a base, solicita loja e administrador e verifica `/v1/ready`. O endereço padrão `127.0.0.1` só permite acesso no próprio servidor; uso multioperador exige configuração da LAN e revisão de segurança. Não pressupõe conta em nuvem, API paga nem assinatura.
+
+**Pendências para homologação:** impressoras e leitores reais, Windows instalado na loja, fluxo WAN-off/LAN-on, restauração com fotos, disponibilidade de rede, segurança e revisão de acessibilidade por teclado/leitor de tela. CI verde não é evidência desses requisitos. Não publicar release antes da homologação.

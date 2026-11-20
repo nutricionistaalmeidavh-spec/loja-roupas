@@ -118,10 +118,10 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {section==='operacoes'&&<div id="gestao-operacoes" className="management-section">
       <OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/>
     </div>}
-    {section==='inteligencia'&&<div id="gestao-inteligencia" className="management-section">
+    {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
     </div>}
-    {section==='vitrine'&&<section id="gestao-vitrine" className="management-section">
+    {section==='vitrine'&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
     </section>}

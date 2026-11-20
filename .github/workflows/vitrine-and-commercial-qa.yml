@@ -1,0 +1,33 @@
+name: Vitrine multitenant e ativação comercial opcional
+on:
+  push:
+    branches:
+      - 'feat/online-vitrine-multitenant-*'
+  pull_request:
+    paths:
+      - 'cloudflare/loja-roupas-vitrine/**'
+      - 'apps/desktop/src/commercial-license.cjs'
+      - 'apps/desktop/test/commercial-license.test.cjs'
+      - 'scripts/package-desktop.mjs'
+      - '.github/workflows/vitrine-and-commercial-qa.yml'
+permissions:
+  contents: read
+jobs:
+  contract-and-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cloudflare Worker (tenant scopes, pedidos e rotas)
+        run: node --test cloudflare/loja-roupas-vitrine/test/*.test.mjs
+      - name: Licença comercial opcional
+        run: node --test apps/desktop/test/*.test.cjs
+      - name: Sintaxe Node e Electron
+        run: |
+          node --check cloudflare/loja-roupas-vitrine/worker.mjs
+          node --check apps/desktop/src/main.cjs
+          node --check apps/desktop/src/commercial-license.cjs
+          node --check scripts/package-desktop.mjs

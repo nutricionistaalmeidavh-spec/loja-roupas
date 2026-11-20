@@ -17,6 +17,8 @@ import { registerProductFields } from './product-fields.ts';
 import { registerProductImport } from './import-products.ts';
 import { registerStockHolds } from './stock-holds.ts';
 import { registerStockSpreadsheet } from './stock-spreadsheet.ts';
+import { registerStockSpreadsheetP2 } from './stock-spreadsheet-p2.ts';
+import { registerStaticUi } from './static-ui.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -41,10 +43,12 @@ export function buildApp(db: Pool) {
   registerStoreOperations(app, db);
   registerStockHolds(app, db);
   registerStockSpreadsheet(app, db);
+  registerStockSpreadsheetP2(app, db);
   registerPickupOrders(app, db);
   registerOperationalCompletion(app, db);
   registerIntelligence(app, db);
   registerProductFields(app, db);
+  registerStaticUi(app);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

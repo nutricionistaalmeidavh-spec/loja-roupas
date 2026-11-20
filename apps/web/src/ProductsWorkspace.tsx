@@ -18,6 +18,7 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
   const [mode,setMode]=useState<'list'|'edit'|'sheet'>('list');
   const [selectedProduct,setSelectedProduct]=useState<{id:string;name:string}|null>(null);
   const [createOpen,setCreateOpen]=useState(false);
+  const [createLocked,setCreateLocked]=useState(false);
   const [importOpen,setImportOpen]=useState(false);
   const [revision,setRevision]=useState(0);
   function refreshed(){setRevision(x=>x+1);onSaved();}
@@ -76,8 +77,8 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
       <M2CatalogEditor key={selectedProduct?.id??'catalog-editor'} session={session} onSaved={refreshed}
         initialProductId={selectedProduct?.id} initialProductName={selectedProduct?.name}/>
     </div>}
-    {createOpen&&<TaskDialog title="Novo produto" wide onClose={()=>setCreateOpen(false)}>
-      <CreateProductForm session={session} onSaved={refreshed}/>
+    {createOpen&&<TaskDialog title="Novo produto" wide busy={createLocked} onClose={()=>setCreateOpen(false)}>
+      <CreateProductForm session={session} onSaved={refreshed} onLockChange={setCreateLocked}/>
     </TaskDialog>}
     {importOpen&&<ProductSpreadsheetImport session={session} onSaved={refreshed}
       onClose={()=>setImportOpen(false)}/>}

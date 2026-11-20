@@ -1,13 +1,15 @@
 import { requestId } from './request-id.ts';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
-import { ApiError, listCatalog, scanCatalog, revokeSession } from './api-client.ts';
+import { ApiError, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
+import { FirstRunTour } from './FirstRunTour.tsx';
+import { colorSwatch } from './visual-colors.ts';
 import { ReceiveStockForm } from './Management.tsx';
 import { ProductsWorkspace } from './ProductsWorkspace.tsx';
 import { TaskDialog } from './TaskDialog.tsx';
@@ -36,12 +38,14 @@ type Page = 'pdv'|'produtos'|'estoque'|'caixa'|'gestao';
 export function App() {
   const [session,setSession] = useState<Session|null>(null);
   const [page,setPage] = useState<Page>('pdv');
+  const [tourReplay,setTourReplay] = useState(0);
   const [products,setProducts] = useState<Product[]>([]);
   const [allProducts,setAllProducts] = useState<Product[]>([]);
   const [cursor,setCursor] = useState<string|null>(null);
   const [paging,setPaging] = useState(false);
   const [stockSearch,setStockSearch] = useState('');
   const [stockAction,setStockAction] = useState<'receive'|'adjust'|null>(null);
+  const [stockLocked,setStockLocked] = useState(false);
   const [cashState,setCashState] = useState<CashState|null>(null);
   const [cashRefresh,setCashRefresh] = useState(0);
   const [pickup,setPickup] = useState<PickupOrder>();
@@ -56,9 +60,13 @@ export function App() {
   const [search,setSearch] = useState('');
   const [debouncedSearch,setDebouncedSearch] = useState('');
   const [category,setCategory] = useState('Todos');
+  const [categories,setCategories] = useState<string[]>(['Todos']);
+  const [recoveryBusy,setRecoveryBusy] = useState(false);
+  const cartDialogRef=useRef<HTMLElement>(null);
   const [selected,setSelected] = useState<Record<string,{color:string;size:string}>>({});
   const [draft,setDraft] = useState<DraftLine[]>([]);
   const [recoverable,setRecoverable] = useState<Array<{id:string;quantity:number}>>([]);
+  const [hydratedDraftKey,setHydratedDraftKey] = useState<string|null>(null);
   const [message,setMessage] = useState('');
   const [catalogError,setCatalogError] = useState('');
   const [loading,setLoading] = useState(false);
@@ -70,39 +78,78 @@ export function App() {
   const canReceive = manager || (session?.roles.includes('stocker')??false);
   const canCash = manager || (session?.roles.includes('cashier')??false);
   const cashId = cashState?.active ? cashState.id : null;
-  const categories = useMemo(()=>['Todos',...new Set(products.map(p=>p.category))],[products]);
-  const filtered = useMemo(()=>products.filter(p=>category==='Todos'||p.category===category),[products,category]);
+  const filtered = products;
   const total = draftTotalCents(draft);
   const quantity = draft.reduce((sum,line)=>sum+line.quantity,0);
   const draftKey = session&&cashId ? 'loja:rascunho:'+session.storeId+':'+cashId : null;
   useEffect(()=>{
-    if(!draftKey){setRecoverable([]);return;}
+    if(!draftKey){setRecoverable([]);setHydratedDraftKey(null);return;}
     try{
       const stored=JSON.parse(sessionStorage.getItem(draftKey)||'[]') as Array<{id:string;quantity:number}>;
       setRecoverable(Array.isArray(stored)?stored.filter(x=>typeof x.id==='string'&&Number.isSafeInteger(x.quantity)&&x.quantity>0):[]);
-    }catch{setRecoverable([]);}
+      setHydratedDraftKey(draftKey);
+    }catch{setRecoverable([]);setHydratedDraftKey(draftKey);}
   },[draftKey]);
   useEffect(()=>{
-    if(!draftKey)return;
+    if(!draftKey||hydratedDraftKey!==draftKey)return;
     if(draft.length){sessionStorage.setItem(draftKey,JSON.stringify(draft.map(x=>({id:x.variant.id,quantity:x.quantity}))));}
     else if(!recoverable.length){sessionStorage.removeItem(draftKey);}
-  },[draft,draftKey,recoverable.length]);
+  },[draft,draftKey,recoverable.length,hydratedDraftKey]);
   useEffect(()=>{
     if(!draft.length)return;
     const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
     window.addEventListener('beforeunload',warn);
     return ()=>window.removeEventListener('beforeunload',warn);
   },[draft.length]);
-  function recoverDraft(){
-    if(!draftKey||draft.length)return;
-    const variants=products.flatMap(p=>p.variants);
-    const recovered=recoverable.flatMap(line=>{
-      const variant=variants.find(v=>v.id===line.id);
-      return variant?[{variant,quantity:line.quantity}]:[];
-    });
-    if(recovered.length!==recoverable.length){setMessage('Algumas peças não estão no catálogo carregado. Pesquise-as antes de recuperar.');return;}
-    setDraft(recovered);setRecoverable([]);setMessage('Carrinho recuperado. Preço e estoque serão conferidos no checkout.');
+  async function recoverDraft(){
+    if(!session||!draftKey||draft.length||!recoverable.length||recoveryBusy)return;
+    setRecoveryBusy(true);setMessage('');
+    try{
+      const catalog=mapCatalog(await lookupDraftVariants(session,recoverable.map(item=>item.id)));
+      const variants=catalog.flatMap(p=>p.variants);
+      const recovered=recoverable.flatMap(line=>{
+        const variant=variants.find(v=>v.id===line.id);
+        return variant?[{variant,quantity:line.quantity}]:[];
+      });
+      if(recovered.length!==recoverable.length){
+        setMessage('Algumas peças foram removidas do catálogo. Revise o carrinho antes de recuperar.');
+        return;
+      }
+      setDraft(recovered);setRecoverable([]);
+      setMessage('Carrinho recuperado do servidor. Preços e estoque serão conferidos no checkout.');
+    }catch(error){setMessage(error instanceof Error?error.message:'Não foi possível recuperar o carrinho.');}
+    finally{setRecoveryBusy(false);}
   }
+
+  useEffect(()=>{
+    if(!session){setCategories(['Todos']);return;}
+    const controller=new AbortController();
+    void listCategories(session,fetch,controller.signal).then(result=>{
+      if(!controller.signal.aborted)setCategories(['Todos',...result.categories]);
+    }).catch(error=>{
+      if(!controller.signal.aborted)setCatalogError(error instanceof Error?error.message:'Falha ao carregar categorias');
+    });
+    return ()=>controller.abort();
+  },[session,refetch]);
+
+  useEffect(()=>{
+    if(!cartOpen)return;
+    const dialog=cartDialogRef.current;
+    const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    dialog?.focus();
+    function onKeyDown(event:globalThis.KeyboardEvent){
+      if(event.key==='Escape'){event.preventDefault();setCartOpen(false);return;}
+      if(event.key!=='Tab'||!dialog)return;
+      const focusables=[...dialog.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')]
+        .filter(element=>element.getClientRects().length>0);
+      if(!focusables.length){event.preventDefault();dialog.focus();return;}
+      const first=focusables[0],last=focusables[focusables.length-1];
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===dialog)){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    }
+    document.addEventListener('keydown',onKeyDown);
+    return ()=>{document.removeEventListener('keydown',onKeyDown);previous?.focus();};
+  },[cartOpen]);
 
   useEffect(()=>{
     const timer=setTimeout(()=>setDebouncedSearch(search),250);
@@ -112,7 +159,7 @@ export function App() {
     if(!session){setProducts([]);setCursor(null);return;}
     const controller=new AbortController();
     setLoading(true);setCatalogError('');
-    void listCatalog(session,debouncedSearch,fetch,controller.signal)
+    void listCatalog(session,debouncedSearch,fetch,controller.signal,undefined,category==='Todos'?undefined:category)
       .then(data=>{if(!controller.signal.aborted){setProducts(mapCatalog(data));setCursor(data.next_cursor);}})
       .catch(error=>{
         if(controller.signal.aborted)return;
@@ -122,7 +169,7 @@ export function App() {
       })
       .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     return ()=>controller.abort();
-  },[session,debouncedSearch,refetch]);
+  },[session,debouncedSearch,refetch,category]);
   useEffect(()=>{
     if(!session||page!=='estoque'){setAllProducts([]);return;}
     const controller=new AbortController();
@@ -139,7 +186,7 @@ export function App() {
     if(!session||!cursor||paging)return;
     setPaging(true);setCatalogError('');
     try{
-      const data=await listCatalog(session,debouncedSearch,fetch,undefined,cursor);
+      const data=await listCatalog(session,debouncedSearch,fetch,undefined,cursor,category==='Todos'?undefined:category);
       const appended=mapCatalog(data);
       setProducts(current=>{
         const ids=new Set(current.map(p=>p.id));
@@ -267,12 +314,13 @@ export function App() {
       <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><span aria-hidden="true">Sair</span></button>
     </nav>
     <main className="workspace">
-      <header className="topbar">
+      <header className="topbar" data-tour="overview">
         <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':'Estoque'}</h1>
           <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
             {catalogError?'Servidor indisponível':cashId?'Caixa aberto · Conectado':'Catálogo conectado · Sem caixa'}</span>
+          <button className="help-tour" type="button" aria-label="Reabrir tour" onClick={()=>setTourReplay(n=>n+1)}>Ajuda · Tour</button>
           <button className="mobile-logout" onClick={logout}>Sair</button>
         </div>
       </header>
@@ -288,14 +336,14 @@ export function App() {
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
-        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" onClick={recoverDraft}>Recuperar carrinho</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
+        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" disabled={recoveryBusy} onClick={()=>void recoverDraft()}>{recoveryBusy?'Recuperando…':'Recuperar carrinho'}</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
           <strong>Vendas suspensas ({savedDrafts.length})</strong>
           {savedDrafts.map(item=><button key={item.id} className="light-button"
             onClick={()=>void resumeCurrent(item)}>Retomar venda · {item.lines.length} itens</button>)}
         </section>}
         {cashId&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
-        <div className="search-row"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
+        <div className="search-row" data-tour="search"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
           <input id="search" value={search} autoComplete="off" onChange={e=>setSearch(e.target.value)} onKeyDown={keySearch} placeholder="Pesquisar produto, SKU ou código…"/>
           <button type="button" className="scan-button" disabled={scanBusy||!search.trim()} onClick={()=>void scan()}>{scanBusy?'Consultando…':'Confirmar código'}</button>
         </div>
@@ -305,7 +353,7 @@ export function App() {
         {message&&<p role="alert" className="error">{message}</p>}
         {catalogError&&<div className="error" role="alert">{catalogError} <button onClick={refreshed}>Tentar novamente</button></div>}
         {loading&&<p className="notice" role="status">Carregando produtos da loja…</p>}
-        {!loading&&!catalogError&&<div className="product-grid">
+        {!loading&&!catalogError&&<div className="product-grid" data-tour="variants">
           {filtered.map(p=>{
             const colors=[...new Set(p.variants.map(v=>v.color))];
             const choice=selected[p.id],color=choice?.color??colors[0]??'';
@@ -322,9 +370,9 @@ export function App() {
                 </div>
                 <div className="card-bottom">
                   <div className="swatches" role="group" aria-label={'Cores de '+p.name}>
-                    {colors.map(c=><button type="button" key={c} aria-label={'Selecionar cor '+c} aria-pressed={ready&&color===c}
+                    {colors.map(c=>{const visual=colorSwatch(c);return <button type="button" key={c} aria-label={'Selecionar cor '+c} aria-pressed={ready&&color===c}
                       title={c} className={ready&&color===c?'selected':''} onClick={()=>selectVariant(p,c,size)}>
-                      <span className={'swatch '+(c==='Azul'?'azul':c==='Preto'?'preto':c==='Areia'?'areia':c==='Bege'?'bege':'cinza')}/></button>)}
+                      <span className={'swatch'+(!visual.known?' unknown':'')} style={{backgroundColor:visual.background}}>{visual.label}</span></button>;})}
                   </div>
                   <button className="add" aria-label={'Adicionar '+p.name} disabled={!ready||!selectedVariant||selectedVariant.available===0}
                     onClick={()=>{if(selectedVariant)addVariant(selectedVariant);}}>+</button>
@@ -337,11 +385,11 @@ export function App() {
         </div>}
         {cursor&&<button className="light-button" disabled={paging} onClick={()=>void loadMore()}>{paging?'Carregando…':'Carregar mais produtos'}</button>}
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
-      </section><aside className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
-      {page==='gestao'&&manager&&<StoreOperations session={session} cashId={cashId} onReturned={refreshed}/>}
-      {page==='produtos'&&manager&&<ProductsWorkspace session={session} onSaved={refreshed}/>}
-      {page==='caixa'&&canCash&&<CashPanel session={session} onChanged={cashUpdated}/>}
-      {page==='estoque'&&canReceive&&<div className="products-workspace">
+      </section><aside data-tour="cart" className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
+      {page==='gestao'&&manager&&<div data-tour="management"><StoreOperations session={session} cashId={cashId} onReturned={refreshed}/></div>}
+      {page==='produtos'&&manager&&<div data-tour="products"><ProductsWorkspace session={session} onSaved={refreshed}/></div>}
+      {page==='caixa'&&canCash&&<div data-tour="cash"><CashPanel session={session} onChanged={cashUpdated}/></div>}
+      {page==='estoque'&&canReceive&&<div className="products-workspace" data-tour="stock">
         <section className="workspace-hero">
           <div><h2>Estoque da loja</h2><p>Consulte e registre movimentações apenas quando necessário.</p></div>
           <div className="workspace-actions">
@@ -355,7 +403,7 @@ export function App() {
         </Suspense>
       </div>}
     </main>
-    {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide
+    {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide busy={stockLocked}
       onClose={()=>setStockAction(null)}>
       <div className="stock-task-layout">
         <div className="management-form">
@@ -365,14 +413,14 @@ export function App() {
           {stockLoading&&<p className="notice">Carregando variantes para recebimento…</p>}
           <p className="muted small">Mostrando até 50 resultados; pesquise o SKU exato para outros itens.</p>
         </div>
-        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed}/>
+        <ReceiveStockForm session={session} products={allProducts} onSaved={refreshed} onLockChange={setStockLocked}/>
       </div>
     </TaskDialog>}
-    {page==='estoque'&&manager&&stockAction==='adjust'&&<TaskDialog title="Ajustar estoque" wide
+    {page==='estoque'&&manager&&stockAction==='adjust'&&<TaskDialog title="Ajustar estoque" wide busy={stockLocked}
       onClose={()=>setStockAction(null)}>
-      <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch}/>
+      <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch} onLockChange={setStockLocked}/>
     </TaskDialog>}
-    {page==='pdv'&&<button className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
+    {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
       draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
     {lastSale&&<div className="checkout-overlay" role="presentation">
@@ -388,8 +436,9 @@ export function App() {
         </div>
       </section>
     </div>}
+    <FirstRunTour key={session.storeId+session.roles.join(',')} storeId={session.storeId} roles={session.roles} replayToken={tourReplay} onNavigate={setCurrentPage}/>
     {page==='pdv'&&cartOpen&&<div className="drawer-backdrop" onMouseDown={()=>setCartOpen(false)}>
-      <aside className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
+      <aside ref={cartDialogRef} tabIndex={-1} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
         <button className="close-drawer" onClick={()=>setCartOpen(false)}>Fechar ×</button>{cart}
       </aside></div>}
   </div>;

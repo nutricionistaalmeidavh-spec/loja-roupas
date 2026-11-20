@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { Storefront } from './StoreOperations.tsx';
 import { App } from './App.tsx';
 import './styles.css';
+import './tour.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Elemento root ausente');
