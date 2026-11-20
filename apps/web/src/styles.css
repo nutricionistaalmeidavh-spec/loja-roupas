@@ -286,6 +286,7 @@
  .sheet-selection-toolbar>.workspace-actions{width:100%}
  .sheet-selection-toolbar>.workspace-actions button{flex:1 1 125px}
 }
+
 /* UX: cor desconhecida explícita, menu de gestão e foco previsível. */
 .swatch.unknown{display:grid;place-items:center;color:#475569;font-size:11px;font-weight:700}
 .mobile-drawer:focus{outline:none}
