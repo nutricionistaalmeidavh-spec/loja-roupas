@@ -78,6 +78,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
    <form className="cash-action-form" onSubmit={e=>void perform(e,'open')}>
     <p>Informe o valor em dinheiro conferido na gaveta antes de iniciar as vendas.</p>
     <label>Valor inicial (R$)<input required inputMode="decimal" autoFocus value={opening} disabled={busy} onChange={e=>setOpening(e.target.value)}/></label>
+    {error&&<p className="error" role="alert">{error}</p>}
     <button type="submit" disabled={busy} className="primary-action">Confirmar abertura</button>
    </form>
   </AppDialog>}
@@ -88,6 +89,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
     </select></label>
     <label>Valor (R$)<input required inputMode="decimal" placeholder="25,00" value={amount} disabled={busy} onChange={e=>setAmount(e.target.value)}/></label>
     <label>Motivo<input required minLength={8} maxLength={250} value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label>
+    {error&&<p className="error" role="alert">{error}</p>}
     <button type="submit" disabled={busy} className="primary-action">Registrar movimentação</button>
    </form>
   </AppDialog>}
@@ -98,6 +100,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
     <label>Justificativa para divergência<input maxLength={250} minLength={8} value={reason} disabled={busy} onChange={e=>setReason(e.target.value)}/></label>
     <label className="cash-confirm"><input type="checkbox" checked={closeAcknowledged} disabled={busy} onChange={e=>setCloseAcknowledged(e.target.checked)}/>
      Conferi os valores e quero encerrar este caixa.</label>
+    {error&&<p className="error" role="alert">{error}</p>}
     <button type="submit" disabled={busy||!closeAcknowledged} className="primary-action">Confirmar fechamento</button>
    </form>
   </AppDialog>}
