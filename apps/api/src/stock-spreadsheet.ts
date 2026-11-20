@@ -46,7 +46,7 @@ export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
   const {query='',category='',limit=50,offset=0}=request.query,store=request.authContext!.storeId;
   const args=[store,query.trim(),category.trim(),limit,offset];
   const filter="v.store_id=$1 AND ($2='' OR p.name ILIKE '%'||$2||'%' OR v.sku ILIKE '%'||$2||'%' OR v.barcode=$2) AND ($3='' OR p.category=$3)";
-  const [count,records]=await Promise.all([
+  const [count,records,categories]=await Promise.all([
    db.query<{total:string}>('SELECT count(*)::text AS total FROM product_variants v JOIN products p '+
     'ON p.id=v.product_id AND p.store_id=v.store_id WHERE '+filter,args.slice(0,3)),
    db.query<DbRow>('SELECT '+rowColumns+
@@ -60,9 +60,10 @@ export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
     ' max(occurred_at) AS last_movement_at FROM stock_movements m '+
     ' WHERE m.store_id=v.store_id AND m.variant_id=v.id'+
     ') m ON true WHERE '+filter+
-    ' ORDER BY p.name,v.sku,v.id LIMIT $4 OFFSET $5',args)
+    ' ORDER BY p.name,v.sku,v.id LIMIT $4 OFFSET $5',args),
+   db.query<{category:string}>('SELECT DISTINCT category FROM products WHERE store_id=$1 ORDER BY category',[store])
   ]);
-  return {total:safeCount(count.rows[0]?.total??'0','total'),limit,offset,
+  return {total:safeCount(count.rows[0]?.total??'0','total'),limit,offset,categories:categories.rows.map(x=>x.category),
    items:records.rows.map(row=>({
     product_id:row.product_id,variant_id:row.variant_id,name:row.name,category:row.category,
     sku:row.sku,color:row.color,size:row.size,barcode:row.barcode,
