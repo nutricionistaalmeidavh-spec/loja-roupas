@@ -49,6 +49,7 @@ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectO
  await page.evaluate(()=>delete document.documentElement.dataset.printLabel);
 
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await page.getByRole('button',{name:'Receber estoque'}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(item).toBeAttached();
@@ -56,6 +57,7 @@ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectO
  await page.getByLabel('Quantidade recebida').fill('5');
  await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
  await expect(page.getByText(/Novo saldo em mãos: 5/)).toBeVisible();
+ await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
 
  await page.getByRole('button',{name:'PDV'}).click();
  const scannerInput=page.getByLabel('Buscar nome, SKU ou código');
