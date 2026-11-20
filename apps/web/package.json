@@ -15,7 +15,10 @@
     "@loja/domain": "workspace:*",
     "jsbarcode": "3.12.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "read-excel-file": "9.3.19",
+    "write-excel-file": "4.1.1",
+    "react-data-grid": "7.0.0-beta.64"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
