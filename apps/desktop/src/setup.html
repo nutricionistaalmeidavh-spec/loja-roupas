@@ -16,7 +16,7 @@ small{display:block;margin-top:20px;color:#777}
 <div class="eyebrow">LOJA DE ROUPAS · INSTALAÇÃO LOCAL</div>
 <h1 id="title">Preparando sua loja</h1>
 <p id="intro">Tudo funcionará neste computador, sem servidor contratado, Docker ou assinatura.</p>
-<div id="loading"><progress aria-label="Preparando o sistema"></progress><p id="status" role="status">Verificando componentes…</p></div>
+<form id="activation" hidden><p>Esta edição comercial precisa ser ativada apenas no computador principal.</p><label>E-mail vinculado à licença<input name="email" type="email" autocomplete="email" required/></label><label>Código de seis dígitos<input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required/></label><p id="activationError" role="alert"></p><button class="primary" type="submit">Ativar Loja Roupas</button></form><div id="loading"><progress aria-label="Preparando o sistema"></progress><p id="status" role="status">Verificando componentes…</p></div>
 <div id="failure" hidden><p id="failureMessage" role="alert"></p><button type="button" id="retry">Tentar novamente</button></div><form id="first" hidden>
 <label>Nome da loja<input name="name" maxlength="120" required placeholder="Ex.: Boutique Central" autocomplete="organization"/></label>
 <label>Usuário administrador<input name="login" maxlength="80" required placeholder="Ex.: gerente" autocomplete="username"/></label>
@@ -31,18 +31,26 @@ small{display:block;margin-top:20px;color:#777}
 <p id="remoteError" role="alert"></p>
 <button class="primary" type="submit">Conectar terminal</button>
 </form></div>
-<small>O PostgreSQL e a API usam somente a rede local deste computador. Nenhuma licença ou serviço pago é necessário.</small>
+<small>O núcleo livre não exige licença, Cloudflare ou serviço pago. A edição comercial, quando adquirida, utiliza um código emitido pela Central ArtiSys.</small>
 </main>
 <script>
 const $=id=>document.getElementById(id);
 function render(state){
  $('status').textContent=state.status||'Preparando…';
- if(state.error){$('loading').hidden=true;$('first').hidden=true;$('failure').hidden=false;$('failureMessage').textContent=state.error;$('title').textContent='Não foi possível iniciar';return;}
+ if(state.error){$('loading').hidden=true;$('activation').hidden=true;$('first').hidden=true;$('failure').hidden=false;$('failureMessage').textContent=state.error;$('title').textContent='Não foi possível iniciar';return;}
  $('failure').hidden=true;
+ if(state.activationRequired){$('loading').hidden=true;$('first').hidden=true;$('activation').hidden=false;$('title').textContent='Ative sua licença comercial';$('intro').textContent='Use o código enviado após a liberação na Central ArtiSys. Seu caixa e dados serão locais, inclusive offline após ativação.';return;}
+ $('activation').hidden=true;
  if(state.ready){$('loading').hidden=true;$('first').hidden=false;$('title').textContent='Crie sua loja';$('intro').textContent='Seu banco de dados foi preparado. Cadastre o primeiro administrador.';}
 }
 window.lojaSetup.onStatus(message=>render(message));
 window.lojaSetup.state().then(render).catch(error=>{$('status').textContent=error.message});
+$('activation').addEventListener('submit',async event=>{
+ event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;
+ $('activationError').textContent='';
+ try{const data=Object.fromEntries(new FormData(event.target).entries());await window.lojaSetup.activate(data);}
+ catch(error){$('activationError').textContent=error.message;button.disabled=false;}
+});
 $('first').addEventListener('submit',async event=>{
  event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;$('error').textContent='';
  const data=Object.fromEntries(new FormData(event.target).entries());

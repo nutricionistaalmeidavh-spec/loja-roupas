@@ -14,3 +14,9 @@ Worker independente do `pdv-artisys`. Banco D1 separado `loja-roupas-vitrine`. O
 O plano gratuito da Cloudflare tem cotas. Não é uma dependência do core livre: a vitrine é opcional e a interface de sincronização é isolada para permitir provedor open source self-hosted alternativo.
 
 A integração desktop automática só pode ser habilitada após o cliente ativar a licença comercial e o gestor cadastrar a loja no Worker. Emissão de licenças e email de boas-vindas são responsabilidade exclusiva do Worker `pdv-artisys` e do serviço de email transacional.
+
+## Licenciamento comercial opcional do desktop
+
+A central existente `pdv-artisys` libera `LOJA_ROUPAS`, envia e-mail de boas-vindas por `oficina-mail.artisys.dev/welcome` e valida o código de seis dígitos por 48 horas. A edição livre não realiza consultas de licença.
+
+Para gerar explicitamente a edição comercial: `LOJA_COMMERCIAL_EDITION=true pnpm --filter @loja/desktop build` (Windows: `$env:LOJA_COMMERCIAL_EDITION='true'`). O manifesto `commercial-edition.json` é embarcado somente neste caso. Na primeira abertura, o assistente exige e-mail e código **antes** do bootstrap local. Depois, a operação continua offline utilizando a licença local previamente validada; a revogação é consultada ao reconectar. Nenhuma chave da Central entra no instalador. A distribuição comercial precisa incluir PostgreSQL e API conforme `scripts/prepare-windows-runtime.ps1`.

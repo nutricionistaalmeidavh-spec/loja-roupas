@@ -3,8 +3,12 @@ const {readFileSync} =require('node:fs');
 const fs=require('node:fs/promises');
 const path=require('node:path');
 const {launchLocalRuntime}=require('./local-runtime.cjs');
+const {existsSync}=require('node:fs');
+const {createCommercialLicense}=require('./commercial-license.cjs');
 
 let runtime=null,setupWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
+const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
+let commercialLicense=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();
 if(!single)app.quit();
@@ -68,6 +72,20 @@ function transition(url){
  if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
  setupWindow=null;
 }
+async function requireCommercialApproval(){
+ if(!commercialEdition)return true;
+ commercialLicense??=createCommercialLicense({directory:app.getPath('userData')});
+ const state=await commercialLicense.status({refresh:true});
+ if(state.active)return true;
+ setupState={status:'Informe o código enviado pela ArtiSys depois da liberação na Central.',
+  activationRequired:true,installationId:state.installationId,ready:false,error:''};
+ status(setupState.status);
+ return false;
+}
+async function beginLocal(){
+ try{if(await requireCommercialApproval())await startLocal();}
+ catch(error){showError(error);}
+}
 async function startLocal(){
  setupState={status:'Preparando PostgreSQL e interface local…',ready:false,error:''};
  status(setupState.status);
@@ -81,6 +99,16 @@ async function startLocal(){
 }
 function registerSetupHandlers(){
  ipcMain.handle('loja:setup-state',event=>{setupAllowed(event);return setupState;});
+ ipcMain.handle('loja:setup-activate',async(event,input)=>{
+  setupAllowed(event);
+  if(!commercialEdition)throw new Error('Ativação comercial indisponível na edição livre.');
+  if(!setupState.activationRequired)throw new Error('A ativação não está sendo solicitada.');
+  commercialLicense??=createCommercialLicense({directory:app.getPath('userData')});
+  const license=await commercialLicense.activate(input);
+  if(!license.active)throw new Error('Licença não autorizada.');
+  await startLocal();
+  return {ok:true};
+ });
  ipcMain.handle('loja:setup-create',async(event,input)=>{
   setupAllowed(event);
   if(!runtime||!setupState.ready)throw new Error('O banco ainda não está pronto.');
@@ -101,7 +129,7 @@ function registerSetupHandlers(){
  });
  ipcMain.handle('loja:setup-retry',async(event)=>{
   setupAllowed(event);if(runtime)await runtime.stop();runtime=null;
-  void startLocal();return {ok:true};
+  void beginLocal();return {ok:true};
  });
 }
 async function start(){
@@ -114,7 +142,7 @@ async function start(){
   webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
  await setupWindow.loadFile(path.join(__dirname,'setup.html'));
- await startLocal();
+ await beginLocal();
 }
 app.whenReady().then(start).catch(error=>{dialog.showErrorBox('Iniciar Loja de Roupas',error.message);app.quit();});
 app.on('before-quit',event=>{
