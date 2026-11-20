@@ -7,6 +7,7 @@ CREATE TABLE marketplace_links (
  last_attempt_at timestamptz,
  last_success_at timestamptz,
  last_error text,
+ order_cursor uuid,
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE marketplace_listings (
