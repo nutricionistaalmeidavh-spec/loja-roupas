@@ -39,3 +39,14 @@ test('rotas do portal só aceitam sessão autenticada',async()=>{
  }),{DB:{}});
  assert.equal(signin.status,400);
 });
+
+test('script inline do marketplace tem sintaxe JavaScript válida e nonce CSP',async()=>{
+ const {Script}=await import('node:vm');
+ const response=await worker.fetch(new Request('https://example.test/'),{});
+ const html=await response.text();
+ const found=/<script nonce="[a-f0-9]+">([\s\S]*?)<\/script>/.exec(html);
+ assert.ok(found,'script de interface encontrado');
+ assert.doesNotThrow(()=>new Script(found[1]));
+ assert.ok(!html.includes('__NONCE__'));
+ assert.ok(!html.includes('__CLIENT__'));
+});
