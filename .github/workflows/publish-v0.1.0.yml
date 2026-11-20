@@ -1,0 +1,87 @@
+name: Publicar release v0.1.0 (autorizada)
+on:
+  push:
+    branches:
+      - release/publish-v0.1.0
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: loja-roupas-release-v0.1.0
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout código aprovado na main
+        uses: actions/checkout@v4
+        with:
+          ref: c3d56632ae5cd0ef2bdd2fb1bf3c9e9fccd350ea
+          persist-credentials: false
+      - name: Conferir código, versão e release inexistente
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "c3d56632ae5cd0ef2bdd2fb1bf3c9e9fccd350ea" ]]
+          [[ "$(node -p "require('./apps/desktop/package.json').version")" == "0.1.0" ]]
+          if gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v0.1.0 já existe. Interrompendo para evitar sobrescrita."
+            exit 1
+          fi
+          gh run view 44832748992 --repo "$GITHUB_REPOSITORY"             --json conclusion,headSha --jq '[.conclusion,.headSha] | @tsv' |
+            grep -Fx "$(printf 'success	%s' 65f56cd0ed4e355ce43d0b90c9928bc5ad500626)"
+      - name: Baixar instalador Windows da CI aprovada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets/windows
+          gh run download 44832748992 --repo "$GITHUB_REPOSITORY"             --name m8-candidata-windows-x64 --dir release-assets/windows
+          test -s release-assets/windows/Loja-de-Roupas-Setup-x64.exe
+          test -s release-assets/windows/SHA256SUMS
+      - name: Validar SHA256 do instalador e preparar manifesto oficial
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets/windows
+          expected="$(awk '$2=="Loja-de-Roupas-Setup-x64.exe" { print $1 }' SHA256SUMS)"
+          [[ "$expected" =~ ^[a-f0-9]{64}$ ]]
+          actual="$(sha256sum Loja-de-Roupas-Setup-x64.exe | awk '{print $1}')"
+          [[ "$actual" == "$expected" ]] || { echo "Checksum do instalador diverge da CI"; exit 1; }
+          printf '%s  Loja-de-Roupas-Setup-x64.exe
+' "$actual" > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          echo "SHA256 verificado: $actual"
+      - name: Escrever notas de lançamento
+        shell: bash
+        run: |
+          cat > release-assets/RELEASE_NOTES.md <<'EOF'
+          # Loja de Roupas v0.1.0 — primeira distribuição Windows x64
+
+          - Instalador local com Electron, API e PostgreSQL incluído.
+          - PDV, catálogo, estoque, gestão e primeiro acesso da loja.
+          - Verificação de novas versões ao abrir, exibindo aviso com novidades.
+          - Configurações → Atualizações com verificação manual.
+          - O instalador só é baixado após confirmação explícita; sem download silencioso.
+          - Backup PostgreSQL pré-atualização, SHA-256 e recuperação dos arquivos do aplicativo quando possível.
+          - Sem assinatura, serviço pago ou servidor obrigatório.
+
+          **Instalação:** baixe o arquivo `Loja-de-Roupas-Setup-x64.exe` desta release.
+          **Integridade:** o arquivo `SHA256SUMS` contém o hash do instalador.
+          **Atenção:** esta é a primeira release oficial. A função de atualização automática será testável com uma próxima versão estável, sem download automático. Não confundir os testes de instalação e empacotamento com homologação de equipamentos físicos.
+          EOF
+      - name: Publicar draft, validar os anexos e liberar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v0.1.0             release-assets/windows/Loja-de-Roupas-Setup-x64.exe             release-assets/windows/SHA256SUMS             --repo "$GITHUB_REPOSITORY"             --target c3d56632ae5cd0ef2bdd2fb1bf3c9e9fccd350ea             --title "Loja de Roupas v0.1.0"             --notes-file release-assets/RELEASE_NOTES.md             --draft
+          files="$(gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json assets             --jq '.assets[].name' | sort)"
+          expected="$(printf 'Loja-de-Roupas-Setup-x64.exe
+SHA256SUMS' | sort)"
+          [[ "$files" == "$expected" ]] || { echo "Assets de release incompletos"; exit 1; }
+          gh release edit v0.1.0 --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          gh release view v0.1.0 --repo "$GITHUB_REPOSITORY" --json url,isDraft             --jq 'select(.isDraft == false) | .url' | tee -a "$GITHUB_STEP_SUMMARY"
