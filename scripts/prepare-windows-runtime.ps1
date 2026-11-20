@@ -38,20 +38,18 @@ try {
 $api=Join-Path $runtime 'api'
 if(!(Test-Path (Join-Path $api 'src/main.ts'))){throw 'Packaged API missing'}
 if(!(Test-Path (Join-Path $api 'node_modules/tsx'))){throw 'Packaged TS runtime missing'}
-# pnpm deploy --legacy pode deixar a dependência transitiva esbuild de tsx de fora.
-# Copiar os pacotes OSS fixados no lockfile (incluindo o binário nativo Windows).
-# Nenhuma instalação ou download ocorre no computador do cliente.
-$esbuildVersion='0.28.2'
-$pnpmModules=Join-Path $repo 'node_modules/.pnpm'
-$esbuildSource=Join-Path $pnpmModules "esbuild@$esbuildVersion/node_modules/esbuild"
-$esbuildNative=Join-Path $pnpmModules "@esbuild+win32-x64@$esbuildVersion/node_modules/@esbuild/win32-x64"
-if(!(Test-Path (Join-Path $esbuildSource 'lib/main.js'))){throw 'esbuild runtime missing from pnpm store'}
-if(!(Test-Path (Join-Path $esbuildNative 'esbuild.exe'))){throw 'esbuild Windows binary missing from pnpm store'}
-Copy-Item -Recurse -Force -LiteralPath $esbuildSource -Destination (Join-Path $api 'node_modules/esbuild')
-$esbuildScope=Join-Path $api 'node_modules/@esbuild'
-New-Item -ItemType Directory -Force -Path $esbuildScope|Out-Null
-Copy-Item -Recurse -Force -LiteralPath $esbuildNative -Destination (Join-Path $esbuildScope 'win32-x64')
-if(!(Test-Path (Join-Path $api 'node_modules/@esbuild/win32-x64/esbuild.exe'))){throw 'Bundled esbuild binary missing'}
+# Preserve the lockfile-pinned esbuild optional native package on Windows.
+# pnpm deploy --legacy does not always materialize it with tsx.
+$store=Join-Path $repo 'node_modules/.pnpm'
+$esb=@(Get-ChildItem -LiteralPath $store -Directory -Filter 'esbuild@*')
+$native=@(Get-ChildItem -LiteralPath $store -Directory -Filter '@esbuild+win32-x64@*')
+if($esb.Count -ne 1 -or $native.Count -ne 1){throw 'Pinned esbuild packages not found'}
+$src=Join-Path $esb[0].FullName 'node_modules/esbuild'
+$nativeSrc=Join-Path $native[0].FullName 'node_modules/@esbuild/win32-x64'
+if(!(Test-Path (Join-Path $src 'lib/main.js')) -or !(Test-Path (Join-Path $nativeSrc 'bin/esbuild.exe'))){throw 'esbuild package incomplete'}
+New-Item -ItemType Directory -Force -Path (Join-Path $api 'node_modules/@esbuild') | Out-Null
+Copy-Item -Recurse -LiteralPath $src -Destination (Join-Path $api 'node_modules/esbuild')
+Copy-Item -Recurse -LiteralPath $nativeSrc -Destination (Join-Path $api 'node_modules/@esbuild/win32-x64')
 
 if(!(Test-Path (Join-Path $api 'node_modules/@loja/domain'))){throw 'Packaged domain missing'}
 Copy-Item -Recurse -LiteralPath (Join-Path $repo 'apps/web/dist') -Destination (Join-Path $runtime 'web')
