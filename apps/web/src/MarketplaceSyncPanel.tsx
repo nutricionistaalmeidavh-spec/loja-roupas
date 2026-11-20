@@ -16,6 +16,7 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
  const [slug,setSlug]=useState('');
  const [key,setKey]=useState('');
  const [busy,setBusy]=useState(false);
+ const [editingKey,setEditingKey]=useState(false);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
  const refresh=useCallback(async(signal?:AbortSignal)=>{
@@ -41,7 +42,7 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
     method:'POST',headers:{...headers(session),'content-type':'application/json'},
     body:JSON.stringify({slug:slug.trim().toLowerCase(),sync_key:key.trim()})
    },fetch);
-   setKey('');setNotice('Vitrine conectada. A publicação inicia com a próxima sincronização.');
+   setKey('');setEditingKey(false);setNotice('Vitrine conectada. A publicação inicia com a próxima sincronização.');
    await refresh();
   }catch(e){setError(describe(e));}finally{setBusy(false);}
  }
@@ -84,7 +85,7 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
  return <div className="marketplace-sync-panel">
   <h3>Conectar ao marketplace ArtiSys</h3>
   <p className="muted">Opcional. Suas vendas e o estoque continuam locais no PostgreSQL. A internet é necessária somente para publicar peças e receber solicitações.</p>
-  {!status?.configured&&<form onSubmit={event=>void connect(event)} className="management-form">
+  {(!status?.configured||editingKey)&&<form onSubmit={event=>void connect(event)} className="management-form">
    <label>Identificador da vitrine<input value={slug} required minLength={3} maxLength={48}
     pattern="[a-z0-9-]{3,48}" placeholder="minha-boutique" autoCapitalize="none"
     onChange={event=>setSlug(event.target.value)} disabled={busy}/></label>
@@ -101,6 +102,10 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
    <p><strong>Alterações na fila:</strong> {status.pending_changes} · <strong>Pedidos aguardando:</strong> {status.pending_orders}</p>
    {status.connected?.last_error&&<p role="alert">Última falha de sincronização: {status.connected.last_error}</p>}
    <div className="marketplace-sync-actions">
+    {!editingKey&&<button type="button" className="light-button" disabled={busy} onClick={()=>{
+     setSlug(status.connected?.slug||'');setKey('');setEditingKey(true);
+    }}>Atualizar chave</button>}
+    {editingKey&&<button type="button" className="light-button" disabled={busy} onClick={()=>{setKey('');setEditingKey(false);}}>Cancelar alteração de chave</button>}
     <button type="button" className="primary-action" disabled={busy||!active} onClick={()=>void control('sync')}>{busy?'Processando…':'Sincronizar agora'}</button>
     <button type="button" className="light-button" disabled={busy} onClick={()=>void control(active?'disable':'enable')}>{active?'Pausar sincronização':'Ativar sincronização'}</button>
    </div>
