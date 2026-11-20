@@ -4,10 +4,10 @@ import {randomUUID} from 'node:crypto';
 
 test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',async({page},testInfo)=>{
  const suffix=randomUUID().slice(0,8).toUpperCase();
- const name='Blusa XLSX '+suffix,sku='XLS-'+suffix+'-P';
+ const name='Blusa XLSX '+suffix,sku='XLS-'+suffix+'-P',barcode='000'+suffix.replace(/[^0-9A-Z]/g,'')+'0123';
  const file=await writeExcelFile([
   ['produto','categoria','sku','cor','tamanho','preco','codigo_barras','estoque_inicial'],
-  [name,'Feminino',sku,'Preto','P',99.90,'0009988776655',2],
+  [name,'Feminino',sku,'Preto','P',99.90,barcode,2],
   [name,'Feminino','XLS-'+suffix+'-M','Preto','M',99.90,null,3]
  ]).toBuffer();
  await page.goto('/');
@@ -33,12 +33,13 @@ test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',as
  const row=grid.getByRole('row').filter({hasText:sku});
  await expect(row).toBeVisible();
  await expect(row.getByRole('gridcell').nth(9)).toHaveText('2');
- await row.getByRole('button',{name:'Histórico '+sku}).click();
+ await row.getByRole('gridcell',{name:sku,exact:true}).click();
+ await page.getByRole('button',{name:'Histórico selecionado '+sku}).click();
  const history=page.getByRole('dialog',{name:'Histórico — '+sku});
  await expect(history.getByText('Recebimento')).toBeVisible();
  await expect(history.getByText('+2 peças')).toBeVisible();
  await history.getByRole('button',{name:'Fechar Histórico — '+sku}).click();
- await row.getByRole('button',{name:'Receber '+sku}).click();
+ await page.getByRole('button',{name:'Receber selecionado '+sku}).click();
  const incoming=page.getByRole('dialog',{name:'Receber peças — '+sku});
  await expect(incoming.getByLabel('Variante (SKU)')).toHaveValue(/.+/);
  await incoming.getByLabel('Quantidade recebida').fill('4');
