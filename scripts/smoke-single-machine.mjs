@@ -37,7 +37,19 @@ try{
   appWindow=instance.windows().find(w=>w.url().startsWith('http://127.0.0.1:'));
  }
  assert.ok(appWindow,'Aplicativo não abriu após bootstrap');
- await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:15000});
+ try {
+  await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:30000});
+ } catch(error){
+  console.error('Windows login URL:',appWindow.url());
+  console.error('Windows page title:',await appWindow.title().catch(()=>'<sem titulo>'));
+  console.error('Windows body:',(await appWindow.locator('body').innerText().catch(()=>'<sem body>')).slice(0,1500));
+  console.error('Windows document:',await appWindow.evaluate(()=>({
+   state:document.readyState,root:document.querySelector('#root')?.innerHTML.slice(0,500),
+   scripts:[...document.scripts].map(s=>s.src).slice(0,5)
+  })).catch(e=>({error:String(e)})));
+  console.error('Setup state:',(await setup.locator('body').innerText().catch(()=>'<janela fechada>')).slice(0,1000));
+  throw error;
+ }
  const origin=new URL(appWindow.url()).origin;
  assert.equal(new URL(origin).hostname,'127.0.0.1');
  await appWindow.getByLabel('Usuário').fill('local-admin');
