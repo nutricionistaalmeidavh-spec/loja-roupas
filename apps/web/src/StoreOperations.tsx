@@ -8,6 +8,7 @@ import { CommercialIntelligence } from './CommercialIntelligence.tsx';
 import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
 import { TaskDialog } from './TaskDialog.tsx';
+import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -124,6 +125,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {section==='vitrine'&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
+      <MarketplaceSyncPanel session={session}/>
     </section>}
     {status&&<p role="status">{status}</p>}
     {error&&<p role="alert" className="error">{error}</p>}
