@@ -107,7 +107,7 @@ paths:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
     put:
-      summary: Informar quantas unidades recebidas passaram na inspeção
+      summary: Endpoint legado desativado para evitar reclassificação sem movimentação de estoque
       parameters:
         - $ref: '#/components/parameters/WriteKey'
       requestBody:
@@ -120,8 +120,7 @@ paths:
               properties:
                 accepted_quantity: { type: integer, minimum: 0, maximum: 100000 }
       responses:
-        '200': { description: Inspeção registrada }
-        '409': { description: Compra indisponível ou quantidade acima do recebido }
+        '409': { description: Inspeção agora é obrigatória no recebimento; reclassificação exige ajuste auditado }
 
 components:
   parameters:

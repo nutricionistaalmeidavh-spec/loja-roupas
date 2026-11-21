@@ -90,9 +90,10 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByRole('button',{name:'Nova devolução'}).click();
   await page.getByLabel('Número da venda').fill(saleNumber!);
   await page.getByRole('button',{name:'Localizar venda'}).click();
+  await page.getByLabel('Quantidade a devolver').fill('1');
   await page.getByLabel('Motivo da devolução').fill('Cliente devolveu a peça em condições de venda');
-  await page.getByLabel('Conferi todas as peças e autorizo a devolução integral').check();
-  await page.getByRole('button',{name:'Registrar devolução',exact:true}).click();
+  await page.getByLabel('Conferi fisicamente os itens e o valor do reembolso').check();
+  await page.getByRole('button',{name:'Registrar devolução e reembolso'}).click();
   await expect(page.getByText(/Devolução registrada/)).toBeVisible();
   await page.getByRole('button',{name:'Fechar Registrar devolução'}).click();
   await page.getByRole('link',{name:'Operações'}).click();
@@ -106,8 +107,11 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByLabel('Custo unitário (R$)').fill('30,00');
   await page.getByRole('button',{name:'Registrar pedido de compra'}).click();
   const purchase=page.getByRole('listitem').filter({hasText:supplier}).filter({hasText:new RegExp(sku,'i')});
-  await purchase.getByRole('button',{name:'Receber compra'}).click();
-  await expect(purchase.getByText('Recebido',{exact:true})).toBeVisible();
+  await purchase.getByRole('button',{name:'Conferir recebimento'}).click();
+  await purchase.getByLabel('Quantidade entregue').fill('1');
+  await purchase.getByLabel('Quantidade aprovada para venda').fill('1');
+  await purchase.getByRole('button',{name:'Confirmar conferência e liberar aprovadas'}).click();
+  await expect(purchase.getByText(/Conferido: 1 aprovadas/)).toBeVisible();
 
   await storefront.getByLabel('Quantidade de '+name+' Azul M').fill('1');
   await storefront.getByRole('button',{name:'Enviar pedido para retirada'}).click();
