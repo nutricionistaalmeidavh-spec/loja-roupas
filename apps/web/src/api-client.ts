@@ -1,8 +1,8 @@
 import type { CatalogPage } from './catalog-model.ts';
 
-export type StoreAccess = { store_id: string; roles: string[] };
+export type StoreAccess = { store_id: string; name?: string; roles: string[] };
 export type LoginResult = { token: string; expires_at: string; stores: StoreAccess[] };
-export type Session = { token: string; storeId: string; roles: string[] };
+export type Session = { token: string; storeId: string; storeName?: string; roles: string[] };
 export type ProductPatchPayload = {name:string;category:string;expected_revision:number};
 export type VariantPricePayload = {price_cents:number;expected_revision:number};
 export type StockAdjustPayload = {variant_id:string;reference_id:string;counted_on_hand:number;expected_revision:number;reason:string};
