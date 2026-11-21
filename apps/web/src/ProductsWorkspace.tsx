@@ -6,6 +6,7 @@ import type { Product } from './catalog-model.ts';
 import { CreateProductForm } from './Management.tsx';
 import { M2CatalogEditor } from './M2Admin.tsx';
 import { TaskDialog } from './TaskDialog.tsx';
+import { UiIcon } from './UiIcon.tsx';
 import { ProductSpreadsheetImport } from './ProductSpreadsheetImport.tsx';
 
 const InventorySpreadsheet=lazy(()=>import('./InventorySpreadsheet.tsx'));
@@ -52,8 +53,11 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
       <InventorySpreadsheet session={session} onSaved={refreshed} canEdit canReceive/>
     </Suspense>:mode==='list'?<section className="workspace-card">
       <label className="workspace-search-label">Pesquisar no catálogo
-        <input value={search} onChange={e=>setSearch(e.target.value)}
-          placeholder="Nome, SKU ou código de barras"/>
+        <span className="workspace-search-field">
+          <input value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Nome, SKU ou código de barras"/>
+          {search&&<button type="button" aria-label="Limpar busca de produtos" onClick={()=>setSearch('')}><UiIcon name="x" size={16}/></button>}
+        </span>
       </label>
       {loading&&<p role="status">Buscando produtos…</p>}
       {error&&<p className="error" role="alert">{error}</p>}
