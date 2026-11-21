@@ -60,7 +60,7 @@ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({labe
  await expect(page.getByText(/adjustment/)).toBeVisible();
  await page.getByRole('button',{name:'Fechar Ajustar estoque'}).click();
 
- await page.getByRole('button',{name:'PDV'}).click();
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
  const card=page.locator('.product-card').filter({hasText:name+' atual'});
  await expect(card.getByText('R$ 229,90')).toBeVisible();
