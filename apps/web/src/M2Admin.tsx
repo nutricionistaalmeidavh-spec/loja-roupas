@@ -27,6 +27,13 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
  const [editSku,setEditSku]=useState(''),[editColor,setEditColor]=useState(''),[editSize,setEditSize]=useState(''),[editBarcode,setEditBarcode]=useState('');
 
  const [photo,setPhoto]=useState<File|null>(null);
+ const [photoPreview,setPhotoPreview]=useState<string|null>(null);
+ useEffect(()=>{
+  if(!photo){setPhotoPreview(null);return;}
+  const url=URL.createObjectURL(photo);
+  setPhotoPreview(url);
+  return ()=>URL.revokeObjectURL(url);
+ },[photo]);
  const [pending,setPending]=useState<Pending|null>(null);
  const [busy,setBusy]=useState(false);
  const [refresh,setRefresh]=useState(0);
@@ -175,6 +182,11 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
     <p className="muted small">Uma foto principal por produto; PNG, JPEG ou WebP até 2 MiB.</p>
     <label>Selecionar fotografia<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||Boolean(pending)}
        onChange={e=>setPhoto(e.target.files?.[0]??null)}/></label>
+    {photo&&photoPreview&&<div className="photo-upload-preview">
+      <img src={photoPreview} alt="Prévia local da fotografia selecionada"/>
+      <div><strong>Prévia antes do envio</strong><span>{photo.name} · {(photo.size/1024).toFixed(0)} KiB</span>
+        <p>A fotografia só é enviada quando você confirmar. O original permanece no servidor local.</p></div>
+    </div>}
     <button type="submit" className="light-button" disabled={!photo||busy}>Enviar fotografia local</button>
    </form>
   </>}
