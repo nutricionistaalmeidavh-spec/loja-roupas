@@ -8,14 +8,23 @@ function readFlag(key:string){
 function saveFlag(key:string,value:string){
  try{window.localStorage.setItem(key,value);}catch{/* navegadores sem armazenamento continuam operando */}
 }
-export function FirstRunTour({storeId,roles,replayToken,onNavigate}:{
- storeId:string;roles:string[];replayToken:number;onNavigate:(page:TourPage)=>void;
+export function FirstRunTour({storeId,roles,replayToken,suspended=false,onNavigate}:{
+ storeId:string;roles:string[];replayToken:number;suspended?:boolean;onNavigate:(page:TourPage)=>void;
 }){
  const steps=tourStepsFor(roles);
  const key=tourStorageKey(storeId,roles);
  const [open,setOpen]=useState(()=>shouldShowTour(readFlag(key)));
  const [index,setIndex]=useState(()=>restoredTourStep(readFlag(key),steps.length));
  const [targetFound,setTargetFound]=useState(false);
+ const [modalActive,setModalActive]=useState(false);
+ useEffect(()=>{
+  const sync=()=>setModalActive(Boolean(document.querySelector('[role="dialog"][aria-modal="true"]')));
+  const observer=new MutationObserver(sync);
+  observer.observe(document.body,{childList:true,subtree:true});
+  sync();
+  return ()=>observer.disconnect();
+ },[]);
+ const visible=open&&!suspended&&!modalActive;
  const titleRef=useRef<HTMLHeadingElement>(null);
  const navigatorRef=useRef(onNavigate);
  navigatorRef.current=onNavigate;
@@ -26,7 +35,7 @@ export function FirstRunTour({storeId,roles,replayToken,onNavigate}:{
  },[replayToken]);
  useEffect(()=>{if(open)saveFlag(key,'step:'+index);},[open,index,key]);
  useEffect(()=>{
-  if(!open||!step)return;
+  if(!visible||!step)return;
   navigatorRef.current(step.page);
   let highlighted:Element|null=null;
   const raf=requestAnimationFrame(()=>{
@@ -37,17 +46,17 @@ export function FirstRunTour({storeId,roles,replayToken,onNavigate}:{
    titleRef.current?.focus();
   });
   return ()=>{cancelAnimationFrame(raf);highlighted?.removeAttribute('data-tour-active');};
- },[open,index,storeId]);
+ },[visible,index,storeId]);
  useEffect(()=>{
-  if(!open)return;
+  if(!visible)return;
   const escape=(event:KeyboardEvent)=>{
    if(event.key==='Escape'){event.preventDefault();saveFlag(key,'skipped');setOpen(false);}
   };
   document.addEventListener('keydown',escape);
   return ()=>document.removeEventListener('keydown',escape);
- },[open,key]);
+ },[visible,key]);
  function close(result:'complete'|'skipped'){saveFlag(key,result);setOpen(false);}
- if(!open||!step)return null;
+ if(!visible||!step)return null;
  return <section className="tour-card" role="dialog" aria-modal="false" aria-label="Guia inicial da loja">
   <div className="tour-top"><span className="tour-label">PRIMEIRO ACESSO</span>
    <button type="button" className="tour-dismiss" onClick={()=>close('skipped')} aria-label="Pular tour">Pular tour</button>
