@@ -111,10 +111,11 @@ export async function uploadPhoto(session:Session,productId:string,file:Blob,key
   method:'PUT',headers:{...headers(session,key),'content-type':file.type},body:file
  },fetchImpl);
 }
-export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal) {
+export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal,version?:string|null) {
  let response:Response;
- try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',{
-  headers:headers(session),cache:'no-store',signal
+ try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail'+
+  (version?'?v='+encodeURIComponent(version):''),{
+  headers:headers(session),cache:version?'default':'no-store',signal
  });} catch {throw new ApiError(0,'NETWORK_ERROR','Imagem indisponível no servidor LAN');}
  if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a fotografia');
  return response.blob();
