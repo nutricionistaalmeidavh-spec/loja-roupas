@@ -209,6 +209,8 @@ paths:
                         sku: { type: string }
                         quantity: { type: integer }
                         created_at: { type: string, format: date-time }
+                        state: { type: string, enum: [active] }
+                        stale: { type: boolean, description: Reserva ativa há mais de 24 horas, revisão manual recomendada }
     post:
       summary: Reservar unidades disponíveis para atendimento interno
       parameters:
