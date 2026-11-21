@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
+import {purchaseState,transition} from '@loja/domain/operations';
+import type {PurchaseReceiptRequest} from '@loja/domain/operations';
 import type { AuthContext } from './auth.ts';
 import { requirePermission } from './auth.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
@@ -65,7 +67,7 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
     return reply.code(201).send(out.result);
   });
 
-  app.post<{Params:{id:string};Body:{received_quantity:number;accepted_quantity:number;reason?:string}}>(
+  app.post<{Params:{id:string};Body:PurchaseReceiptRequest}>(
   '/v1/management/purchases/:id/receive',{
     schema:{params,body:{type:'object',additionalProperties:false,
       required:['received_quantity','accepted_quantity'],properties:{
@@ -79,10 +81,12 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
     const {received_quantity,accepted_quantity}=request.body;
     const reason=request.body.reason?.trim()??'';
     const out=await withIdempotentTransaction(db,auth,'purchase.receive:'+id,key(request),request.body,async client=>{
-      const purchase=await client.query<{variant_id:string;quantity:number;received_at:Date|null}>(`SELECT variant_id,quantity,received_at
+      const purchase=await client.query<{variant_id:string;quantity:number;received_at:Date|null;quality_finalized:boolean}>(`SELECT variant_id,quantity,received_at,quality_finalized
         FROM purchase_orders WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,id]);
       const line=purchase.rows[0];
-      if(!line||line.received_at)throw new DomainError(409,'PURCHASE_UNAVAILABLE','Compra já recebida ou indisponível');
+      if(!line||transition('purchase',purchaseState({received_at:line.received_at?.toISOString()??null,
+        quality_finalized:line.quality_finalized}),'receive')!=='checked')
+        throw new DomainError(409,'PURCHASE_UNAVAILABLE','Compra já recebida ou indisponível');
       if(received_quantity>line.quantity||accepted_quantity>received_quantity)
         throw new DomainError(422,'RECEIPT_QUANTITY','Aprovadas não podem exceder recebidas ou pedidas');
       const rejected_quantity=received_quantity-accepted_quantity;
