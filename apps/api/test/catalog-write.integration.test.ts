@@ -43,7 +43,7 @@ test('M2 PostgreSQL: cadastro e recebimento transacionais, isolamento e idempot√
     assert.equal(mismatch.statusCode,409);
     const variantId=created.json().variants[0].id;
     const referenceId=randomUUID();
-    const receipt={variant_id:variantId,reference_id:referenceId,quantity:4};
+    const receipt={variant_id:variantId,reference_id:referenceId,quantity:4,note:'Entrada direta auditada para teste'};
     const stockKey=randomUUID();
     const received=await app.inject({method:'POST',url:'/v1/stock/receipts',headers:{...headers,'idempotency-key':stockKey},payload:receipt});
     assert.equal(received.statusCode,201,received.body);
