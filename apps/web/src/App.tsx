@@ -128,6 +128,12 @@ export function App() {
   }
 
   useEffect(()=>{
+    if(!cartFeedback)return;
+    const timer=setTimeout(()=>setCartFeedback(''),3200);
+    return ()=>clearTimeout(timer);
+  },[cartFeedback]);
+
+  useEffect(()=>{
     if(!session){setCategories(['Todos']);return;}
     const controller=new AbortController();
     void listCategories(session,fetch,controller.signal).then(result=>{
@@ -335,15 +341,12 @@ export function App() {
         </div>
       </header>
       <nav className="mobile-navigation" aria-label="Navegação da loja">
-        <label htmlFor="mobile-page">Página</label>
-        <select id="mobile-page" value={page} onChange={event=>setCurrentPage(event.target.value as Page)}>
-          <option value="pdv">PDV</option>
-          {manager&&<option value="produtos">Produtos</option>}
-          {canReceive&&<option value="estoque">Estoque</option>}
-          {canCash&&<option value="caixa">Caixa</option>}
-          {manager&&<option value="gestao">Gestão</option>}
-          <option value="configuracoes">Configurações</option>
-        </select>
+        <button type="button" aria-current={page==='pdv'?'page':undefined} className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')}><UiIcon name="pos" size={19}/><span>PDV</span></button>
+        {manager&&<button type="button" aria-current={page==='produtos'?'page':undefined} className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')}><UiIcon name="shirt" size={19}/><span>Produtos</span></button>}
+        {canReceive&&<button type="button" aria-current={page==='estoque'?'page':undefined} className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')}><UiIcon name="boxes" size={19}/><span>Estoque</span></button>}
+        {canCash&&<button type="button" aria-current={page==='caixa'?'page':undefined} className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')}><UiIcon name="wallet" size={19}/><span>Caixa</span></button>}
+        {manager&&<button type="button" aria-current={page==='gestao'?'page':undefined} className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')}><UiIcon name="chart" size={19}/><span>Gestão</span></button>}
+        <button type="button" aria-current={page==='configuracoes'?'page':undefined} className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')}><UiIcon name="settings" size={19}/><span>Ajustes</span></button>
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
@@ -373,7 +376,7 @@ export function App() {
             const selectedVariant=resolveVariant(p.variants,color,size);
             const ready=Boolean(choice)||p.variants.length===1;
             return <article key={p.id} className="product-card">
-              <div data-kind={p.kind} className={'product-visual '+p.kind}>{p.hasPhoto?<ProductPhoto session={session} product={p}/>:<div className="garment-placeholder"><Garment kind={p.kind}/><span>Foto não cadastrada</span></div>}</div>
+              <div data-kind={p.kind} className={'product-visual '+p.kind}>{p.hasPhoto?<ProductPhoto session={session} product={p} fallback={<div className="garment-placeholder"><Garment kind={p.kind}/><span>Foto indisponível</span></div>}/>:<div className="garment-placeholder"><Garment kind={p.kind}/><span>Foto não cadastrada</span></div>}</div>
               <div className="card-copy">
                 <h3 title={p.name}>{p.name}</h3>
                 <p className="price">{selectedVariant?brl(selectedVariant.priceCents):'Indisponível'}</p>
@@ -433,7 +436,7 @@ export function App() {
       onClose={()=>setStockAction(null)}>
       <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch} onLockChange={setStockLocked}/>
     </TaskDialog>}
-    {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
+    {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}><UiIcon name="bag" size={19}/> <span>Ver carrinho · {quantity} {quantity===1?'peça':'peças'}</span><strong>{brl(total)}</strong></button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
       draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
     {lastSale&&<div className="checkout-overlay" role="presentation">
@@ -450,6 +453,7 @@ export function App() {
       </section>
     </div>}
     <FirstRunTour key={session.storeId+session.roles.join(',')} storeId={session.storeId} roles={session.roles} replayToken={tourReplay} suspended={checkoutOpen||cartOpen||Boolean(lastSale)||Boolean(stockAction)} onNavigate={setCurrentPage}/>
+    {cartFeedback&&<div className="retail-toast" role="status" aria-live="polite"><UiIcon name="bag" size={19}/><span>{cartFeedback}</span><button type="button" onClick={()=>setCartFeedback('')} aria-label="Fechar notificação"><UiIcon name="x" size={16}/></button></div>}
     {page==='pdv'&&cartOpen&&<div className="drawer-backdrop" onMouseDown={()=>setCartOpen(false)}>
       <aside ref={cartDialogRef} tabIndex={-1} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
         <button className="close-drawer" onClick={()=>setCartOpen(false)}>Fechar ×</button>{cart}
