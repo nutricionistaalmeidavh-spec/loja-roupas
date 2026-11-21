@@ -91,6 +91,9 @@ jobs:
           if (!(Test-Path dist/desktop-win32-x64/resources/runtime/api/src/main.ts)) { throw 'API local ausente' }
           if (!(Test-Path dist/desktop-win32-x64/electron.exe -PathType Leaf)) { throw 'Executável ausente' }
           if (!(Test-Path dist/desktop-win32-x64/resources/app/main.cjs -PathType Leaf)) { throw 'Entrada do aplicativo ausente' }
+          node --check apps/desktop/src/window-health.cjs
+          if($LASTEXITCODE -ne 0){throw 'Módulo de recuperação inválido'}
+          if (!(Test-Path dist/desktop-win32-x64/resources/app/window-health.cjs -PathType Leaf)) { throw 'Recuperação gráfica ausente do instalador' }
           Set-Location dist
           Compress-Archive -Path desktop-win32-x64 -DestinationPath loja-roupas-candidata-windows-x64.zip
           $hash = (Get-FileHash loja-roupas-candidata-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
