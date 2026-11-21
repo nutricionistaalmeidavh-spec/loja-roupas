@@ -56,3 +56,13 @@ test('normal window shutdown never triggers a crash dialog',async()=>{
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(reports.length,0);
 });
+
+test('closing window suppresses late renderer errors and native dialogs',async()=>{
+ const window=fakeWindow();const reports=[];
+ attachWindowHealth({window,notify:report=>reports.push(report)});
+ window.emit('close');
+ window.webContents.emit('render-process-gone',{}, {reason:'abnormal-exit',exitCode:1});
+ window.webContents.emit('did-fail-load',{},-102,'connection','http://127.0.0.1:3333/',true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(reports.length,0);
+});
