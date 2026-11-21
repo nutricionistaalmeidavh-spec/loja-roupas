@@ -26,7 +26,7 @@ test('P1 planilha canônica: entradas, vendas, devoluções, ajustes e revisão'
   const unauth=await app.inject('/v1/stock/spreadsheet');
   assert.equal(unauth.statusCode,401);
   const receipt=await app.inject({method:'POST',url:'/v1/stock/receipts',headers:{...headers,'idempotency-key':randomUUID()},
-    payload:{variant_id:variant,reference_id:randomUUID(),quantity:9}});
+    payload:{variant_id:variant,reference_id:randomUUID(),quantity:9,note:'Entrada direta auditada para teste'}});
   assert.equal(receipt.statusCode,201,receipt.body);
   await db.query('UPDATE stock_balances SET on_hand=7,revision=revision+1 WHERE store_id=$1 AND variant_id=$2',[sid,variant]);
   await db.query("INSERT INTO stock_movements(store_id,variant_id,source_type,source_id,movement_kind,qty_delta) VALUES($1,$2,'sale',$3,'sale',-2)",[sid,variant,randomUUID()]);
