@@ -32,6 +32,9 @@ function attachWindowHealth({window, notify, onDiagnostic=()=>{}, unresponsiveMs
   report('navigation',code);
  };
  const onRendererExit=(_event,details)=>{
+  // Electron also emits this event while closing a healthy window.
+  // A native modal during shutdown prevents the application from exiting.
+  if(details?.reason==='clean-exit'||details?.reason==='killed')return;
   report('renderer',details?.exitCode);
  };
  const onUnresponsive=()=>{
