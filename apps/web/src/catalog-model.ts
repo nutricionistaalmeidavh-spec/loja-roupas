@@ -8,7 +8,7 @@ export type ApiProduct = {id:string;name:string;category:string;revision?:number
 export type CatalogPage = { items: ApiProduct[]; next_cursor: string | null };
 export type Product = {
   id: string; name: string; category: string; revision:number;hasPhoto:boolean;
-  kind: 'shirt' | 'pants' | 'bag' | 'shoe';
+  kind: 'shirt' | 'pants' | 'bag' | 'shoe' | 'dress' | 'skirt' | 'generic';
   variants: Array<Variant & {barcode:string|null;stockRevision:number;variantRevision:number}>;
 };
 export function productCanAdd(variant: Variant | null | undefined): boolean {
@@ -20,8 +20,12 @@ export function mapCatalog(page: CatalogPage): Product[] {
     if (!p.id || !p.name || !Array.isArray(p.variants)) throw new Error('Produto inválido recebido da API');
     const label = (p.name + ' ' + p.category).toLowerCase();
     const kind: Product['kind'] = /bolsa|mochila/.test(label) ? 'bag'
-      : /sapato|mocassim|tênis|sandália|calçado/.test(label) ? 'shoe'
-      : /calça|jeans|bermuda|short/.test(label) ? 'pants' : 'shirt';
+      : /sapato|mocassim|tênis|tenis|sandália|sandalia|calçado/.test(label) ? 'shoe'
+      : /vestido/.test(label) ? 'dress'
+      : /saia/.test(label) ? 'skirt'
+      : /calça|jeans|bermuda|short/.test(label) ? 'pants'
+      : /camisa|camiseta|blusa|regata|polo|casaco|jaqueta|suéter/.test(label) ? 'shirt'
+      : 'generic';
     return {
       id: p.id, name: p.name, category: p.category, revision:p.revision??1,hasPhoto:p.has_photo??false,kind,
       variants: p.variants.map(v => {
