@@ -90,7 +90,7 @@ export function App() {
     return ()=>{active=false;};
   },[session]);
   const manager = session?.roles.includes('manager')??false;
-  const canReceive = manager || (session?.roles.includes('stocker')??false);
+  const canReceive = manager || (session?.roles.includes('stocker')??false) || directAccess;
   const canCash = manager || (session?.roles.includes('cashier')??false);
   const cashId = cashState?.active ? cashState.id : null;
   const filtered = products;
