@@ -75,6 +75,25 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
     ]);
   return serializeProducts(rows.rows,limit);
  });
+ app.get<{Params:{id:string}}>('/v1/catalog/products/:id',{
+  schema:{params:{type:'object',additionalProperties:false,required:['id'],properties:{
+   id:{type:'string',pattern:uuid.source}
+  }}}
+ },async(request,reply)=>{
+  if(requirePermission(request,reply,'catalog.read'))return reply;
+  const result=await db.query<Row>(`SELECT p.id::text AS product_id,p.name,p.category,
+   p.revision::text AS product_revision,(img.product_id IS NOT NULL) AS has_photo,img.sha256 AS photo_version,
+   v.id::text AS variant_id,v.sku,v.barcode,v.color,v.size,v.price_cents::text,
+   (coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available,
+   coalesce(s.revision,0)::text AS revision,v.revision::text AS variant_revision
+   FROM products p JOIN product_variants v ON v.product_id=p.id AND v.store_id=p.store_id
+   LEFT JOIN stock_balances s ON s.variant_id=v.id AND s.store_id=v.store_id
+   LEFT JOIN product_photos img ON img.product_id=p.id AND img.store_id=p.store_id
+   WHERE p.id=$1 AND p.store_id=$2 ORDER BY v.sku,v.id`,
+   [request.params.id,request.authContext!.storeId]);
+  if(!result.rowCount)throw new DomainError(404,'NOT_FOUND','Produto não encontrado nesta loja');
+  return {item:serializeProducts(result.rows,1).items[0]};
+ });
  app.get('/v1/catalog/categories',async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.read'))return reply;
   const result=await db.query<{category:string}>(
