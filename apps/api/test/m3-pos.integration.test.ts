@@ -39,7 +39,7 @@ test('M3: caixa, cotação, venda ACID, split, troco, recibo e fechamento idempo
   assert.equal(product.statusCode,201,product.body);
   const variantId=product.json().variants[0].id;
   const receipt=await app.inject({method:'POST',url:'/v1/stock/receipts',headers:write(),
-    payload:{variant_id:variantId,reference_id:randomUUID(),quantity:3}});
+    payload:{variant_id:variantId,reference_id:randomUUID(),quantity:3,note:'Entrada direta auditada para teste'}});
   assert.equal(receipt.statusCode,201,receipt.body);
   const quote=await app.inject({method:'POST',url:'/v1/sales/quotes',headers,
     payload:{lines:[{variant_id:variantId,quantity:2}]}});
