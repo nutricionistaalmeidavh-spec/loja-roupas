@@ -22,6 +22,8 @@ await cp(new URL('../apps/desktop/src/update-preload.cjs',import.meta.url),path.
 await cp(new URL('../apps/desktop/src/update-helper.ps1',import.meta.url),path.join(application,'update-helper.ps1'));
 await cp(new URL('../apps/desktop/src/commercial-license.cjs',import.meta.url),path.join(application,'commercial-license.cjs'));
 if(process.env.LOJA_COMMERCIAL_EDITION==='true')await writeFile(path.join(application,'commercial-edition.json'),JSON.stringify({required:true,product:'LOJA_ROUPAS'}));
+await cp(new URL('../apps/desktop/src/recovery-preload.cjs',import.meta.url),path.join(application,'recovery-preload.cjs'));
+await cp(new URL('../apps/desktop/src/recovery.html',import.meta.url),path.join(application,'recovery.html'));
 await cp(new URL('../apps/desktop/src/setup-preload.cjs',import.meta.url),path.join(application,'setup-preload.cjs'));
 await cp(new URL('../apps/desktop/src/setup.html',import.meta.url),path.join(application,'setup.html'));
 const packageInfo=JSON.parse(await readFile(new URL('../apps/desktop/package.json',import.meta.url),'utf8'));
