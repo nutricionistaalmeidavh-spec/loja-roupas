@@ -106,7 +106,7 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
   try{await execute(bin('initdb'),['--version'],{env});}
   catch(error){
    const message=String(error?.message||error);
-   if(message.includes('3221225781')||message.includes('0xC0000135'))
+   if(message.includes('3221225781')||message.includes('-1073741515')||message.includes('0xC0000135'))
     throw new Error('PostgreSQL não iniciou: falta uma DLL do Windows (0xC0000135). Instale o Microsoft Visual C++ Redistributable x64 incluído no instalador e tente novamente. Seus dados foram preservados.');
    throw new Error('Não foi possível executar o PostgreSQL incluído: '+message);
   }
