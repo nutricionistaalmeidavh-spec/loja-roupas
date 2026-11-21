@@ -34,6 +34,7 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
   const [pending,setPending]=useState<{key:string;body:string}|null>(null);
   const [result,setResult]=useState<Result|null>(null);
   const [error,setError]=useState('');
+  const [stockReason,setStockReason]=useState('');
   async function chooseFile(event:ChangeEvent<HTMLInputElement>){
     const file=event.target.files?.[0];
     if(!file)return;
@@ -57,6 +58,7 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
   async function submit(){
     if(!preview||preview.issues.length||!preview.rows||busy)return;
     setError('');
+    if(countStock(preview)>0 && stockReason.trim().length<8){setError('Justifique a liberação direta do estoque inicial (mínimo 8 caracteres).');return;}
     const body=JSON.stringify({products:preview.products});
     const key=pending?.body===body?pending.key:requestId();
     if(pending&&pending.body!==body&&uncertain){
@@ -67,7 +69,7 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
     setBusy(true);
     try{
       const response=await jsonRequest<Result>('/v1/catalog/products/import',{
-        method:'POST',headers:{...headers(session,key),'content-type':'application/json'},
+        method:'POST',headers:{...headers(session,key),'content-type':'application/json',...(countStock(preview)>0?{'x-stock-import-reason':stockReason.trim()}:{})},
         body
       },fetch);
       setPending(null);setUncertain(false);setResult(response);onSaved();
@@ -128,6 +130,9 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
             </table>
           </div>
           {preview.rows>20&&<p className="muted small">Prévia das primeiras 20 variantes.</p>}
+          {countStock(preview)>0&&<label>Justificativa para entrada direta de estoque (obrigatória)
+            <input required minLength={8} maxLength={250} value={stockReason} disabled={locked} onChange={event=>setStockReason(event.target.value)} placeholder="Origem e motivo da liberação imediata" />
+          </label>}
         </>}
       </section>}
       {error&&<p role="alert" className="error">{error}{uncertain&&' A operação pode ter sido concluída. Clique novamente em confirmar sem alterar os dados.'}</p>}
