@@ -4,7 +4,21 @@ import {requirePermission} from './auth.ts';
 import {DomainError,requireIdempotencyKey,withIdempotentTransaction} from './transactions.ts';
 
 const uuid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
-type SheetQuery={query?:string;category?:string;limit?:number;offset?:number};
+type SheetQuery={query?:string;category?:string;limit?:number;offset?:number;cursor?:string};
+type SheetCursor={name:string;sku:string;id:string};
+function decodeSheetCursor(raw?:string):SheetCursor|null{
+ if(!raw)return null;
+ if(raw.length>512)throw new DomainError(400,'BAD_CURSOR','Cursor de estoque inválido');
+ try{
+  const value=JSON.parse(Buffer.from(raw,'base64url').toString('utf8')) as SheetCursor;
+  if(typeof value.name!=='string'||value.name.length>200||typeof value.sku!=='string'||value.sku.length>64||
+   typeof value.id!=='string'||!/^[0-9a-f-]{36}$/i.test(value.id))throw Error('invalid');
+  return value;
+ }catch{throw new DomainError(400,'BAD_CURSOR','Cursor de estoque inválido');}
+}
+function encodeSheetCursor(row:{name:string;sku:string;variant_id:string}){
+ return Buffer.from(JSON.stringify({name:row.name,sku:row.sku,id:row.variant_id})).toString('base64url');
+}
 type SheetPatch={
  name:string;category:string;sku:string;color:string;size:string;
  barcode?:string|null;price_cents:number;
@@ -39,12 +53,14 @@ export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
    query:{type:'string',maxLength:100,default:''},
    category:{type:'string',maxLength:100,default:''},
    limit:{type:'integer',minimum:1,maximum:100,default:50},
-   offset:{type:'integer',minimum:0,maximum:1000000,default:0}
+   offset:{type:'integer',minimum:0,maximum:1000000,default:0},
+   cursor:{type:'string',maxLength:512}
   }}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'stock.read'))return reply;
-  const {query='',category='',limit=50,offset=0}=request.query,store=request.authContext!.storeId;
-  const args=[store,query.trim(),category.trim(),limit,offset];
+  const {query='',category='',limit=50,offset=0,cursor}=request.query,store=request.authContext!.storeId;
+  const after=decodeSheetCursor(cursor);
+  const args=[store,query.trim(),category.trim(),limit+1,after?0:offset,after?.name??null,after?.sku??null,after?.id??null];
   const filter="v.store_id=$1 AND ($2='' OR p.name ILIKE '%'||$2||'%' OR v.sku ILIKE '%'||$2||'%' OR v.barcode=$2) AND ($3='' OR p.category=$3)";
   const [count,records,categories]=await Promise.all([
    db.query<{total:string}>('SELECT count(*)::text AS total FROM product_variants v JOIN products p '+
@@ -60,11 +76,13 @@ export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
     ' max(occurred_at) AS last_movement_at FROM stock_movements m '+
     ' WHERE m.store_id=v.store_id AND m.variant_id=v.id'+
     ') m ON true WHERE '+filter+
+    ' AND ($6::text IS NULL OR (p.name,v.sku,v.id)>($6::text,$7::text,$8::uuid))'+
     ' ORDER BY p.name,v.sku,v.id LIMIT $4 OFFSET $5',args),
    db.query<{category:string}>('SELECT DISTINCT category FROM products WHERE store_id=$1 ORDER BY category',[store])
   ]);
   return {total:safeCount(count.rows[0]?.total??'0','total'),limit,offset,categories:categories.rows.map(x=>x.category),
-   items:records.rows.map(row=>({
+   next_cursor:records.rows.length>limit?encodeSheetCursor(records.rows[limit-1]):null,
+   items:records.rows.slice(0,limit).map(row=>({
     product_id:row.product_id,variant_id:row.variant_id,name:row.name,category:row.category,
     sku:row.sku,color:row.color,size:row.size,barcode:row.barcode,
     price_cents:safeCount(row.price_cents,'preço'),
