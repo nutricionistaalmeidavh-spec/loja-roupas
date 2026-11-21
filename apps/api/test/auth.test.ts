@@ -11,8 +11,8 @@ function fakeDatabase(passwordHash:string) {
   const query=async(sql:string,params?:unknown[])=>{
     calls.push({sql,params});
     if(sql.includes('password_hash FROM users'))return {rowCount:1,rows:[{id:'user-1',password_hash:passwordHash}]};
-    if(sql.includes('array_agg(role_code) AS roles FROM user_store_roles'))
-      return {rowCount:1,rows:[{store_id:storeId,roles:['manager']}]};
+    if(sql.includes('FROM user_store_roles r JOIN stores st'))
+      return {rowCount:1,rows:[{store_id:storeId,name:'Loja de teste',roles:['manager']}]};
     if(sql.includes('INSERT INTO auth_sessions')) {state.sessionHash=String(params?.[1]);return {rowCount:1,rows:[]};}
     if(sql.includes('FROM auth_sessions s')) {
       const match=params?.[0]===state.sessionHash && params?.[1]===storeId;
