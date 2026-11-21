@@ -68,21 +68,26 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
         variant_id:{type:'string',pattern:uuid},
         reference_id:{type:'string',pattern:uuid},
         quantity:{type:'integer',minimum:1},
-        note:{type:'string',maxLength:140}
+        note:{type:'string',minLength:8,maxLength:250}
       }
     }}
   },async(request,reply)=>{
-    if(requirePermission(request,reply,'stock.receive'))return reply;
+    const auth=request.authContext!;
+    if(!auth.roles.includes('manager')) {
+      const grant=await db.query('SELECT 1 FROM stock_direct_receive_grants WHERE store_id=$1 AND user_id=$2 AND revoked_at IS NULL',[auth.storeId,auth.userId]);
+      if(!grant.rowCount)return reply.code(403).send({code:'FORBIDDEN',message:'Entrada direta exige autorização individual'});
+    }
+    if(!request.body.note?.trim() || request.body.note.trim().length<8)
+      throw new DomainError(422,'DIRECT_RECEIPT_REASON','Justificativa obrigatória com pelo menos 8 caracteres');
     const key=requireIdempotencyKey(request.headers['idempotency-key']);
     const input={...request.body,quantity:validateReceiptQuantity(request.body.quantity)};
-    const auth=request.authContext!;
-    const response=await withIdempotentTransaction(db,auth,'stock.receipt.create',key,input,async client=>{
+    const response=await withIdempotentTransaction(db,auth,'stock.direct_receipt.create',key,input,async client=>{
       const variant=await client.query<{id:string}>(`SELECT id::text FROM product_variants WHERE id=$1 AND store_id=$2 FOR KEY SHARE`,
         [input.variant_id,auth.storeId]);
       if(!variant.rowCount)throw new DomainError(404,'VARIANT_NOT_FOUND','Variante não encontrada na loja');
       const movement=await client.query<{id:string}>(`INSERT INTO stock_movements
         (store_id,variant_id,source_type,source_id,movement_kind,qty_delta)
-        VALUES ($1,$2,'manual_receipt',$3,'receipt',$4)
+        VALUES ($1,$2,'direct_receipt',$3,'receipt',$4)
         ON CONFLICT (store_id,source_type,source_id,variant_id,movement_kind) DO NOTHING
         RETURNING id::text`,[auth.storeId,input.variant_id,input.reference_id,input.quantity]);
       if(!movement.rowCount)throw new DomainError(409,'RECEIPT_ALREADY_RECORDED','Entrada já registrada');
@@ -100,11 +105,38 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
         VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,
         [auth.storeId,input.variant_id,stock.revision,JSON.stringify({variant_id:input.variant_id,revision:stock.revision})]);
       await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
-        VALUES($1,$2,'inventory.receipt',$3,$4::jsonb)`,
-        [auth.storeId,auth.userId,input.variant_id,JSON.stringify({reference_id:input.reference_id,quantity:input.quantity})]);
+        VALUES($1,$2,'inventory.direct_receipt',$3,$4::jsonb)`,
+        [auth.storeId,auth.userId,input.variant_id,JSON.stringify({reference_id:input.reference_id,quantity:input.quantity,reason:input.note?.trim(),source:'direct_receipt',operator_id:auth.userId})]);
       return { movement_id:movement.rows[0].id, variant_id:input.variant_id,
         on_hand:Number(stock.on_hand),reserved:Number(stock.reserved),revision:Number(stock.revision) };
     });
     return reply.code(201).send(response.result);
   });
+  app.get('/v1/stock/direct-receipt/grants',async(request,reply)=>{
+    if(requirePermission(request,reply,'stock.adjust'))return reply;
+    const auth=request.authContext!;
+    const rows=await db.query('SELECT user_id::text,granted_by::text,granted_at,revoked_at FROM stock_direct_receive_grants WHERE store_id=$1 ORDER BY granted_at DESC LIMIT 200',[auth.storeId]);
+    return {grants:rows.rows};
+  });
+  app.put<{Params:{id:string};Body:{enabled:boolean}}>('/v1/stock/direct-receipt/grants/:id',{
+    schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uuid}}},
+      body:{type:'object',additionalProperties:false,required:['enabled'],properties:{enabled:{type:'boolean'}}}}
+  },async(request,reply)=>{
+    if(requirePermission(request,reply,'stock.adjust'))return reply;
+    const auth=request.authContext!,userId=request.params.id,enabled=request.body.enabled;
+    const out=await withIdempotentTransaction(db,auth,'stock.direct_receipt.grant:'+userId,
+      requireIdempotencyKey(request.headers['idempotency-key']),request.body,async client=>{
+        const member=await client.query('SELECT 1 FROM user_store_roles WHERE store_id=$1 AND user_id=$2 LIMIT 1',[auth.storeId,userId]);
+        if(!member.rowCount)throw new DomainError(404,'USER_NOT_IN_STORE','Usuário não pertence à loja');
+        if(enabled)await client.query(`INSERT INTO stock_direct_receive_grants(store_id,user_id,granted_by,granted_at,revoked_at)
+          VALUES($1,$2,$3,now(),NULL) ON CONFLICT(store_id,user_id) DO UPDATE SET granted_by=EXCLUDED.granted_by,granted_at=now(),revoked_at=NULL`,
+          [auth.storeId,userId,auth.userId]);
+        else await client.query('UPDATE stock_direct_receive_grants SET revoked_at=now() WHERE store_id=$1 AND user_id=$2 AND revoked_at IS NULL',[auth.storeId,userId]);
+        await client.query('INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail) VALUES($1,$2,$3,$4,$5::jsonb)',
+          [auth.storeId,auth.userId,'inventory.direct_receipt.permission',userId,JSON.stringify({enabled})]);
+        return {user_id:userId,enabled};
+      });
+    return out.result;
+  });
+
 }
