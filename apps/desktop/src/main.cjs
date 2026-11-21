@@ -6,6 +6,7 @@ const {launchLocalRuntime}=require('./local-runtime.cjs');
 const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
 const {createDesktopUpdater}=require('./desktop-updater.cjs');
+const {attachWindowHealth}=require('./window-health.cjs');
 
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
@@ -33,6 +34,40 @@ function configuredUrl(){
  }
  return configured?validateOrigin(configured):null;
 }
+async function logInterfaceFailure(info){
+ const file=path.join(app.getPath('userData'),'interface-diagnostics.log');
+ try{
+  await fs.mkdir(path.dirname(file),{recursive:true,mode:0o700});
+  const previous=await fs.stat(file).catch(()=>null);
+  if(previous && previous.size>128*1024){
+   await fs.rename(file,file+'.previous').catch(()=>{});
+  }
+  // Only numeric failure codes and fixed event labels. Never store URLs,
+  // credentials, HTTP payloads, session tokens or SQL details.
+  const record=JSON.stringify({time:new Date().toISOString(),kind:info.kind,code:info.code})+'\\n';
+  await fs.appendFile(file,record,{encoding:'utf8',mode:0o600});
+ }catch{/* The recovery dialog must still work even if disk logging fails. */}
+ return file;
+}
+async function showInterfaceFailure(window,info){
+ const file=await logInterfaceFailure(info);
+ if(window.isDestroyed())return;
+ const label={
+  renderer:'O processo gráfico do aplicativo foi interrompido.',
+  navigation:'A interface não conseguiu carregar os arquivos do servidor local.',
+  unresponsive:'A interface parou de responder.',
+  service:'O servidor local foi interrompido.'
+ }[info.kind]||'Não foi possível mostrar a interface.';
+ const answer=await dialog.showMessageBox(window,{
+  type:'warning',title:'Loja de Roupas — recuperação',
+  message:label,
+  detail:'Nenhum dado do banco foi removido. Tente reabrir somente a interface. Se continuar, consulte o diagnóstico em: '+file,
+  buttons:['Recarregar interface','Abrir diagnóstico','Cancelar'],
+  defaultId:0,cancelId:2,noLink:true
+ });
+ if(answer.response===0)info.retry();
+ if(answer.response===1)void shell.showItemInFolder(file);
+}
 function openWindow(url){
  const window=new BrowserWindow({
   width:1440,height:900,minWidth:760,minHeight:560,
@@ -56,7 +91,12 @@ function openWindow(url){
   });
  }
  desktopUpdater.registerWindow(window,url.href);
- void window.loadURL(url.href).catch(error=>dialog.showErrorBox('Conexão com a loja',error.message));
+ const health=attachWindowHealth({
+  window,
+  notify:info=>showInterfaceFailure(window,info),
+  onDiagnostic:()=>{}
+ });
+ void window.loadURL(url.href).catch(()=>health.report('navigation',null));
  return window;
 }
 function status(message){
