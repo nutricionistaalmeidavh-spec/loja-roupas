@@ -315,12 +315,12 @@ export function App() {
   return <div className="shell">
     <nav className="icon-rail" aria-label="Navegação principal">
       <div className="logo">L</div>
-      <button className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')} aria-label="PDV" title="PDV"><UiIcon name="pos"/></button>
-      {manager&&<button className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos"><UiIcon name="shirt"/></button>}
-      {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque"><UiIcon name="boxes"/></button>}
-      {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa"><UiIcon name="wallet"/></button>}
-      {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão"><UiIcon name="chart"/></button>}
-      <button className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')} aria-label="Configurações" title="Configurações"><UiIcon name="settings"/></button>
+      <button aria-current={page==='pdv'?'page':undefined} className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')} aria-label="PDV" title="PDV"><UiIcon name="pos"/></button>
+      {manager&&<button aria-current={page==='produtos'?'page':undefined} className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos"><UiIcon name="shirt"/></button>}
+      {canReceive&&<button aria-current={page==='estoque'?'page':undefined} className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque"><UiIcon name="boxes"/></button>}
+      {canCash&&<button aria-current={page==='caixa'?'page':undefined} className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa"><UiIcon name="wallet"/></button>}
+      {manager&&<button aria-current={page==='gestao'?'page':undefined} className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão"><UiIcon name="chart"/></button>}
+      <button aria-current={page==='configuracoes'?'page':undefined} className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')} aria-label="Configurações" title="Configurações"><UiIcon name="settings"/></button>
       <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><UiIcon name="logout"/></button>
     </nav>
     <main className="workspace">
