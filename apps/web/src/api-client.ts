@@ -111,13 +111,38 @@ export async function uploadPhoto(session:Session,productId:string,file:Blob,key
   method:'PUT',headers:{...headers(session,key),'content-type':file.type},body:file
  },fetchImpl);
 }
-export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal) {
+async function fetchPhotoBlob(session:Session,path:string,fetchImpl:typeof fetch,signal?:AbortSignal,version?:string) {
  let response:Response;
- try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',{
-  headers:headers(session),cache:'no-store',signal
+ try {response=await fetchImpl(path+(version?'?v='+encodeURIComponent(version):''),{
+  headers:headers(session),cache:version?'default':'no-store',signal
  });} catch {throw new ApiError(0,'NETWORK_ERROR','Imagem indisponível no servidor LAN');}
  if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a fotografia');
  return response.blob();
+}
+export function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal,version?:string) {
+ return fetchPhotoBlob(session,'/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',fetchImpl,signal,version);
+}
+export type GalleryPhoto={id:string;variant_id:string|null;sha256:string;content_type:string;is_primary:boolean;created_at:string};
+export function listProductPhotos(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal){
+ return jsonRequest<{items:GalleryPhoto[]}>('/v1/catalog/products/'+encodeURIComponent(productId)+'/photos',
+  {method:'GET',headers:headers(session),signal},fetchImpl);
+}
+export function addGalleryPhoto(session:Session,productId:string,file:Blob,key:string,variantId:string|null,
+ fetchImpl:typeof fetch=fetch){
+ return jsonRequest<{id:string;product_id:string;sha256:string;revision:number}>(
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/photos'+(variantId?'?variant_id='+encodeURIComponent(variantId):''),
+  {method:'POST',headers:{...headers(session,key),'content-type':file.type},body:file},fetchImpl);
+}
+export function deleteGalleryPhoto(session:Session,productId:string,photoId:string,key:string,fetchImpl:typeof fetch=fetch){
+ return jsonRequest<{deleted:boolean;photo_id:string;revision:number}>(
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/photos/'+encodeURIComponent(photoId),
+  {method:'DELETE',headers:headers(session,key)},fetchImpl);
+}
+export function fetchGalleryThumbnail(session:Session,productId:string,photoId:string,version:string,
+ fetchImpl:typeof fetch=fetch,signal?:AbortSignal){
+ return fetchPhotoBlob(session,
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/photos/'+encodeURIComponent(photoId)+'/thumbnail',
+  fetchImpl,signal,version);
 }
 
 export type VariantAttributes={sku:string;color:string;size:string;barcode?:string|null;expected_revision:number};
