@@ -13,15 +13,16 @@ test('capturas e video mobile, tablet e carrinho',async({page},info)=>{
   const tour=page.getByRole('button',{name:'Pular tour'});
   if(await tour.isVisible())await tour.click();
   await page.screenshot({path:info.outputPath('02-pdv-mobile-390.png'),fullPage:true});
+  const nav=page.getByRole('navigation',{name:'Navegação da loja'});
   for(const [value,title] of [['produtos','Produtos'],['estoque','Estoque'],['caixa','Caixa'],['gestao','Gestão']]){
-    await page.getByLabel('Página',{exact:true}).selectOption(value);
+    await nav.getByRole('button',{name:title,exact:true}).click();
     await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();
     await page.screenshot({path:info.outputPath('mobile-'+value+'-390.png'),fullPage:true});
   }
-  await page.getByLabel('Página',{exact:true}).selectOption('configuracoes');
+  await nav.getByRole('button',{name:'Ajustes',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Configurações',exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath('mobile-configuracoes-390.png'),fullPage:true});
-  await page.getByLabel('Página',{exact:true}).selectOption('pdv');
+  await nav.getByRole('button',{name:'PDV',exact:true}).click();
   await page.getByRole('button',{name:/Ver carrinho/}).click();
   await expect(page.getByRole('dialog',{name:'Carrinho'})).toBeVisible();
   await page.screenshot({path:info.outputPath('07-carrinho-mobile-390.png')});
