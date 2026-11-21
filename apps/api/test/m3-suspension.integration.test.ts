@@ -23,7 +23,7 @@ test('M3: suspender e recuperar carrinho sem baixar estoque', {skip:!url&&'Postg
   assert.equal(product.statusCode,201,product.body);
   const variantId=product.json().variants[0].id;
   const recv=await app.inject({method:'POST',url:'/v1/stock/receipts',headers:write(),
-   payload:{variant_id:variantId,reference_id:randomUUID(),quantity:2}});
+   payload:{variant_id:variantId,reference_id:randomUUID(),quantity:2,note:'Entrada direta auditada para teste'}});
   assert.equal(recv.statusCode,201,recv.body);
   const cash=await app.inject({method:'POST',url:'/v1/cash-sessions',headers:write(),
    payload:{terminal_code:'CAIXA-02',opening_cents:0}});
