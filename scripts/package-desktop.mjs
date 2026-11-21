@@ -15,6 +15,7 @@ await cp(distribution,output,{recursive:true,verbatimSymlinks:true});
 const application = path.join(resources,'app');
 await mkdir(application,{recursive:true});
 await cp(new URL('../apps/desktop/src/main.cjs',import.meta.url),path.join(application,'main.cjs'));
+await cp(new URL('../apps/desktop/src/window-health.cjs',import.meta.url),path.join(application,'window-health.cjs'));
 await cp(new URL('../apps/desktop/src/local-runtime.cjs',import.meta.url),path.join(application,'local-runtime.cjs'));
 await cp(new URL('../apps/desktop/src/updates.cjs',import.meta.url),path.join(application,'updates.cjs'));
 await cp(new URL('../apps/desktop/src/desktop-updater.cjs',import.meta.url),path.join(application,'desktop-updater.cjs'));
