@@ -9,6 +9,10 @@ CREATE INDEX catalog_products_store_name_seek ON products(store_id,name,id);
 CREATE INDEX catalog_products_category_seek ON products(store_id,category,name,id);
 CREATE INDEX catalog_variants_product_seek ON product_variants(store_id,product_id,sku,id);
 
+-- Integridade relacional: cada foto vinculada pertence à variante do MESMO produto e loja.
+ALTER TABLE product_variants ADD CONSTRAINT product_variants_gallery_product_scope
+ UNIQUE(id,product_id,store_id);
+
 -- Foto principal legada segue em product_photos. A galeria só guarda fotos adicionais,
 -- preservando rotas e backups existentes, sem duplicar os bytes da foto principal.
 CREATE TABLE product_gallery_photos (
@@ -22,7 +26,7 @@ CREATE TABLE product_gallery_photos (
  sha256 char(64) NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now(),
  FOREIGN KEY(product_id,store_id) REFERENCES products(id,store_id) ON DELETE CASCADE,
- FOREIGN KEY(variant_id,store_id) REFERENCES product_variants(id,store_id)
+ FOREIGN KEY(variant_id,product_id,store_id) REFERENCES product_variants(id,product_id,store_id)
 );
 CREATE INDEX product_gallery_by_product ON product_gallery_photos(store_id,product_id,created_at,id);
 CREATE INDEX product_gallery_by_variant ON product_gallery_photos(store_id,variant_id) WHERE variant_id IS NOT NULL;
