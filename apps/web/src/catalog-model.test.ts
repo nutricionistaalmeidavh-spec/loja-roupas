@@ -29,3 +29,10 @@ test('entrada BRL converte inteiros e vírgula a centavos sem float arbitrário'
   for(const bad of ['1.299,90','1.20','-2,00','10,999','','a10'])
     assert.throws(()=>reaisToCents(bad));
 });
+
+test('fallback de moda não inventa uma camiseta para vestido, saia ou categoria não identificada',()=>{
+ for(const [name,kind] of [['Vestido midi','dress'],['Saia evasê','skirt'],['Camisa de linho','shirt'],['Peça coleção autoral','generic']]){
+   const [mapped]=mapCatalog({items:[{...product,name}],next_cursor:null});
+   assert.equal(mapped.kind,kind);
+ }
+});

@@ -15,6 +15,7 @@ import { ReceiveStockForm } from './Management.tsx';
 import { ProductsWorkspace } from './ProductsWorkspace.tsx';
 import { TaskDialog } from './TaskDialog.tsx';
 import { ProductPhoto } from './ProductPhoto.tsx';
+import { UiIcon } from './UiIcon.tsx';
 import { M2StockAdjustment } from './M2Admin.tsx';
 import { PickupLookup } from './PickupOrders.tsx';
 import type { PickupOrder } from './PickupOrders.tsx';
@@ -27,10 +28,13 @@ import type { CashState, Sale, SuspendedDraft } from './pos-client.ts';
 const brl = (cents:number) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
 const sizesFor = (p:Product,color:string) => [...new Set(p.variants.filter(v=>v.color===color).map(v=>v.size))];
 function Garment({kind}:{kind:Product['kind']}) {
-  return <svg viewBox="0 0 120 120" role="img" aria-label="Imagem ilustrativa; fotografia não cadastrada">
+  return <svg viewBox="0 0 120 120" role="img" aria-label="Ilustração de categoria; fotografia não cadastrada">
     {kind==='pants'?<path d="M37 15h46l-7 93H62L60 60l-3 48H43z" fill="currentColor"/>:
     kind==='bag'?<><rect x="24" y="50" width="72" height="55" rx="8" fill="currentColor"/><path d="M42 50Q42 12 60 12T78 50" fill="none" stroke="currentColor" strokeWidth="8"/></>:
     kind==='shoe'?<path d="M8 70Q30 60 40 35h23Q70 66 106 72l5 24H8z" fill="currentColor"/>:
+    kind==='dress'?<path d="M44 13h32l8 25-13 9 25 62H24l25-62-13-9z" fill="currentColor"/>:
+    kind==='skirt'?<path d="M40 18h40l20 90H20z" fill="currentColor"/>:
+    kind==='generic'?<><rect x="24" y="22" width="72" height="76" rx="9" fill="none" stroke="currentColor" strokeWidth="4"/><path d="M37 76 51 60l13 14 13-22 10 17" stroke="currentColor" strokeWidth="4" fill="none"/><circle cx="47" cy="41" r="7" fill="currentColor"/></>:
     <path d="M37 13L10 37l14 24 13-10v57h46V51l13 10 14-24-27-24-12-4Q60 27 49 9z" fill="currentColor"/>}
   </svg>;
 }
@@ -69,6 +73,7 @@ export function App() {
   const [recoverable,setRecoverable] = useState<Array<{id:string;quantity:number}>>([]);
   const [hydratedDraftKey,setHydratedDraftKey] = useState<string|null>(null);
   const [message,setMessage] = useState('');
+  const [cartFeedback,setCartFeedback] = useState('');
   const [catalogError,setCatalogError] = useState('');
   const [loading,setLoading] = useState(false);
   const [refetch,setRefetch] = useState(0);
@@ -121,6 +126,12 @@ export function App() {
     }catch(error){setMessage(error instanceof Error?error.message:'Não foi possível recuperar o carrinho.');}
     finally{setRecoveryBusy(false);}
   }
+
+  useEffect(()=>{
+    if(!cartFeedback)return;
+    const timer=setTimeout(()=>setCartFeedback(''),3200);
+    return ()=>clearTimeout(timer);
+  },[cartFeedback]);
 
   useEffect(()=>{
     if(!session){setCategories(['Todos']);return;}
@@ -259,7 +270,7 @@ export function App() {
     setSelected(current=>({...current,[product.id]:{color,size:sizes.includes(size)?size:(sizes[0]??'')}}));
   }
   function addVariant(variant:Variant){
-    try { setDraft(addToDraft(draft,variant));setMessage(''); }
+    try { setDraft(addToDraft(draft,variant));setMessage('');setCartFeedback('Peça adicionada ao carrinho: '+variant.sku); }
     catch(error){setMessage(error instanceof Error?error.message:'Não foi possível adicionar');}
   }
   async function scan(){
@@ -285,11 +296,14 @@ export function App() {
   function refreshed(){setRefetch(n=>n+1);}
   if(!session)return <LoginScreen onAuthenticated={authenticated}/>;
 
+  const operatorRole=session.roles.includes('manager')?'Gestor':session.roles.includes('cashier')?'Operador de caixa':session.roles.includes('stocker')?'Estoque':'Colaborador';
+  const storeTitle=session.storeName?.trim()||'Sua loja';
   const cart = <div className="cart-content">
     <div className="cart-head"><h2>Carrinho</h2><button className="text-btn" disabled={!draft.length} onClick={()=>setDraft([])}>Limpar</button></div>
     <p className="muted">{quantity} {quantity===1?'peça adicionada':'peças adicionadas'}</p>
+    {cartFeedback&&<p className="sr-only" role="status">{cartFeedback}</p>}
     <div className="cart-lines">{draft.length?draft.map(line=><div className="cart-line" key={line.variant.id}>
-      <div className="mini-visual" aria-hidden="true">◇</div><div className="cart-description"><strong>{products.find(p=>p.variants.some(v=>v.id===line.variant.id))?.name??line.variant.sku}</strong>
+      <div className="mini-visual" aria-hidden="true"><UiIcon name="bag" size={22}/></div><div className="cart-description"><strong>{products.find(p=>p.variants.some(v=>v.id===line.variant.id))?.name??line.variant.sku}</strong>
       <span>{line.variant.color} · {line.variant.size} · {line.variant.sku}</span>
       <div className="qty"><button aria-label={'Diminuir '+line.variant.sku} onClick={()=>setDraft(draft.flatMap(x=>x.variant.id!==line.variant.id?[x]:x.quantity===1?[]:[{...x,quantity:x.quantity-1}]))}>−</button>
       <span>{line.quantity}</span><button aria-label={'Aumentar '+line.variant.sku} onClick={()=>addVariant(line.variant)}>+</button></div>
@@ -307,18 +321,18 @@ export function App() {
   return <div className="shell">
     <nav className="icon-rail" aria-label="Navegação principal">
       <div className="logo">L</div>
-      <button className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')} aria-label="PDV" title="PDV"><span aria-hidden="true">PDV</span></button>
-      {manager&&<button className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos"><span aria-hidden="true">PRD</span></button>}
-      {canReceive&&<button className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque"><span aria-hidden="true">EST</span></button>}
-      {canCash&&<button className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa"><span aria-hidden="true">CX</span></button>}
-      {manager&&<button className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão"><span aria-hidden="true">GES</span></button>}
-      <button className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')} aria-label="Configurações" title="Configurações"><span aria-hidden="true">CFG</span></button>
-      <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><span aria-hidden="true">Sair</span></button>
+      <button aria-current={page==='pdv'?'page':undefined} className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')} aria-label="PDV" title="PDV"><UiIcon name="pos"/></button>
+      {manager&&<button aria-current={page==='produtos'?'page':undefined} className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')} aria-label="Cadastrar produtos" title="Produtos"><UiIcon name="shirt"/></button>}
+      {canReceive&&<button aria-current={page==='estoque'?'page':undefined} className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')} aria-label="Entrada de estoque" title="Estoque"><UiIcon name="boxes"/></button>}
+      {canCash&&<button aria-current={page==='caixa'?'page':undefined} className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')} aria-label="Caixa" title="Caixa"><UiIcon name="wallet"/></button>}
+      {manager&&<button aria-current={page==='gestao'?'page':undefined} className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')} aria-label="Gestão" title="Gestão"><UiIcon name="chart"/></button>}
+      <button aria-current={page==='configuracoes'?'page':undefined} className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')} aria-label="Configurações" title="Configurações"><UiIcon name="settings"/></button>
+      <button className="exit" title="Sair" aria-label="Encerrar sessão" onClick={logout}><UiIcon name="logout"/></button>
     </nav>
     <main className="workspace">
       <header className="topbar" data-tour="overview">
         <div><h1>{page==='pdv'?'Nova venda':page==='produtos'?'Produtos':page==='caixa'?'Caixa':page==='gestao'?'Gestão':page==='configuracoes'?'Configurações':'Estoque'}</h1>
-          <span>Loja {session.storeId.slice(0,8)} · {session.roles.join(', ')}</span></div>
+          <span>{storeTitle} · {operatorRole}</span></div>
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
             {catalogError?'Servidor indisponível':cashId?'Caixa aberto · Conectado':'Catálogo conectado · Sem caixa'}</span>
@@ -327,15 +341,12 @@ export function App() {
         </div>
       </header>
       <nav className="mobile-navigation" aria-label="Navegação da loja">
-        <label htmlFor="mobile-page">Página</label>
-        <select id="mobile-page" value={page} onChange={event=>setCurrentPage(event.target.value as Page)}>
-          <option value="pdv">PDV</option>
-          {manager&&<option value="produtos">Produtos</option>}
-          {canReceive&&<option value="estoque">Estoque</option>}
-          {canCash&&<option value="caixa">Caixa</option>}
-          {manager&&<option value="gestao">Gestão</option>}
-          <option value="configuracoes">Configurações</option>
-        </select>
+        <button type="button" aria-current={page==='pdv'?'page':undefined} className={page==='pdv'?'active':''} onClick={()=>setCurrentPage('pdv')}><UiIcon name="pos" size={19}/><span>PDV</span></button>
+        {manager&&<button type="button" aria-current={page==='produtos'?'page':undefined} className={page==='produtos'?'active':''} onClick={()=>setCurrentPage('produtos')}><UiIcon name="shirt" size={19}/><span>Produtos</span></button>}
+        {canReceive&&<button type="button" aria-current={page==='estoque'?'page':undefined} className={page==='estoque'?'active':''} onClick={()=>setCurrentPage('estoque')}><UiIcon name="boxes" size={19}/><span>Estoque</span></button>}
+        {canCash&&<button type="button" aria-current={page==='caixa'?'page':undefined} className={page==='caixa'?'active':''} onClick={()=>setCurrentPage('caixa')}><UiIcon name="wallet" size={19}/><span>Caixa</span></button>}
+        {manager&&<button type="button" aria-current={page==='gestao'?'page':undefined} className={page==='gestao'?'active':''} onClick={()=>setCurrentPage('gestao')}><UiIcon name="chart" size={19}/><span>Gestão</span></button>}
+        <button type="button" aria-current={page==='configuracoes'?'page':undefined} className={page==='configuracoes'?'active':''} onClick={()=>setCurrentPage('configuracoes')}><UiIcon name="settings" size={19}/><span>Ajustes</span></button>
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
@@ -348,6 +359,7 @@ export function App() {
         {cashId&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
         <div className="search-row" data-tour="search"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
           <input id="search" value={search} autoComplete="off" onChange={e=>setSearch(e.target.value)} onKeyDown={keySearch} placeholder="Pesquisar produto, SKU ou código…"/>
+          {search&&<button type="button" className="search-clear" aria-label="Limpar busca" onClick={()=>setSearch('')}><UiIcon name="x" size={16}/></button>}
           <button type="button" className="scan-button" disabled={scanBusy||!search.trim()} onClick={()=>void scan()}>{scanBusy?'Consultando…':'Confirmar código'}</button>
         </div>
         <div className="categories" role="group" aria-label="Categorias disponíveis">
@@ -355,7 +367,15 @@ export function App() {
         </div>
         {message&&<p role="alert" className="error">{message}</p>}
         {catalogError&&<div className="error" role="alert">{catalogError} <button onClick={refreshed}>Tentar novamente</button></div>}
-        {loading&&<p className="notice" role="status">Carregando produtos da loja…</p>}
+        {loading&&<div className="catalog-loading" role="status" aria-label="Carregando produtos da loja">
+          <span className="sr-only">Carregando produtos da loja…</span>
+          <div className="product-grid" aria-hidden="true">{Array.from({length:6},(_,index)=>
+            <div key={index} className="product-card skeleton-product">
+              <div className="product-visual skeleton-shimmer"/>
+              <div className="skeleton-line"/><div className="skeleton-line short"/>
+              <div className="skeleton-controls"><span/><span/><span/></div>
+            </div>)}</div>
+        </div>}
         {!loading&&!catalogError&&<div className="product-grid" data-tour="variants">
           {filtered.map(p=>{
             const colors=[...new Set(p.variants.map(v=>v.color))];
@@ -364,7 +384,7 @@ export function App() {
             const selectedVariant=resolveVariant(p.variants,color,size);
             const ready=Boolean(choice)||p.variants.length===1;
             return <article key={p.id} className="product-card">
-              <div className={'product-visual '+p.kind}>{p.hasPhoto?<ProductPhoto session={session} product={p}/>:<Garment kind={p.kind}/>}</div>
+              <div data-kind={p.kind} className={'product-visual '+p.kind}>{p.hasPhoto?<ProductPhoto session={session} product={p} fallback={<div className="garment-placeholder"><Garment kind={p.kind}/><span>Foto indisponível</span></div>}/>:<div className="garment-placeholder"><Garment kind={p.kind}/><span>Foto não cadastrada</span></div>}</div>
               <div className="card-copy">
                 <h3 title={p.name}>{p.name}</h3>
                 <p className="price">{selectedVariant?brl(selectedVariant.priceCents):'Indisponível'}</p>
@@ -378,7 +398,7 @@ export function App() {
                       <span className={'swatch'+(!visual.known?' unknown':'')} style={{backgroundColor:visual.background}}>{visual.label}</span></button>;})}
                   </div>
                   <button className="add" aria-label={'Adicionar '+p.name} disabled={!ready||!selectedVariant||selectedVariant.available===0}
-                    onClick={()=>{if(selectedVariant)addVariant(selectedVariant);}}>+</button>
+                    onClick={()=>{if(selectedVariant)addVariant(selectedVariant);}}><UiIcon name="plus" size={15}/><span>Adicionar</span></button>
                 </div>
                 <p className="stock-hint">{!ready?'Selecione cor e tamanho':selectedVariant?.available?selectedVariant.available+' disponíveis':'Sem estoque para esta variante'}</p>
               </div>
@@ -424,7 +444,7 @@ export function App() {
       onClose={()=>setStockAction(null)}>
       <M2StockAdjustment session={session} onSaved={refreshed} refreshKey={refetch} onLockChange={setStockLocked}/>
     </TaskDialog>}
-    {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}>Ver carrinho · {quantity} peças · {brl(total)}</button>}
+    {page==='pdv'&&<button data-tour="mobile-cart" className="mobile-cart" onClick={()=>setCartOpen(true)}><UiIcon name="bag" size={19}/> <span>Ver carrinho · {quantity} {quantity===1?'peça':'peças'}</span><strong>{brl(total)}</strong></button>}
     {checkoutOpen&&cashId&&<CheckoutDrawer session={session} cashSessionId={cashId}
       draft={draft} pickup={pickup} onClose={()=>{setPickup(undefined);setCheckoutOpen(false);}} onConfirmed={saleConfirmed}/>}
     {lastSale&&<div className="checkout-overlay" role="presentation">
@@ -440,7 +460,8 @@ export function App() {
         </div>
       </section>
     </div>}
-    <FirstRunTour key={session.storeId+session.roles.join(',')} storeId={session.storeId} roles={session.roles} replayToken={tourReplay} onNavigate={setCurrentPage}/>
+    <FirstRunTour key={session.storeId+session.roles.join(',')} storeId={session.storeId} roles={session.roles} replayToken={tourReplay} suspended={checkoutOpen||cartOpen||Boolean(lastSale)||Boolean(stockAction)} onNavigate={setCurrentPage}/>
+    {cartFeedback&&<div className="retail-toast" role="status" aria-live="polite"><UiIcon name="bag" size={19}/><span>{cartFeedback}</span><button type="button" onClick={()=>setCartFeedback('')} aria-label="Fechar notificação"><UiIcon name="x" size={16}/></button></div>}
     {page==='pdv'&&cartOpen&&<div className="drawer-backdrop" onMouseDown={()=>setCartOpen(false)}>
       <aside ref={cartDialogRef} tabIndex={-1} className="mobile-drawer" role="dialog" aria-modal="true" aria-label="Carrinho" onMouseDown={e=>e.stopPropagation()}>
         <button className="close-drawer" onClick={()=>setCartOpen(false)}>Fechar ×</button>{cart}

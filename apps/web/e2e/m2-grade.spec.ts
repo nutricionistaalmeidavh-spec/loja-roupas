@@ -40,7 +40,7 @@ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({labe
  await page.getByLabel('Tamanho existente').fill('GG');
  await page.getByRole('button',{name:'Salvar atributos da variante'}).click();
  await expect(page.getByText('Atributos da variante atualizados.')).toBeVisible();
- await page.getByRole('button',{name:'PDV'}).click();
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(updated);
  await expect(page.locator('.product-card').filter({hasText:name})).toBeVisible();
 });

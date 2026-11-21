@@ -61,7 +61,7 @@ export function CreateProductForm({ session, onSaved, onLockChange }: { session:
       setRows([blankVariant()]);
       setPending(null);
       setUncertain(false);
-      setNotice('Produto cadastrado: '+created.id+'. Consulte o catálogo para conferir suas variantes.');
+      setNotice('Produto cadastrado: '+payload.name+'. Consulte o catálogo para conferir as variantes.');
       onSaved();
     } catch(err) {
       setError(mutationError(err));

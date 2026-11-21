@@ -12,6 +12,7 @@ declare global {
 export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)=>void}) {
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
+  const [showPassword,setShowPassword]=useState(false);
   const [pending,setPending]=useState(false);
   const [error,setError]=useState('');
   const [result,setResult]=useState<LoginResult|null>(null);
@@ -34,7 +35,7 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
         return;
       }
       if(response.stores.length===1) {
-        onAuthenticated({token:response.token,storeId:response.stores[0].store_id,roles:response.stores[0].roles});
+        onAuthenticated({token:response.token,storeId:response.stores[0].store_id,storeName:response.stores[0].name,roles:response.stores[0].roles});
       } else setResult(response);
     } catch(err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível autenticar.');
@@ -42,18 +43,18 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
   }
   return <div className="login-shell"><section className="login-panel">
     <div className="login-logo">L</div>
-    <p className="eyebrow">LOJA DE ROUPAS · SELF-HOSTED</p>
+    <p className="eyebrow">LOJA DE ROUPAS</p>
     <h1>Bem-vindo à sua loja</h1>
-    <p className="muted">Entre com as credenciais criadas no servidor local. Não há conta em nuvem obrigatória.</p>
+    <p className="muted">Acesse o caixa e a gestão da sua loja com segurança.</p>
     {result?<div className="login-chooser">
       <h2>Escolher loja</h2>
       {result.stores.map(store=><button key={store.store_id} className="store-option" onClick={()=>onAuthenticated({
-        token:result.token,storeId:store.store_id,roles:store.roles})}>
-        Loja {store.store_id.slice(0,8)} · Continuar
+        token:result.token,storeId:store.store_id,storeName:store.name,roles:store.roles})}>
+        {store.name?.trim()||'Sua loja'} · Continuar
       </button>)}
     </div>:<form onSubmit={event=>void submit(event)} className="login-form">
       <label>Usuário<input required autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} placeholder="Login do operador"/></label>
-      <label>Senha<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha"/></label>
+      <div className="password-control"><label htmlFor="login-password">Senha</label><span className="password-field"><input id="login-password" type={showPassword?'text':'password'} required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha"/><button type="button" className="password-toggle" aria-label={showPassword?'Ocultar caracteres':'Mostrar caracteres'} aria-pressed={showPassword} onClick={()=>setShowPassword(v=>!v)}>{showPassword?'Ocultar':'Mostrar'}</button></span></div>
       {error&&<p className="error" role="alert">{error}</p>}
       <button className="primary-action" disabled={pending}>{pending?'Entrando…':'Entrar na loja'}</button>
       {localRecovery&&<button type="button" className="text-btn"
@@ -61,6 +62,6 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
         Esqueci minha senha · Recuperar neste computador
       </button>}
     </form>}
-    <p className="login-help">Primeiro acesso no Windows: abra o aplicativo instalado e siga o assistente para criar sua loja. Nenhuma instalação separada de banco ou Docker é necessária. Para Linux/servidor LAN, utilize o instalador local documentado.</p>
+    <details className="login-help"><summary>Primeiro acesso ou instalação</summary><p>No Windows, abra o aplicativo e siga o assistente para criar sua loja. Para servidor LAN no Linux, consulte o guia de instalação local. Não é necessário serviço comercial de nuvem.</p></details>
   </section></div>;
 }

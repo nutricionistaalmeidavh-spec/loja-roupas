@@ -90,8 +90,10 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
       throw error;
     }
     if(attempts.get(bucket)===attempt)attempts.delete(bucket);
-    const storeRows = await db.query<{ store_id:string; roles: string[] }>(
-      'SELECT store_id::text, array_agg(role_code) AS roles FROM user_store_roles WHERE user_id=$1 GROUP BY store_id', [user.id]);
+    const storeRows = await db.query<{ store_id:string; name:string; roles: string[] }>(
+      `SELECT r.store_id::text, st.name, array_agg(r.role_code) AS roles
+       FROM user_store_roles r JOIN stores st ON st.id=r.store_id
+       WHERE r.user_id=$1 GROUP BY r.store_id, st.name ORDER BY st.name`, [user.id]);
     if (!storeRows.rowCount) return reply.code(403).send({ code:'FORBIDDEN', message:'Usuário sem loja autorizada' });
     const {token, tokenHash} = issueSession();
     const expiresAt = new Date(now + 8*60*60_000).toISOString();

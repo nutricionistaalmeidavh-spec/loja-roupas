@@ -35,7 +35,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await expect(page.getByRole('status').filter({hasText:'Novo saldo em mãos: 3'})).toBeVisible();
   await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
 
-  await page.getByRole('button', {name:'PDV'}).click();
+  await page.getByRole('button', {name:'PDV',exact:true}).click();
   const card=page.locator('.product-card').filter({hasText:name});
   await expect(card).toBeVisible();
   await expect(card.getByText('3 disponíveis')).toBeVisible();

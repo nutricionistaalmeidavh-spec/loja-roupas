@@ -19,3 +19,12 @@
 .tour-card{top:88px;bottom:auto;pointer-events:none}
 .tour-card button,.tour-card progress{pointer-events:auto}
 @media(max-width:600px){.tour-card{top:110px;bottom:auto;max-height:min(42dvh,350px)}}
+
+/* Tutorial contextual compacto: nunca cobrir o carrinho nem checkout. */
+.tour-card{top:auto;bottom:16px;left:99px;right:auto;width:min(315px,calc(100vw - 110px));max-height:min(45dvh,370px);pointer-events:none;box-shadow:0 16px 46px #0002;border-color:var(--retail-border)}
+.tour-card .tour-label{color:var(--retail-brand)}
+@media(max-width:600px){.tour-card{top:auto;bottom:calc(82px + env(safe-area-inset-bottom,0px));left:12px;right:12px;width:auto;max-height:min(34dvh,280px)}}
+
+/* Guia não bloqueia ações operacionais atrás da janela. */
+.tour-card{pointer-events:none}
+.tour-card button{pointer-events:auto}

@@ -1,4 +1,4 @@
-name: Publicar instalador Loja de Roupas v0.2.1
+name: Publicar instalador Loja de Roupas v0.2.2
 on:
   push:
     branches: [main]
@@ -10,7 +10,7 @@ permissions:
 jobs:
   publish-windows:
     # Publica somente por comando explícito de merge, nunca em pushes normais.
-    if: contains(github.event.head_commit.message, '[publish-loja-v0.2.1]')
+    if: contains(github.event.head_commit.message, '[publish-loja-v0.2.2]')
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -22,7 +22,7 @@ jobs:
         shell: pwsh
         run: |
           $info=Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json
-          if ($info.version -ne '0.2.1') { throw 'Versão do desktop deve ser 0.2.1' }
+          if ($info.version -ne '0.2.2') { throw 'Versão do desktop deve ser 0.2.2' }
           node --check apps/desktop/src/main.cjs
           node --check apps/desktop/src/updates.cjs
           node --check apps/desktop/src/desktop-updater.cjs
@@ -77,7 +77,7 @@ jobs:
           & "$root/runtime/postgres/bin/pg_ctl.exe" --version
           if($LASTEXITCODE -ne 0){throw 'pg_ctl não inicia: DLL ausente'}
           $version=(Get-Content "$root/app/package.json" -Raw | ConvertFrom-Json).version
-          if($version -ne '0.2.1'){throw 'Versão embutida divergente'}
+          if($version -ne '0.2.2'){throw 'Versão embutida divergente'}
       - name: Gerar instalador NSIS e executar testes reais
         shell: pwsh
         run: |
@@ -99,7 +99,7 @@ jobs:
           node scripts/smoke-single-machine.mjs "$install/app/electron.exe"
           if($LASTEXITCODE -ne 0){throw 'Falha no primeiro uso com PostgreSQL'}
           $installedVersion=(Get-Content "$install/app/resources/app/package.json" -Raw | ConvertFrom-Json).version
-          if($installedVersion -ne '0.2.1'){throw 'Versão instalada diferente da release'}
+          if($installedVersion -ne '0.2.2'){throw 'Versão instalada diferente da release'}
           $process=Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
           if($process.ExitCode -ne 0){throw 'Falha na desinstalação'}
           $deadline=(Get-Date).AddSeconds(30)
@@ -119,50 +119,47 @@ jobs:
       - name: Guardar cópia do instalador validado
         uses: actions/upload-artifact@v4
         with:
-          name: loja-roupas-v0.2.1-windows-release
+          name: loja-roupas-v0.2.2-windows-release
           path: |
             dist/Loja-de-Roupas-Setup-x64.exe
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
-      - name: Publicar GitHub Release v0.2.1 (única vez)
+      - name: Publicar GitHub Release v0.2.2 (única vez)
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $repo='${{ github.repository }}'
-          $tag='v0.2.1'
+          $tag='v0.2.2'
           $existing=gh release view $tag --repo $repo --json tagName 2>$null
           if($LASTEXITCODE -eq 0){throw "Release $tag já existe: não sobrescrever"}
           $tagExists=git ls-remote --tags origin "refs/tags/$tag"
           if($LASTEXITCODE -ne 0){throw 'Não foi possível verificar a tag remota'}
           if($tagExists){throw "Tag $tag já existe: publicação interrompida"}
           @'
-          ## Loja de Roupas v0.2.1 — Windows x64
-
-          Atualização de manutenção do aplicativo local com PostgreSQL integrado. Corrige a inicialização do PostgreSQL em Windows sem DLLs necessárias e adiciona a recuperação offline da senha administrativa.
-
-          ### Correções desta versão
-          - Diagnóstico de dependências do PostgreSQL antes de alterar a base.
-          - Componente VC++ oficial incluído no pacote, instalado apenas sob escolha explícita do usuário.
-          - Recuperação segura de senha do administrador apenas no computador principal, sem apagar dados.
-          - Revogação das sessões antigas após redefinição da senha.
-
-          ### Instalação
-          Baixe **Loja-de-Roupas-Setup-x64.exe** e execute no Windows 64 bits. O assistente prepara banco, API e interface no próprio computador, sem hospedagem e sem assinatura obrigatória.
-
-          ### Atualizações com autorização explícita
-          - Ao abrir o app, verifica somente metadados no GitHub e mostra uma janela modal se houver nova versão.
-          - Em Configurações → Atualizações há verificação manual, versão e novidades.
-          - O download do EXE só começa após clicar e confirmar: não existe download silencioso.
-          - Verifica SHA-256, cria backup local do PostgreSQL antes de atualizar e preserva snapshot de recuperação do aplicativo.
-
-          ### Integridade e cuidados
-          O arquivo **SHA256SUMS** nesta release contém a impressão digital SHA-256 do EXE. Testes automatizados de instalação, primeiro acesso e desinstalação foram executados; periféricos físicos de clientes ainda exigem homologação em campo.
-
+          ## Loja de Roupas v0.2.2 — Windows x64
+          
+          Atualização visual da Loja de Roupas com correções de usabilidade no PDV, catálogo, caixa e gestão.
+          
+          ### Melhorias
+          - Novo acabamento Retail Fashion POS com visual claro, ícones e layout adaptado a diferentes telas.
+          - Catálogo com fotografias privadas, prévia antes do envio, seleção de cor e tamanho e estados de carregamento.
+          - Carrinho e checkout refinados, com controles de toque e notificações de adição.
+          - Tour de primeiro acesso ajustado para não cobrir ou impedir ações operacionais.
+          - Gestão com indicadores e gráficos diários e mensais baseados exclusivamente nos registros reais da loja.
+          - Testes de regressão Playwright da jornada desktop, mobile, estoque, caixa e checkout.
+          
+          ### Instalação e atualização segura
+          Baixe **Loja-de-Roupas-Setup-x64.exe** no Windows 64 bits. PostgreSQL, API e interface estão incluídos; não há hospedagem ou assinatura obrigatória.
+          
+          O sistema verifica apenas metadados de versões. O instalador só é baixado após autorização do usuário. O processo valida o SHA-256, cria backup local do PostgreSQL e preserva recursos de recuperação. O arquivo **SHA256SUMS** acompanha o instalador.
+          
+          A homologação com impressoras e periféricos físicos deve ser feita na loja.
+          
           Núcleo R$0 / self-hosted / open source.
           '@ | Set-Content -LiteralPath dist/RELEASE_NOTES.md -Encoding UTF8
-          gh release create $tag 'dist/Loja-de-Roupas-Setup-x64.exe' 'dist/SHA256SUMS' --repo $repo --target '${{ github.sha }}' --title 'Loja de Roupas v0.2.1' --notes-file 'dist/RELEASE_NOTES.md' --latest
+          gh release create $tag 'dist/Loja-de-Roupas-Setup-x64.exe' 'dist/SHA256SUMS' --repo $repo --target '${{ github.sha }}' --title 'Loja de Roupas v0.2.2' --notes-file 'dist/RELEASE_NOTES.md' --latest
           if($LASTEXITCODE -ne 0){throw 'Falha na publicação GitHub Release'}
           $published=gh release view $tag --repo $repo --json tagName,isDraft,isPrerelease,assets,url | ConvertFrom-Json
           if($published.isDraft -or $published.isPrerelease){throw 'Release não estável'}

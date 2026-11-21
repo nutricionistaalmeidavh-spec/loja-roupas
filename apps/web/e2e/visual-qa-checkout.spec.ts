@@ -1,10 +1,13 @@
 import {test,expect} from '@playwright/test';
+test.use({video:'on'});
 import {loginWithCash} from './visual-qa-login';
 import {createVisualProduct} from './visual-qa-product';
 import {stockVisualProduct} from './visual-qa-stock';
 test('checkout visual ponta a ponta',async({page},info)=>{
  test.setTimeout(120000);
  await loginWithCash(page);
+ const tour=page.getByRole('button',{name:'Pular tour'});
+ if(await tour.isVisible())await tour.click();
  const {sku,name}=await createVisualProduct(page);
  await stockVisualProduct(page,sku);
  await page.getByRole('button',{name:'PDV',exact:true}).click();

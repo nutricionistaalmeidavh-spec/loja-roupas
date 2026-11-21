@@ -19,8 +19,9 @@ test('configura a meta e navega pelo painel em sete larguras',async({page},testI
   for(const width of [320,390,600,768,1024,1280,1440]){
     await page.setViewportSize({width,height:900});
     if(width<=600){
-      await page.getByLabel('Página',{exact:true}).selectOption('pdv');
-      await page.getByLabel('Página',{exact:true}).selectOption('gestao');
+      const nav=page.getByRole('navigation',{name:'Navegação da loja'});
+      await nav.getByRole('button',{name:'PDV',exact:true}).click();
+      await nav.getByRole('button',{name:'Gestão',exact:true}).click();
     }else{
       await page.getByRole('button',{name:'PDV',exact:true}).click();
       await page.getByRole('button',{name:'Gestão',exact:true}).click();

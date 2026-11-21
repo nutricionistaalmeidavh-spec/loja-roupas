@@ -8,6 +8,7 @@ import { CommercialIntelligence } from './CommercialIntelligence.tsx';
 import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
 import { TaskDialog } from './TaskDialog.tsx';
+import {SalesBars,RetailEmpty} from './RetailUI.tsx';
 import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
@@ -74,6 +75,8 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     }
   }
 
+  const salesCount=days.reduce((sum,day)=>sum+Number(day.sale_count||0),0);
+  const activeDays=days.filter(day=>Number(day.sale_count)>0).length;
   const sections=[
     {key:'vendas',label:'Vendas'},
     {key:'fornecedores',label:'Fornecedores'},
@@ -92,13 +95,23 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
       </a>)}
     </nav>
     {section==='vendas'&&<section id="gestao-vendas" className="management-section">
-      <h2>Vendas e devoluções nos últimos 30 dias</h2>
+      <div className="management-section-head">
+        <div><h2>Vendas e devoluções nos últimos 30 dias</h2><p>Informações registradas no servidor da loja.</p></div>
+      </div>
+      {!ready&&!error&&<p role="status" className="management-loading">Carregando resumo comercial…</p>}
+      {error&&!ready&&<div role="alert" className="management-error"><p>{error}</p><button className="light-button" onClick={()=>{setError('');setRefresh(value=>value+1);}}>Tentar novamente</button></div>}
+      {ready&&<div className="management-kpis" role="region" aria-label="Resumo da gestão">
+        <div><span>Vendas registradas</span><strong>{salesCount.toLocaleString('pt-BR')}</strong><small>Últimos 30 dias</small></div>
+        <div><span>Dias com vendas</span><strong>{activeDays}</strong><small>Dias no período</small></div>
+        <div><span>Fornecedores cadastrados</span><strong>{suppliers.length}</strong><small>Base desta loja</small></div>
+      </div>}
+      {ready&&<SalesBars days={days}/>}
       {ready&&(days.length?<div className="management-table-scroll" role="region" aria-label="Histórico de vendas" tabIndex={0}>
         <table><thead><tr><th>Data</th><th>Vendas</th><th>Total bruto</th><th>Devoluções</th></tr></thead>
           <tbody>{days.map(day=><tr key={day.day}><td>{day.day.split('-').reverse().join('/')}</td>
             <td>{day.sale_count}</td><td>{money(day.gross_cents)}</td><td>{money(day.refunded_cents)}</td></tr>)}</tbody>
         </table>
-      </div>:<p>Sem vendas no período.</p>)}
+      </div>:<RetailEmpty title="Nenhuma venda registrada" description="Assim que uma venda for confirmada no caixa, os indicadores aparecerão aqui."/>)}
     </section>}
     {section==='fornecedores'&&<section id="gestao-fornecedores" className="management-section">
       <div className="management-section-head">
@@ -106,7 +119,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
         <button className="primary-action" disabled={!ready} onClick={()=>setSupplierOpen(true)}>Novo fornecedor</button>
       </div>
       {suppliers.length?<ul>{suppliers.map(supplier=><li key={supplier.id}>{supplier.name}</li>)}</ul>:
-        <p className="muted">Nenhum fornecedor cadastrado.</p>}
+        <RetailEmpty title="Nenhum fornecedor cadastrado" description="Use Novo fornecedor para adicionar seu primeiro parceiro de abastecimento."/>}
     </section>}
     {section==='posvenda'&&<div id="gestao-posvenda" className="management-section management-surface">
       <div className="management-section-head">

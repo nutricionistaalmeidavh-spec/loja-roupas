@@ -4,6 +4,7 @@ import {ApiError,headers,jsonRequest,listCatalog} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {reaisToCents} from './catalog-model.ts';
 import {requestId} from './request-id.ts';
+import {SalesBars} from './RetailUI.tsx';
 
 const route='/v1/management/intelligence';
 const widgets={seasonality:'Sazonalidade',collections:'Coleções',suppliers:'Fornecedores',stock:'Estoque baixo'};
@@ -98,6 +99,9 @@ export function CommercialIntelligence({session}:{session:Session}) {
         <div><dt>Estimativa dos próximos 14 dias</dt>
           <dd>{forecast.estimate_cents===null?'Histórico insuficiente':money(forecast.estimate_cents)}</dd></div>
       </dl>
+      <SalesBars period="monthly" days={data.historical_months.map(period=>({
+        day:period.period.slice(0,7)+'-01',sale_count:0,gross_cents:period.gross_cents,refunded_cents:period.refunded_cents
+      }))}/>
       <p>{forecast.active_days} de 28 dias completos com vendas. A projeção usa o ritmo líquido desse período e exige ao menos sete dias com vendas.</p>
       {forecast.low_cents!==null&&forecast.high_cents!==null&&<p>Faixa observada entre as duas quinzenas de {money(forecast.low_cents)} a {money(forecast.high_cents)}.</p>}
       <details>
