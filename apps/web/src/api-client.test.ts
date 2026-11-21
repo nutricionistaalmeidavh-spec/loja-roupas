@@ -79,3 +79,46 @@ test('categorias e variantes recuperadas respeitam escopo e IDs exatos',async()=
  await lookupDraftVariants(session,[id],fake);
  assert.deepEqual(urls,['/v1/catalog/categories','/v1/catalog/draft-variants?ids='+id]);
 });
+
+test('fotografia versionada usa hash e cache privado, sem alterar rota antiga',async()=>{
+ const {fetchProductPhoto}=await import('./api-client.ts');
+ const id='b69c72ed-45ac-4e36-8c32-3be1fa475ee9',sha='a'.repeat(64);
+ const fake:typeof fetch=async(input,init)=>{
+  assert.equal(String(input),'/v1/catalog/products/'+id+'/thumbnail?v='+sha);
+  assert.equal(init?.cache,'default');
+  assert.equal((init?.headers as Record<string,string>)['authorization'],'Bearer '+session.token);
+  return new Response(new Uint8Array([1,2,3]),{headers:{'content-type':'image/webp'}});
+ };
+ assert.equal((await fetchProductPhoto(session,id,fake,undefined,sha)).type,'image/webp');
+});
+test('planilha pode solicitar cursor em vez de paginação profunda',async()=>{
+ const {listStockSpreadsheet}=await import('./api-client.ts');
+ const fake:typeof fetch=async(input,init)=>{
+  const url=new URL(String(input),'http://localhost');
+  assert.equal(url.pathname,'/v1/stock/spreadsheet');
+  assert.equal(url.searchParams.get('cursor'),'opaque-cursor');
+  assert.equal(url.searchParams.get('limit'),'50');
+  assert.equal(init?.cache,'no-store');
+  return Response.json({items:[],total:0,categories:[],next_cursor:null,limit:50,offset:0});
+ };
+ const page=await listStockSpreadsheet(session,{limit:50,cursor:'opaque-cursor'},fake);
+ assert.equal(page.next_cursor,null);
+});
+test('cliente da galeria exige autorização para listagem e remoção',async()=>{
+ const {listProductPhotos,deleteGalleryPhoto}=await import('./api-client.ts');
+ const id='b69c72ed-45ac-4e36-8c32-3be1fa475ee9',photo='82df5fca-2c59-49f7-8ac8-38cd1996c229';
+ const calls:string[]=[];
+ const fake:typeof fetch=async(input,init)=>{
+  calls.push(String(input));
+  assert.equal((init?.headers as Record<string,string>)['x-store-id'],session.storeId);
+  assert.equal((init?.headers as Record<string,string>)['authorization'],'Bearer '+session.token);
+  if(init?.method==='DELETE')assert.equal((init?.headers as Record<string,string>)['idempotency-key'],'gallery-retry');
+  return Response.json(init?.method==='DELETE'?{deleted:true}: {items:[]});
+ };
+ await listProductPhotos(session,id,fake);
+ await deleteGalleryPhoto(session,id,photo,'gallery-retry',fake);
+ assert.deepEqual(calls,[
+  '/v1/catalog/products/'+id+'/photos',
+  '/v1/catalog/products/'+id+'/photos/'+photo
+ ]);
+});
