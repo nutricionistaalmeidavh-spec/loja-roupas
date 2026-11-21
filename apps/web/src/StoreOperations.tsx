@@ -23,6 +23,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
   const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'>('vendas');
   const [supplierOpen,setSupplierOpen] = useState(false);
   const [returnOpen,setReturnOpen] = useState(false);
+  const [returnLocked,setReturnLocked] = useState(false);
   const [days, setDays] = useState<Day[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [name, setName] = useState('');
@@ -151,8 +152,8 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
         <button className="primary-action" disabled={busy||!ready}>Cadastrar</button>
       </form>
     </TaskDialog>}
-    {returnOpen&&<TaskDialog title="Registrar devolução" wide onClose={()=>setReturnOpen(false)}>
-      <CashReturnForm session={session} cashId={cashId} onReturned={()=>{
+    {returnOpen&&<TaskDialog title="Registrar devolução" wide busy={returnLocked} onClose={()=>{if(!returnLocked)setReturnOpen(false);}}>
+      <CashReturnForm session={session} cashId={cashId} onLockChange={setReturnLocked} onReturned={()=>{
         setRefresh(value=>value+1);
         onReturned();
       }}/>
