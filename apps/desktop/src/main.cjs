@@ -7,7 +7,7 @@ const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
 const {createDesktopUpdater}=require('./desktop-updater.cjs');
 
-let runtime=null,setupWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
+let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
 let commercialLicense=null;
 let quitting=false;
@@ -70,6 +70,47 @@ function showError(error){
 function setupAllowed(event){
  if(!setupWindow||event.sender!==setupWindow.webContents||
   !event.sender.getURL().startsWith('file://'))throw new Error('Operação não permitida fora do assistente local.');
+}
+function isMainLocalSender(event){
+ if(!runtime)return false;
+ try{
+  const target=new URL(event.sender.getURL());
+  const local=new URL(runtime.url);
+  return target.origin===local.origin && target.pathname==='/' &&
+    !target.search && !target.hash && Boolean(BrowserWindow.fromWebContents(event.sender));
+ }catch{return false;}
+}
+function recoveryAllowed(event){
+ if(!recoveryWindow||recoveryWindow.isDestroyed()||
+    event.sender!==recoveryWindow.webContents||
+    !event.sender.getURL().startsWith('file://'))throw new Error('Recuperação disponível somente na janela local segura.');
+}
+function registerRecoveryHandlers(){
+ ipcMain.handle('loja:recovery:available',event=>isMainLocalSender(event));
+ ipcMain.handle('loja:recovery:open',async event=>{
+  if(!isMainLocalSender(event))throw new Error('Recupere a senha no computador principal da loja.');
+  if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.focus();return {ok:true};}
+  recoveryWindow=new BrowserWindow({
+   width:600,height:720,minWidth:500,minHeight:620,
+   parent:BrowserWindow.fromWebContents(event.sender),modal:true,
+   webPreferences:{preload:path.join(__dirname,'recovery-preload.cjs'),
+     contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
+  });
+  recoveryWindow.on('closed',()=>{recoveryWindow=null;});
+  await recoveryWindow.loadFile(path.join(__dirname,'recovery.html'));
+  return {ok:true};
+ });
+ ipcMain.handle('loja:recovery:reset',async(event,input)=>{
+  recoveryAllowed(event);
+  if(!runtime)throw new Error('A base local não está ativa.');
+  return runtime.resetAdminPassword(input);
+ });
+ ipcMain.handle('loja:recovery:restart',event=>{
+  recoveryAllowed(event);
+  app.relaunch();
+  app.quit();
+  return {ok:true};
+ });
 }
 function transition(url){
  openWindow(url);
@@ -142,6 +183,7 @@ async function start(){
  if(url){openWindow(url);return;}
  if(process.platform!=='win32'){openWindow(validateOrigin('http://127.0.0.1:'+(process.defaultApp?'5173':'8080')));return;}
  registerSetupHandlers();
+ registerRecoveryHandlers();
  setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,
   webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
