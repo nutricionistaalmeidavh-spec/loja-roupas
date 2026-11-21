@@ -20,3 +20,8 @@ contextBridge.exposeInMainWorld('lojaUpdates',{
   available:()=>ipcRenderer.invoke('loja:recovery:available'),
   open:()=>ipcRenderer.invoke('loja:recovery:open')
  });
+
+ // Expose only a fixed, data-free frontend crash signal to the local desktop.
+ contextBridge.exposeInMainWorld('lojaDiagnostics',{
+  renderFailure:()=>ipcRenderer.invoke('loja:diagnostics:render-failure')
+ });
