@@ -62,8 +62,9 @@ export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
   if(requirePermission(request,reply,'stock.read'))return reply;
   const {query='',category='',limit=50,offset=0,cursor}=request.query,store=request.authContext!.storeId;
   const after=decodeSheetCursor(cursor);
-  const args=[store,query.trim(),category.trim(),limit+1,after?0:offset,
-   after?.name??null,after?.sku??null,after?.id??null];
+  const args=after?
+   [store,query.trim(),category.trim(),limit+1,0,after.name,after.sku,after.id]:
+   [store,query.trim(),category.trim(),limit+1,offset];
   const filter="v.store_id=$1 AND ($2='' OR p.name ILIKE '%'||$2||'%' OR v.sku ILIKE '%'||$2||'%' OR v.barcode=$2) AND ($3='' OR p.category=$3)";
   const [count,records,categories]=await Promise.all([
    db.query<{total:string}>('SELECT count(*)::text AS total FROM product_variants v JOIN products p '+
