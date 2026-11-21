@@ -69,7 +69,10 @@ export function registerAuth(app: FastifyInstance, db: Pick<Pool, 'query'>) {
     const current=attempts.get(bucket);
     const active=current&&current.expires>now?current:null;
     if((active&&active.count>=5)||(!current&&attempts.size>=4096)){
-      return reply.code(429).send({code:'RATE_LIMITED',message:'Muitas tentativas. Tente novamente depois.'});
+      const retrySeconds=active?Math.max(1,Math.ceil((active.expires-now)/1000)):60;
+      reply.header('Retry-After',String(retrySeconds));
+      return reply.code(429).send({code:'RATE_LIMITED',
+        message:'Muitas tentativas. Aguarde o bloqueio terminar ou recupere a senha no computador principal.'});
     }
     const attempt=active??{count:0,expires:now+15*60_000};
     attempt.count++;
