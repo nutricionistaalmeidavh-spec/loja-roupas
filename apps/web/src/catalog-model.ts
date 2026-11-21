@@ -4,10 +4,10 @@ export type ApiVariant = {variant_revision?:number;
   id: string; product_id: string; sku: string; barcode: string | null;
   color: string; size: string; price_cents: number; available: number; revision: number;
 };
-export type ApiProduct = {id:string;name:string;category:string;revision?:number;has_photo?:boolean;variants:ApiVariant[]};
+export type ApiProduct = {id:string;name:string;category:string;revision?:number;has_photo?:boolean;photo_version?:string|null;variants:ApiVariant[]};
 export type CatalogPage = { items: ApiProduct[]; next_cursor: string | null };
 export type Product = {
-  id: string; name: string; category: string; revision:number;hasPhoto:boolean;
+  id: string; name: string; category: string; revision:number;hasPhoto:boolean;photoVersion:string|null;
   kind: 'shirt' | 'pants' | 'bag' | 'shoe' | 'dress' | 'skirt' | 'generic';
   variants: Array<Variant & {barcode:string|null;stockRevision:number;variantRevision:number}>;
 };
@@ -27,7 +27,7 @@ export function mapCatalog(page: CatalogPage): Product[] {
       : /camisa|camiseta|blusa|regata|polo|casaco|jaqueta|suéter/.test(label) ? 'shirt'
       : 'generic';
     return {
-      id: p.id, name: p.name, category: p.category, revision:p.revision??1,hasPhoto:p.has_photo??false,kind,
+      id: p.id, name: p.name, category: p.category, revision:p.revision??1,hasPhoto:p.has_photo??false,photoVersion:p.photo_version??null,kind,
       variants: p.variants.map(v => {
         if (!v.id || !v.sku || !v.color || !v.size ||
           !Number.isSafeInteger(v.price_cents) || v.price_cents < 0)
