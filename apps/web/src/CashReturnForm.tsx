@@ -82,7 +82,6 @@ export function CashReturnForm({session,cashId,onReturned,onLockChange}:{
    }else setUncertain(true);
   }finally{setBusy(false);}
  }
- const eligible=sale&&['confirmed','partially_returned'].includes(sale.status)&&sale.cash_only;
  return <section>
   <h2>Devolução de peças — pagamento em dinheiro</h2>
   <p className="muted">Localize a venda, selecione apenas as peças recebidas e registre a condição física. Peças avariadas ficam fora do estoque vendável.</p>
