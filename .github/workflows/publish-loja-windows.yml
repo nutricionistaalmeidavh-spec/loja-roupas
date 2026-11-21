@@ -143,12 +143,12 @@ jobs:
           Atualização de manutenção do aplicativo local com PostgreSQL integrado. Corrige a inicialização do PostgreSQL em Windows sem DLLs necessárias e adiciona a recuperação offline da senha administrativa.
 
           ### Correções desta versão
-- Diagnóstico de dependências do PostgreSQL antes de alterar a base.
-- Componente VC++ oficial incluído no pacote, instalado apenas sob escolha explícita do usuário.
-- Recuperação segura de senha do administrador apenas no computador principal, sem apagar dados.
-- Revogação das sessões antigas após redefinição da senha.
+          - Diagnóstico de dependências do PostgreSQL antes de alterar a base.
+          - Componente VC++ oficial incluído no pacote, instalado apenas sob escolha explícita do usuário.
+          - Recuperação segura de senha do administrador apenas no computador principal, sem apagar dados.
+          - Revogação das sessões antigas após redefinição da senha.
 
-### Instalação
+          ### Instalação
           Baixe **Loja-de-Roupas-Setup-x64.exe** e execute no Windows 64 bits. O assistente prepara banco, API e interface no próprio computador, sem hospedagem e sem assinatura obrigatória.
 
           ### Atualizações com autorização explícita
