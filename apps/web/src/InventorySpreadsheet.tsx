@@ -42,6 +42,9 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  const [category,setCategory]=useState('');
  const [categories,setCategories]=useState<string[]>([]);
  const [offset,setOffset]=useState(0);
+ const [cursor,setCursor]=useState<string|null>(null);
+ const [nextCursor,setNextCursor]=useState<string|null>(null);
+ const [cursorTrail,setCursorTrail]=useState<Array<string|null>>([]);
  const [rows,setRows]=useState<SheetRow[]>([]);
  const [total,setTotal]=useState(0);
  const [loading,setLoading]=useState(true);
@@ -69,7 +72,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  const selectedRow=rows.find(r=>r.variant_id===selectedId)??null;
 
  useEffect(()=>{
-  const timer=setTimeout(()=>{setOffset(0);setSearch(query.trim());},270);
+  const timer=setTimeout(()=>{setOffset(0);setCursor(null);setNextCursor(null);setCursorTrail([]);setSearch(query.trim());},270);
   return ()=>clearTimeout(timer);
  },[query]);
  useEffect(()=>{
@@ -83,10 +86,10 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
    const current=++serial;
    if(!background)setLoading(true);
    try{
-    const page=await listStockSpreadsheet(session,{query:search,category,offset,limit},fetch,ctrl.signal);
+    const page=await listStockSpreadsheet(session,{query:search,category,offset,limit,cursor},fetch,ctrl.signal);
     if(!active||current!==serial)return;
     if(dirtyRef.current||savingRef.current){setStale(true);return;}
-    setRows(page.items.map(toRow));setTotal(page.total);setCategories(page.categories);
+    setRows(page.items.map(toRow));setTotal(page.total);setCategories(page.categories);setNextCursor(page.next_cursor??null);
     setError('');setStale(false);setLastUpdated(new Date().toLocaleTimeString('pt-BR'));
    }catch(err){
     if(active&&!ctrl.signal.aborted)setError(err instanceof Error?err.message:'Falha ao atualizar a planilha');
@@ -100,7 +103,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   document.addEventListener('visibilitychange',visible);
   return ()=>{active=false;ctrl.abort();window.clearInterval(timer);
    document.removeEventListener('visibilitychange',visible);};
- },[session,search,category,offset,refreshKey]);
+ },[session,search,category,offset,cursor,refreshKey]);
 
  useEffect(()=>{
   if(!action){setActionProducts([]);setHistoryError('');return;}
@@ -233,7 +236,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
       onChange={e=>setQuery(e.target.value)}/>
    </label>
    <label>Categoria
-    <select value={category} disabled={Boolean(dirty)} onChange={e=>{setCategory(e.target.value);setOffset(0);}}>
+    <select value={category} disabled={Boolean(dirty)} onChange={e=>{setCategory(e.target.value);setOffset(0);setCursor(null);setNextCursor(null);setCursorTrail([]);}}>
      <option value="">Todas</option>
      {categories.map(c=><option key={c} value={c}>{c}</option>)}
     </select>
@@ -279,9 +282,9 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
    <span>{rows.length} SKUs na página · {total} no filtro · saldo disponível considera reservas</span>
    <div className="workspace-actions">
     <button type="button" className="light-button" disabled={offset===0||Boolean(dirty)||loading}
-      onClick={()=>setOffset(x=>Math.max(0,x-limit))}>Anterior</button>
-    <button type="button" className="light-button" disabled={offset+rows.length>=total||Boolean(dirty)||loading}
-      onClick={()=>setOffset(x=>x+limit)}>Próxima</button>
+      onClick={()=>{setCursor(cursorTrail[cursorTrail.length-1]??null);setCursorTrail(x=>x.slice(0,-1));setOffset(x=>Math.max(0,x-limit));}}>Anterior</button>
+    <button type="button" className="light-button" disabled={!nextCursor||Boolean(dirty)||loading}
+      onClick={()=>{if(!nextCursor)return;setCursorTrail(x=>[...x,cursor]);setCursor(nextCursor);setOffset(x=>x+limit);}}>Próxima</button>
    </div>
   </footer>
   {bulkOpen&&<SpreadsheetBulkEditor session={session} rows={rows}
