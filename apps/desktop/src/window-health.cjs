@@ -15,9 +15,9 @@ function normalizedFailure(kind, code, _unsafeDetails) {
 function attachWindowHealth({window, notify, onDiagnostic=()=>{}, unresponsiveMs=8000}) {
  if(!window || !window.webContents || typeof notify!=='function')
   throw new TypeError('Janela e notificador são obrigatórios.');
- let busy=false, frozenTimer=null, disposed=false;
+ let busy=false, frozenTimer=null, disposed=false, closing=false;
  const report=(kind,code)=>{
-  if(disposed||busy||window.isDestroyed())return;
+  if(disposed||closing||busy||window.isDestroyed())return;
   busy=true;
   const data=normalizedFailure(kind,code);
   try{onDiagnostic(data);}catch{/* Do not block the recovery UI if logging fails. */}
@@ -48,6 +48,7 @@ function attachWindowHealth({window, notify, onDiagnostic=()=>{}, unresponsiveMs
  const onResponsive=()=>{
   if(frozenTimer!==null){clearTimeout(frozenTimer);frozenTimer=null;}
  };
+ const onClosing=()=>{closing=true;onResponsive();};
  const dispose=()=>{
   if(disposed)return;
   disposed=true;
@@ -56,11 +57,13 @@ function attachWindowHealth({window, notify, onDiagnostic=()=>{}, unresponsiveMs
   window.webContents.removeListener('render-process-gone',onRendererExit);
   window.removeListener('unresponsive',onUnresponsive);
   window.removeListener('responsive',onResponsive);
+  window.removeListener('close',onClosing);
  };
  window.webContents.on('did-fail-load',onLoadFailure);
  window.webContents.on('render-process-gone',onRendererExit);
  window.on('unresponsive',onUnresponsive);
  window.on('responsive',onResponsive);
+ window.on('close',onClosing);
  window.once('closed',dispose);
  return {dispose, report};
 }
