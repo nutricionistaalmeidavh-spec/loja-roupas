@@ -36,14 +36,12 @@ export function FirstRunTour({storeId,roles,replayToken,suspended=false,onNaviga
  useEffect(()=>{if(open)saveFlag(key,'step:'+index);},[open,index,key]);
  useEffect(()=>{
   if(!visible||!step)return;
-  navigatorRef.current(step.page);
   let highlighted:Element|null=null;
   const raf=requestAnimationFrame(()=>{
    highlighted=document.querySelector('[data-tour="'+step.target+'"]');
    if(!highlighted&&step.target==='cart')highlighted=document.querySelector('[data-tour="mobile-cart"]');
    if(highlighted){highlighted.setAttribute('data-tour-active','true');highlighted.scrollIntoView({block:'nearest',behavior:'instant'});}
    setTargetFound(Boolean(highlighted));
-   titleRef.current?.focus();
   });
   return ()=>{cancelAnimationFrame(raf);highlighted?.removeAttribute('data-tour-active');};
  },[visible,index,storeId]);
@@ -55,6 +53,14 @@ export function FirstRunTour({storeId,roles,replayToken,suspended=false,onNaviga
   document.addEventListener('keydown',escape);
   return ()=>document.removeEventListener('keydown',escape);
  },[visible,key]);
+ function navigateStep(nextIndex:number){
+  const next=steps[nextIndex];
+  if(!next)return;
+  setIndex(nextIndex);
+  navigatorRef.current(next.page);
+  // Não roubar o foco de um diálogo que esteja aberto, nem do botão que o acionou.
+  requestAnimationFrame(()=>titleRef.current?.focus());
+ }
  function close(result:'complete'|'skipped'){saveFlag(key,result);setOpen(false);}
  if(!visible||!step)return null;
  return <section className="tour-card" role="dialog" aria-modal="false" aria-label="Guia inicial da loja">
@@ -68,10 +74,10 @@ export function FirstRunTour({storeId,roles,replayToken,suspended=false,onNaviga
   <p>{step.description}</p>
   {!targetFound&&<p className="tour-help">Esta seção pode não estar visível na tela atual. Use o menu da loja para acessá-la.</p>}
   <div className="tour-actions">
-   <button type="button" className="light-button" disabled={index===0} onClick={()=>setIndex(n=>n-1)}>Voltar</button>
+   <button type="button" className="light-button" disabled={index===0} onClick={()=>navigateStep(index-1)}>Voltar</button>
    {index===steps.length-1
     ?<button type="button" className="primary-action" onClick={()=>close('complete')}>Concluir tour</button>
-    :<button type="button" className="primary-action" onClick={()=>setIndex(n=>n+1)}>Próximo</button>}
+    :<button type="button" className="primary-action" onClick={()=>navigateStep(index+1)}>Próximo</button>}
   </div>
  </section>;
 }
