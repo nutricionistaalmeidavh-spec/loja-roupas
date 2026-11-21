@@ -82,6 +82,10 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
     const key=requireIdempotencyKey(request.headers['idempotency-key']);
     const input={...request.body,quantity:validateReceiptQuantity(request.body.quantity)};
     const response=await withIdempotentTransaction(db,auth,'stock.direct_receipt.create',key,input,async client=>{
+      if(!auth.roles.includes('manager')) {
+        const grant=await client.query('SELECT 1 FROM stock_direct_receive_grants WHERE store_id=$1 AND user_id=$2 AND revoked_at IS NULL FOR UPDATE',[auth.storeId,auth.userId]);
+        if(!grant.rowCount)throw new DomainError(403,'DIRECT_RECEIPT_FORBIDDEN','Autorização revogada');
+      }
       const variant=await client.query<{id:string}>(`SELECT id::text FROM product_variants WHERE id=$1 AND store_id=$2 FOR KEY SHARE`,
         [input.variant_id,auth.storeId]);
       if(!variant.rowCount)throw new DomainError(404,'VARIANT_NOT_FOUND','Variante não encontrada na loja');
@@ -112,10 +116,20 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
     });
     return reply.code(201).send(response.result);
   });
-  app.get('/v1/stock/direct-receipt/grants',async(request,reply)=>{
-    if(requirePermission(request,reply,'stock.adjust'))return reply;
+  app.get('/v1/stock/direct-receipt/access',async(request)=>{
     const auth=request.authContext!;
-    const rows=await db.query('SELECT user_id::text,granted_by::text,granted_at,revoked_at FROM stock_direct_receive_grants WHERE store_id=$1 ORDER BY granted_at DESC LIMIT 200',[auth.storeId]);
+    if(auth.roles.includes('manager'))return {allowed:true};
+    const grant=await db.query('SELECT 1 FROM stock_direct_receive_grants WHERE store_id=$1 AND user_id=$2 AND revoked_at IS NULL',[auth.storeId,auth.userId]);
+    return {allowed:Boolean(grant.rowCount)};
+  });
+  app.get('/v1/stock/direct-receipt/grants',async(request,reply)=>{
+    if(!request.authContext!.roles.includes('manager'))return reply.code(403).send({code:'FORBIDDEN',message:'Somente gestores podem administrar autorizações'});
+    const auth=request.authContext!;
+    const rows=await db.query(`SELECT u.id::text AS user_id,u.login,u.status,coalesce(bool_or(r.role_code='manager'),false) AS manager,
+      g.granted_by::text,g.granted_at,g.revoked_at,(g.user_id IS NOT NULL AND g.revoked_at IS NULL) AS enabled
+      FROM users u JOIN user_store_roles r ON r.user_id=u.id AND r.store_id=$1
+      LEFT JOIN stock_direct_receive_grants g ON g.store_id=$1 AND g.user_id=u.id
+      GROUP BY u.id,u.login,u.status,g.user_id,g.granted_by,g.granted_at,g.revoked_at ORDER BY u.login LIMIT 200`,[auth.storeId]);
     return {grants:rows.rows};
   });
   app.put<{Params:{id:string};Body:{enabled:boolean}}>('/v1/stock/direct-receipt/grants/:id',{
