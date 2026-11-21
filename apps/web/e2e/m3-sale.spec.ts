@@ -59,7 +59,7 @@ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectO
  await expect(page.getByText(/Novo saldo em mãos: 5/)).toBeVisible();
  await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
 
- await page.getByRole('button',{name:'PDV'}).click();
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
  const scannerInput=page.getByLabel('Buscar nome, SKU ou código');
  await scannerInput.focus();
  await scannerInput.pressSequentially(barcode);
@@ -97,7 +97,7 @@ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectO
  await page.getByLabel('Dinheiro contado (R$)').fill('200,00');
  await page.getByRole('button',{name:'Fechar e conferir caixa'}).click();
  await expect(page.getByText('Caixa fechado.')).toBeVisible();
- await page.getByRole('button',{name:'PDV'}).click();
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
  await expect(page.getByRole('button',{name:'Abra o caixa para vender'})).toBeDisabled();
  await page.screenshot({path:'test-results/m3-pdv-cash-closed.png',fullPage:true});
 });
