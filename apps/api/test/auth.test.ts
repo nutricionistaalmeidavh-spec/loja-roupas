@@ -31,6 +31,7 @@ test('login não armazena token em texto e requer loja autorizada', async()=>{
   assert.equal(login.headers['cache-control'],'no-store');
   const token=login.json().token;
   assert.equal(db.state.sessionHash,hashSessionToken(token));
+  assert.equal(login.json().stores[0].name,'Loja de teste');
   const noAuth=await app.inject({url:'/v1/auth/me',headers:{'x-store-id':storeId}});
   assert.equal(noAuth.statusCode,401);
   const me=await app.inject({url:'/v1/auth/me',headers:{authorization:`Bearer ${token}`,'x-store-id':storeId}});
