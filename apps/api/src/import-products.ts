@@ -72,6 +72,10 @@ export function registerProductImport(app:FastifyInstance,db:Pool){
     }
     const key=requireIdempotencyKey(request.headers['idempotency-key']);
     const output=await withIdempotentTransaction(db,auth,'catalog.products.import',key,{products:normalized},async client=>{
+      if(normalized.some(p=>p.variants.some(v=>v.initial_stock>0))&&!auth.roles.includes('manager')){
+        const grant=await client.query('SELECT 1 FROM stock_direct_receive_grants WHERE store_id=$1 AND user_id=$2 AND revoked_at IS NULL FOR UPDATE',[auth.storeId,auth.userId]);
+        if(!grant.rowCount)throw new DomainError(403,'DIRECT_RECEIPT_FORBIDDEN','Autorização para estoque inicial revogada');
+      }
       const existing=await client.query<{sku:string}>(
         'SELECT sku FROM product_variants WHERE store_id=$1 AND sku=ANY($2::text[]) LIMIT 1',
         [auth.storeId,[...skus]]);
