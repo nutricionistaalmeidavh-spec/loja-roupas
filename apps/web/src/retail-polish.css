@@ -162,3 +162,10 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:0s!important;transition-duration:0s!important}
 }
 @media print{.task-dialog,.mobile-drawer,.checkout-modal{animation:none}}
+
+/* Busca de produto e controles de variantes acessíveis em desktop e touch. */
+.workspace-search-field{position:relative;display:block;width:100%;min-width:0}
+.workspace-search-field input{width:100%;padding-right:50px}
+.workspace-search-field button{position:absolute;right:4px;top:4px;bottom:4px;min-width:42px;border:0;border-radius:7px;background:transparent;display:grid;place-items:center;color:var(--retail-muted)}
+.workspace-search-field button:hover{background:#eee}
+.product-card .sizes button{min-height:44px;min-width:44px}
