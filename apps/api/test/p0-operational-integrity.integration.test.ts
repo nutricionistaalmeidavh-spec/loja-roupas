@@ -57,7 +57,7 @@ test('P0: entrada por conferência, devolução parcial e quarentena sem duplici
   assert.deepEqual(purchaseCheck.rows[0],{received_quantity:3,accepted_quantity:2,rejected_quantity:1,missing_quantity:1});
   // Mais duas peças vendáveis para exercitar o retorno parcial.
   const receipt=await app.inject({method:'POST',url:'/v1/stock/receipts',headers:write(),
-   payload:{variant_id:variant,quantity:2,reference_id:randomUUID()}});
+   payload:{variant_id:variant,quantity:2,reference_id:randomUUID(),note:'Ajuste excepcional para teste de devolução'}});
   assert.equal(receipt.statusCode,201,receipt.body);
   const cash=await app.inject({method:'POST',url:'/v1/cash-sessions',headers:write(),
    payload:{terminal_code:'P0-01',opening_cents:0}});
