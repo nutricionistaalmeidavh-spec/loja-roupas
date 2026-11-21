@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import type { Session } from './api-client.ts';
 import { listCatalog } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
+import { appendCatalogPage } from './catalog-pagination.ts';
 import type { Product } from './catalog-model.ts';
 import { CreateProductForm } from './Management.tsx';
 import { M2CatalogEditor } from './M2Admin.tsx';
@@ -16,6 +17,8 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
   const [search,setSearch]=useState('');
   const [products,setProducts]=useState<Product[]>([]);
   const [loading,setLoading]=useState(false);
+  const [cursor,setCursor]=useState<string|null>(null);
+  const [nextCursor,setNextCursor]=useState<string|null>(null);
   const [error,setError]=useState('');
   const [mode,setMode]=useState<'list'|'edit'|'sheet'>('list');
   const [selectedProduct,setSelectedProduct]=useState<{id:string;name:string}|null>(null);
@@ -23,19 +26,22 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
   const [createLocked,setCreateLocked]=useState(false);
   const [importOpen,setImportOpen]=useState(false);
   const [revision,setRevision]=useState(0);
-  function refreshed(){setRevision(x=>x+1);onSaved();}
+  function refreshed(){setCursor(null);setNextCursor(null);setProducts([]);setRevision(x=>x+1);onSaved();}
   useEffect(()=>{
     const controller=new AbortController();
     const timer=setTimeout(()=>{
       setLoading(true);setError('');
-      void listCatalog(session,search,fetch,controller.signal).then(page=>{
-        if(!controller.signal.aborted)setProducts(mapCatalog(page));
+      void listCatalog(session,search,fetch,controller.signal,cursor??undefined).then(page=>{
+        if(!controller.signal.aborted){
+          setProducts(current=>appendCatalogPage(current,mapCatalog(page),Boolean(cursor)));
+          setNextCursor(page.next_cursor===cursor?null:page.next_cursor);
+        }
       }).catch(err=>{
         if(!controller.signal.aborted)setError(err instanceof Error?err.message:'Não foi possível consultar o catálogo');
       }).finally(()=>{if(!controller.signal.aborted)setLoading(false);});
     },250);
     return ()=>{clearTimeout(timer);controller.abort();};
-  },[session,search,revision]);
+  },[session,search,revision,cursor]);
   return <div className="products-workspace">
     <section className="workspace-hero">
       <div><h2>Catálogo da loja</h2>
@@ -55,9 +61,9 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
     </Suspense>:mode==='list'?<section className="workspace-card">
       <label className="workspace-search-label">Pesquisar no catálogo
         <span className="workspace-search-field">
-          <input value={search} onChange={e=>setSearch(e.target.value)}
+          <input value={search} onChange={e=>{setProducts([]);setCursor(null);setNextCursor(null);setSearch(e.target.value);}}
             placeholder="Nome, SKU ou código de barras"/>
-          {search&&<button type="button" aria-label="Limpar busca de produtos" onClick={()=>setSearch('')}><UiIcon name="x" size={16}/></button>}
+          {search&&<button type="button" aria-label="Limpar busca de produtos" onClick={()=>{setSearch('');setProducts([]);setCursor(null);setNextCursor(null);}}><UiIcon name="x" size={16}/></button>}
         </span>
       </label>
       {loading&&<p role="status">Buscando produtos…</p>}
@@ -78,7 +84,8 @@ export function ProductsWorkspace({session,onSaved}:{session:Session;onSaved:()=
           </div>
         </article>)}
       </div>
-      {products.length===50&&<p className="muted small">Exibindo até 50 peças. Refine a busca para encontrar outros produtos.</p>}
+      {products.length>0&&<p className="muted small">{products.length} produtos carregados{nextCursor?' · há mais resultados':''}.</p>}
+      {nextCursor&&<button type="button" className="light-button" disabled={loading} onClick={()=>setCursor(nextCursor)}>{loading?'Carregando…':'Carregar mais produtos'}</button>}
     </section>:<div className="workspace-editor">
       <M2CatalogEditor key={selectedProduct?.id??'catalog-editor'} session={session} onSaved={refreshed}
         initialProductId={selectedProduct?.id} initialProductName={selectedProduct?.name}/>

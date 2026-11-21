@@ -4,7 +4,7 @@ import { requirePermission } from './auth.ts';
 import { DomainError } from './transactions.ts';
 
 type Row = {
- product_id:string;name:string;category:string;product_revision:string;has_photo:boolean;
+ product_id:string;name:string;category:string;product_revision:string;has_photo:boolean;photo_version:string|null;
  variant_id:string;sku:string;barcode:string|null;color:string;size:string;
  price_cents:string;available:string;revision:string;variant_revision:string;
 };
@@ -22,11 +22,11 @@ function decodeCursor(raw:string|undefined):Cursor|null {
 function encodeCursor(name:string,id:string){return Buffer.from(JSON.stringify({name,id})).toString('base64url');}
 function serializeProducts(rows:Row[],limit:number){
   type Variant={id:string;product_id:string;sku:string;barcode:string|null;color:string;size:string;price_cents:number;available:number;revision:number;variant_revision:number};
-  const byId=new Map<string,{id:string;name:string;category:string;revision:number;has_photo:boolean;variants:Variant[]}>();
+  const byId=new Map<string,{id:string;name:string;category:string;revision:number;has_photo:boolean;photo_version:string|null;variants:Variant[]}>();
   for(const row of rows) {
     if(!byId.has(row.product_id))byId.set(row.product_id,{
       id:row.product_id,name:row.name,category:row.category,revision:Number(row.product_revision??1),
-      has_photo:row.has_photo===true,variants:[]
+      has_photo:row.has_photo===true,photo_version:row.photo_version??null,variants:[]
     });
     const price=Number(row.price_cents),available=Number(row.available),revision=Number(row.revision??0),variantRevision=Number(row.variant_revision??1);
     if(![price,available,revision,variantRevision].every(Number.isSafeInteger) || price<0 || available<0)
@@ -51,7 +51,7 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
   const {query='',limit=30,cursor,category='',exact=false}=request.query;
   const after=decodeCursor(cursor);
   const rows=await db.query<Row>(`SELECT p.id::text AS product_id,p.name,p.category,p.revision::text AS product_revision,
-    (img.product_id IS NOT NULL) AS has_photo,
+    (img.product_id IS NOT NULL) AS has_photo,img.sha256::text AS photo_version,
     v.id::text AS variant_id,v.sku,v.barcode,v.color,v.size,v.price_cents::text,
     (coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available,
     coalesce(s.revision,0)::text AS revision,v.revision::text AS variant_revision
@@ -91,7 +91,7 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
   if(ids.length>50||ids.some(id=>!uuid.test(id))||new Set(ids).size!==ids.length)
    throw new DomainError(400,'INVALID_VARIANTS','Lista de variantes inválida');
   const data=await db.query<Row>(`SELECT p.id::text AS product_id,p.name,p.category,
-   p.revision::text AS product_revision,(img.product_id IS NOT NULL) AS has_photo,
+   p.revision::text AS product_revision,(img.product_id IS NOT NULL) AS has_photo,img.sha256::text AS photo_version,
    v.id::text AS variant_id,v.sku,v.barcode,v.color,v.size,v.price_cents::text,
    (coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available,
    coalesce(s.revision,0)::text AS revision,v.revision::text AS variant_revision

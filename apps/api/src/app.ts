@@ -5,6 +5,7 @@ import { registerCatalog } from './catalog.ts';
 import { registerMutations } from './mutations.ts';
 import {registerDirectReceiptReversal} from './direct-receipt-reversal.ts';
 import { registerCatalogAdmin } from './catalog-admin.ts';
+import {registerCatalogGallery} from './catalog-gallery.ts';
 import { registerCashReturns } from './cash-returns.ts';
 import { registerCash } from './cash.ts';
 import { registerSales } from './sales.ts';
@@ -40,6 +41,7 @@ export function buildApp(db: Pool) {
   registerDirectReceiptReversal(app,db);
   registerProductImport(app, db);
   registerCatalogAdmin(app, db);
+  registerCatalogGallery(app, db);
   registerCash(app, db);
   registerCashReturns(app, db);
   registerSales(app, db);

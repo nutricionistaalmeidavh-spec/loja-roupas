@@ -1,4 +1,5 @@
 import { ProductFields } from './ProductFields.tsx';
+import {CatalogGalleryEditor} from './CatalogGalleryEditor.tsx';
 import { BarcodeLabel } from './BarcodeLabel.tsx';
 import { PublishVariant, StockHolds } from './StoreOperations.tsx';
 import { requestId } from './request-id.ts';
@@ -179,7 +180,7 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
    </form>}
    <form onSubmit={e=>void submit('photo',e)} className="editor-block">
     <h3>Fotografia da peça</h3>
-    <p className="muted small">Uma foto principal por produto; PNG, JPEG ou WebP até 2 MiB.</p>
+    <p className="muted small">Foto principal exibida no PDV; PNG, JPEG ou WebP até 2 MiB. Fotos adicionais na galeria abaixo.</p>
     <label>Selecionar fotografia<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||Boolean(pending)}
        onChange={e=>setPhoto(e.target.files?.[0]??null)}/></label>
     {photo&&photoPreview&&<div className="photo-upload-preview">
@@ -189,6 +190,8 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
     </div>}
     <button type="submit" className="light-button" disabled={!photo||busy}>Enviar fotografia local</button>
    </form>
+   <CatalogGalleryEditor key={current.id} session={session} product={current} refresh={refresh}
+     onSaved={()=>{setRefresh(n=>n+1);onSaved();}}/>
   </>}
   {error&&<p role="alert" className="error">{error}</p>}
   {notice&&<p role="status" className="notice">{notice}</p>}

@@ -98,9 +98,16 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
     content_type=EXCLUDED.content_type,image_bytes=EXCLUDED.image_bytes,sha256=EXCLUDED.sha256,
     thumb_bytes=EXCLUDED.thumb_bytes,thumb_type=EXCLUDED.thumb_type,updated_at=now()`,
     [request.params.id,auth.storeId,type,bytes,sha256,thumbnail]);
+   const rev=await client.query<{revision:string}>(
+    'UPDATE products SET revision=revision+1 WHERE store_id=$1 AND id=$2 RETURNING revision::text',
+    [auth.storeId,request.params.id]);
+   const revision=Number(rev.rows[0].revision);
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail) VALUES
-     ($1,$2,'catalog.photo.update',$3,$4::jsonb)`,[auth.storeId,auth.userId,request.params.id,JSON.stringify({sha256,type})]);
-   return {product_id:request.params.id,sha256,content_type:type};
+     ($1,$2,'catalog.photo.update',$3,$4::jsonb)`,[auth.storeId,auth.userId,request.params.id,JSON.stringify({sha256,type,revision})]);
+   await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
+     VALUES($1,'catalog.product.updated.v1',$2,$3,$4::jsonb)`,
+     [auth.storeId,request.params.id,revision,JSON.stringify({revision,media:true})]);
+   return {product_id:request.params.id,sha256,content_type:type,revision};
   });
   return response.result;
  });
@@ -156,16 +163,27 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
     [request.authContext!.storeId,request.query.variant_id,request.query.limit??50]);
    return {items:rows.rows.map(r=>({...r,qty_delta:Number(r.qty_delta)}))};
  });
- app.get<{Params:{id:string}}>('/v1/catalog/products/:id/thumbnail',{schema:{params:uuidParams}},async(request,reply)=>{
+ app.get<{Params:{id:string};Querystring:{v?:string}}>('/v1/catalog/products/:id/thumbnail',{
+  schema:{params:uuidParams,querystring:{type:'object',additionalProperties:false,
+   properties:{v:{type:'string',pattern:'^[a-f0-9]{64}$'}}}}
+ },async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.read'))return reply;
-  const row=await db.query<{bytes:Buffer;mime:string}>(`SELECT
-   COALESCE(thumb_bytes,image_bytes) AS bytes,
+  const row=await db.query<{bytes:Buffer;mime:string;sha256:string}>(`SELECT
+   sha256,COALESCE(thumb_bytes,image_bytes) AS bytes,
    CASE WHEN thumb_bytes IS NOT NULL THEN thumb_type ELSE content_type END AS mime
    FROM product_photos WHERE product_id=$1 AND store_id=$2`,
    [request.params.id,request.authContext!.storeId]);
   if(!row.rowCount)throw new DomainError(404,'NO_IMAGE','Produto sem fotografia');
-  return reply.header('cache-control','private,no-store').header('x-content-type-options','nosniff')
-   .type(row.rows[0].mime).send(row.rows[0].bytes);
+  const data=row.rows[0];
+  if(request.query.v&&request.query.v!==data.sha256)
+   throw new DomainError(409,'PHOTO_CHANGED','Fotografia atualizada; recarregue o catálogo');
+  const etag='"'+data.sha256+'"';
+  reply.header('etag',etag)
+   .header('cache-control',request.query.v?'private, max-age=300, must-revalidate':'private, no-store')
+   .header('vary','Authorization, x-store-id')
+   .header('x-content-type-options','nosniff');
+  if(request.headers['if-none-match']===etag)return reply.code(304).send();
+  return reply.type(data.mime).send(data.bytes);
  });
  app.post<{Params:{id:string};Body:{sku:string;color:string;size:string;price_cents:number;barcode?:string|null;expected_product_revision:number}}>(
  '/v1/catalog/products/:id/variants',{
