@@ -38,8 +38,15 @@ export function registerProductImport(app:FastifyInstance,db:Pool){
   },async(request,reply)=>{
     if(requirePermission(request,reply,'catalog.write'))return reply;
     if(request.body.products.some(product=>product.variants.some(v=>v.initial_stock>0)) &&
-       requirePermission(request,reply,'stock.receive'))return reply;
+       !request.authContext!.roles.includes('manager')) {
+      const auth=request.authContext!;
+      const grant=await db.query('SELECT 1 FROM stock_direct_receive_grants WHERE store_id=$1 AND user_id=$2 AND revoked_at IS NULL',[auth.storeId,auth.userId]);
+      if(!grant.rowCount)return reply.code(403).send({code:'FORBIDDEN',message:'Importação com estoque inicial exige autorização para entrada direta'});
+    }
     const auth=request.authContext!;
+    if(request.body.products.some(p=>p.variants.some(v=>v.initial_stock>0)) &&
+      String(request.headers['x-stock-import-reason']??'').trim().length<8)
+      throw new DomainError(422,'IMPORT_STOCK_REASON','Informe justificativa no cabeçalho x-stock-import-reason');
     const normalized = request.body.products.map((raw,index)=>{
       try {
         const draft=normalizeProductDraft({name:raw.name,category:raw.category,
@@ -104,7 +111,7 @@ export function registerProductImport(app:FastifyInstance,db:Pool){
         await client.query(
           'INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail) VALUES($1,$2,$3,$4,$5::jsonb)',
           [auth.storeId,auth.userId,'catalog.product.import',productId,
-            JSON.stringify({variants:product.variants.length,stock_units:product.variants.reduce((a,v)=>a+v.initial_stock,0)})]);
+            JSON.stringify({variants:product.variants.length,stock_units:product.variants.reduce((a,v)=>a+v.initial_stock,0),reason:String(request.headers['x-stock-import-reason']??'').trim(),source:'spreadsheet_import'})]);
       }
       return {products_created:normalized.length,variants_created:totalVariants,stock_units:stockUnits};
     });
