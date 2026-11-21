@@ -5,7 +5,7 @@
  * credentials, database connection strings, or business records.
  */
 function normalizedFailure(kind, code, _unsafeDetails) {
- const types=new Set(['navigation','renderer','unresponsive','service']);
+ const types=new Set(['navigation','renderer','unresponsive','service','render']);
  return {
   kind:types.has(kind)?kind:'unknown',
   code:Number.isSafeInteger(code)?code:null
