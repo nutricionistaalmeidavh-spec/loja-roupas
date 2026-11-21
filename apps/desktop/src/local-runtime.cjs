@@ -6,7 +6,7 @@ const fs = require('node:fs/promises');
 const net = require('node:net');
 const path = require('node:path');
 
-const expectedBinaries=resources=>['initdb.exe','pg_ctl.exe','psql.exe','createdb.exe'].map(name=>path.join(resources,'runtime','postgres','bin',name));
+const expectedBinaries=resources=>['initdb.exe','pg_ctl.exe','psql.exe','createdb.exe','postgres.exe','pg_dump.exe'].map(name=>path.join(resources,'runtime','postgres','bin',name));
 function makeDatabaseUrl(password,port){
  const url=new URL('postgresql://postgres@127.0.0.1:'+port+'/loja');
  url.password=password;
@@ -32,7 +32,8 @@ async function freePort(){
 }
 async function execute(binary,args,options={}){
  return new Promise((resolve,reject)=>{
-  const child=spawn(binary,args,{cwd:options.cwd,env:options.env,windowsHide:true,stdio:['ignore','pipe','pipe']});
+  const child=spawn(binary,args,{cwd:options.cwd,env:options.env,windowsHide:true,stdio:[options.input===undefined?'ignore':'pipe','pipe','pipe']});
+  if(options.input!==undefined)child.stdin.end(options.input);
   let stdout='',stderr='';
   child.stdout.on('data',data=>{stdout+=data.toString();stdout=stdout.slice(-20000);});
   child.stderr.on('data',data=>{stderr+=data.toString();stderr=stderr.slice(-20000);});
@@ -62,6 +63,8 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
  if(process.platform!=='win32')throw new Error('Instalação local autônoma disponível atualmente para Windows x64.');
  const binaries=expectedBinaries(resources);
  for(const binary of binaries)if(!existsSync(binary))throw new Error('Instalador incompleto: falta '+path.basename(binary));
+ for(const folder of ['lib','share'])if(!existsSync(path.join(resources,'runtime','postgres',folder)))
+  throw new Error('Instalador incompleto: faltam bibliotecas PostgreSQL ('+folder+').');
  const apiRoot=path.join(resources,'runtime','api');
  const webRoot=path.join(resources,'runtime','web');
  if(!existsSync(path.join(apiRoot,'src','main.ts'))||!existsSync(path.join(webRoot,'index.html')))
@@ -86,7 +89,7 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
  const databaseUrl=makeDatabaseUrl(config.password,config.pgPort);
  const appEnv={...env,DATABASE_URL:databaseUrl,HOST:'127.0.0.1',PORT:String(config.apiPort),
   LOJA_WEB_DIST:webRoot,LOJA_SYNC_SECRET_DIR:path.join(userData,'sync-secrets'),ELECTRON_RUN_AS_NODE:'1'};
- const node=async(entry,extra={})=>execute(exe,['--import','tsx',path.join(apiRoot,'src',entry)],{cwd:apiRoot,env:{...appEnv,...extra}});
+ const node=async(entry,extra={},input)=>execute(exe,['--import','tsx',path.join(apiRoot,'src',entry)],{cwd:apiRoot,env:{...appEnv,...extra},input});
  const stop=async()=>{
   if(apiChild){apiChild.kill();apiChild=null;}
   if(startedPostgres){
@@ -95,6 +98,15 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
   }
  };
  try{
+  // A presença de initdb.exe não comprova a presença de suas DLLs no Windows.
+  // Executar antes de criar ou alterar qualquer arquivo da base preserva dados.
+  try{await execute(bin('initdb'),['--version'],{env});}
+  catch(error){
+   const message=String(error?.message||error);
+   if(message.includes('3221225781')||message.includes('0xC0000135'))
+    throw new Error('PostgreSQL não iniciou: falta uma DLL do Windows (0xC0000135). Instale o Microsoft Visual C++ Redistributable x64 incluído no instalador e tente novamente. Seus dados foram preservados.');
+   throw new Error('Não foi possível executar o PostgreSQL incluído: '+message);
+  }
   if(!existsSync(path.join(data,'PG_VERSION'))){
    progress('Preparando o banco de dados local…');
    await fs.mkdir(data,{recursive:true,mode:0o700});
@@ -140,6 +152,14 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
   }
   return {
    url,firstRun:!hasUsers,stop,
+   async resetAdminPassword(input){
+    const login=String(input?.login??'').trim().toLowerCase();
+    const password=input?.password;
+    if(!/^[a-z0-9_.@-]{1,80}$/.test(login)||typeof password!=='string'||password.length<12||password.length>256)
+     throw new Error('Informe o usuário administrador e uma nova senha de 12 a 256 caracteres.');
+    await node('reset-local-admin.ts',{},JSON.stringify({login,password}));
+    return {ok:true};
+   },
    async bootstrap(input){
     if((await execute(bin('psql'),['-d','loja','-At','-c','SELECT EXISTS(SELECT 1 FROM users)'],{env})).trim()!=='f')
      throw new Error('A loja já tem administrador. Entre com sua conta.');
