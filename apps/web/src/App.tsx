@@ -367,7 +367,15 @@ export function App() {
         </div>
         {message&&<p role="alert" className="error">{message}</p>}
         {catalogError&&<div className="error" role="alert">{catalogError} <button onClick={refreshed}>Tentar novamente</button></div>}
-        {loading&&<p className="notice" role="status">Carregando produtos da loja…</p>}
+        {loading&&<div className="catalog-loading" role="status" aria-label="Carregando produtos da loja">
+          <span className="sr-only">Carregando produtos da loja…</span>
+          <div className="product-grid" aria-hidden="true">{Array.from({length:6},(_,index)=>
+            <div key={index} className="product-card skeleton-product">
+              <div className="product-visual skeleton-shimmer"/>
+              <div className="skeleton-line"/><div className="skeleton-line short"/>
+              <div className="skeleton-controls"><span/><span/><span/></div>
+            </div>)}</div>
+        </div>}
         {!loading&&!catalogError&&<div className="product-grid" data-tour="variants">
           {filtered.map(p=>{
             const colors=[...new Set(p.variants.map(v=>v.color))];
