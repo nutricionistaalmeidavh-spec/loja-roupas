@@ -163,8 +163,10 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
     [request.authContext!.storeId,request.query.variant_id,request.query.limit??50]);
    return {items:rows.rows.map(r=>({...r,qty_delta:Number(r.qty_delta)}))};
  });
- app.get<{Params:{id:string};Querystring:{v?:string}}>('/v1/catalog/products/:id/thumbnail',{schema:{params:uuidParams,querystring:{
-   type:'object',additionalProperties:false,properties:{v:{type:'string',pattern:'^[a-f0-9]{64}async(request,reply)=>{
+ app.get<{Params:{id:string};Querystring:{v?:string}}>('/v1/catalog/products/:id/thumbnail',{
+  schema:{params:uuidParams,querystring:{type:'object',additionalProperties:false,
+   properties:{v:{type:'string',pattern:'^[a-f0-9]{64}$'}}}}
+ },async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.read'))return reply;
   const row=await db.query<{bytes:Buffer;mime:string;sha256:string}>(`SELECT
    sha256,COALESCE(thumb_bytes,image_bytes) AS bytes,
@@ -177,7 +179,8 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
    throw new DomainError(409,'PHOTO_CHANGED','Fotografia atualizada; recarregue o catálogo');
   const etag='"'+data.sha256+'"';
   reply.header('etag',etag)
-   .header('cache-control',request.query.v?'private, max-age=86400, immutable':'private, no-store')
+   .header('cache-control',request.query.v?'private, max-age=300, must-revalidate':'private, no-store')
+    .header('vary','Authorization, x-store-id')
    .header('x-content-type-options','nosniff');
   if(request.headers['if-none-match']===etag)return reply.code(304).send();
   return reply.type(data.mime).send(data.bytes);
