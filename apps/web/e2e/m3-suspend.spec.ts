@@ -33,7 +33,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await page.getByRole('button',{name:'Registrar entrada de estoque'}).click();
  await expect(page.getByText(/Novo saldo em mãos: 2/)).toBeVisible();
  await page.getByRole('button',{name:'Fechar Receber estoque'}).click();
- await page.getByRole('button',{name:'PDV'}).click();
+ await page.getByRole('button',{name:'PDV',exact:true}).click();
  await page.getByLabel('Buscar nome, SKU ou código').fill(sku);
  const card=page.locator('.product-card').filter({hasText:productName});
  await expect(card.getByText('2 disponíveis')).toBeVisible();
