@@ -24,6 +24,7 @@ test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',as
   buffer:file
  });
  await expect(importer.getByText('Nenhum dado será gravado até a confirmação.')).toBeVisible();
+ await importer.getByLabel('Justificativa para entrada direta de estoque (obrigatória)').fill('Carga inicial da loja validada para testes');
  await importer.getByRole('button',{name:'Confirmar importação'}).click();
  await expect(importer.getByRole('status').filter({hasText:'Importação concluída'})).toContainText('2 variantes');
  await importer.getByRole('button',{name:'Fechar Importar produtos por planilha'}).click();
@@ -43,7 +44,8 @@ test('P0/P1: importação XLSX, consulta, edição e recebimento na planilha',as
  const incoming=page.getByRole('dialog',{name:'Receber peças — '+sku});
  await expect(incoming.getByLabel('Variante (SKU)')).toHaveValue(/.+/);
  await incoming.getByLabel('Quantidade recebida').fill('4');
- await incoming.getByRole('button',{name:'Registrar entrada de estoque'}).click();
+ await incoming.getByLabel('Justificativa obrigatória').fill('Entrada de estoque excepcional para validar a operação');
+ await incoming.getByRole('button',{name:'Confirmar entrada direta'}).click();
  await expect(incoming.getByText(/Novo saldo em mãos: 6/)).toBeVisible();
  await incoming.getByRole('button',{name:'Fechar Receber peças — '+sku}).click();
  await expect(row.getByRole('gridcell').nth(9)).toHaveText('6');
