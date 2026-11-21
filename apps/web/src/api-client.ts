@@ -167,7 +167,7 @@ export type StockSpreadsheetRow={
  entries:number;sold:number;returns:number;adjustments:number;last_movement_at:string|null;
 };
 export type StockSpreadsheetPage={
- items:StockSpreadsheetRow[];total:number;offset:number;limit:number;categories:string[];
+ items:StockSpreadsheetRow[];total:number;offset:number;limit:number;categories:string[];next_cursor?:string|null;
 };
 export type SpreadsheetRowPatch={
  name:string;category:string;sku:string;color:string;size:string;
@@ -175,13 +175,14 @@ export type SpreadsheetRowPatch={
  expected_product_revision:number;expected_variant_revision:number;
 };
 export function listStockSpreadsheet(
- session:Session,options:{query?:string;category?:string;limit?:number;offset?:number}={},
+ session:Session,options:{query?:string;category?:string;limit?:number;offset?:number;cursor?:string}={},
  fetchImpl:typeof fetch=fetch,signal?:AbortSignal
 ):Promise<StockSpreadsheetPage>{
  const params=new URLSearchParams({
   query:options.query??'',category:options.category??'',
   limit:String(options.limit??50),offset:String(options.offset??0)
  });
+ if(options.cursor)params.set('cursor',options.cursor);
  return jsonRequest<StockSpreadsheetPage>('/v1/stock/spreadsheet?'+params.toString(),{
   method:'GET',headers:headers(session),signal
  },fetchImpl);
