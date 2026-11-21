@@ -62,14 +62,14 @@ export function OperationsActionCenter({session,revision=0,onNavigate}:{
     {c&&<div className="operations-overview-grid">
       {actions.map(item=><article key={item.count} className="operations-overview-item">
         <span>{item.label}</span>
-        <strong aria-label={item.label+': '+c[item.count]}>{c[item.count].toLocaleString('pt-BR')}</strong>
+        <strong>{c[item.count].toLocaleString('pt-BR')}</strong>
         <p>{item.detail}</p>
         <button className="light-button" type="button" onClick={()=>onNavigate(item.target)}>
           {item.action}
         </button>
       </article>)}
     </div>}
-    {c&&<div className="operations-overview-alerts" aria-label="Ocorrências de estoque">
+    {c&&<div className="operations-overview-alerts" role="group" aria-label="Ocorrências de estoque">
       <strong>Exceções registradas</strong>
       <div>{alerts.map(item=><span key={item.label}>{item.label}: <b>{item.count.toLocaleString('pt-BR')}</b></span>)}</div>
       <p>Quarentena e faltas são registros de conferência, não representam estoque disponível.</p>
