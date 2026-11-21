@@ -117,6 +117,7 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
       setError('Selecione uma variante e informe quantidade inteira positiva.');
       return;
     }
+    if(note.trim().length<8){setError('Justifique a entrada direta com pelo menos 8 caracteres.');return;}
     const payload:StockReceiptPayload={variant_id:variantId,reference_id:referenceId,quantity:amount,
       ...(note.trim()?{note:note.trim()}:{})};
     const body=JSON.stringify(payload);
@@ -139,7 +140,7 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
     } finally {setBusy(false);}
   }
   return <form className="management-form" onSubmit={event=>void submit(event)}>
-    <div className="form-heading"><h2>Entrada de estoque</h2><p>Registro manual auditável por variante. Não altera vendas nem cria pedidos de compra.</p></div>
+    <div className="form-heading"><h2>Entrada de estoque</h2><p>Operação excepcional: libera saldo para venda imediatamente. Exige autorização individual e justificativa; não conclui pedidos de compra.</p></div>
     <div className="fields-two">
       <label>Variante (SKU)<select required value={variantId} disabled={busy||uncertain} onChange={e=>setVariantId(e.target.value)}>
         <option value="">Selecione uma variante</option>
@@ -147,12 +148,12 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
       </select></label>
       <label>Quantidade recebida<input required type="number" min="1" step="1" value={quantity} disabled={busy||uncertain} onChange={e=>setQuantity(e.target.value)}/></label>
     </div>
-    <label>Observação (opcional)<input maxLength={140} value={note} disabled={busy||uncertain} placeholder="Conferência do lote recebido" onChange={e=>setNote(e.target.value)}/></label>
+    <label>Justificativa obrigatória<input required minLength={8} maxLength={250} value={note} disabled={busy||uncertain} placeholder="Descreva a origem e por que a entrada é excepcional" onChange={e=>setNote(e.target.value)}/></label>
     <p className="muted small">Referência da entrada: {referenceId}. Será usada para impedir duplicidade após reenvio.</p>
     {error&&<p className="error" role="alert">{error}{uncertain&&' A operação pode ter sido gravada. Repita com a mesma chave.'}</p>}
     {notice&&<p className="notice" role="status">{notice}</p>}
     <button type="submit" className="primary-action" disabled={busy||!variants.length}>
-      {busy?'Registrando…':uncertain?'Repetir mesma entrada':'Registrar entrada de estoque'}
+      {busy?'Registrando…':uncertain?'Repetir mesma entrada':'Confirmar entrada direta'}
     </button>
     {!variants.length&&<p className="muted">Cadastre um produto antes de lançar entradas de estoque.</p>}
   </form>;

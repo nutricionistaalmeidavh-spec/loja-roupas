@@ -19,14 +19,15 @@ test('categoria é carregada do servidor e carrinho volta após recarregar',asyn
  await expect(create.getByRole('status').filter({hasText:'Produto cadastrado'})).toBeVisible();
  await create.getByRole('button',{name:'Fechar Novo produto'}).click();
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
- await page.getByRole('button',{name:'Receber estoque'}).click();
- const receiver=page.getByRole('dialog',{name:'Receber estoque'});
+ await page.getByRole('button',{name:'Entrada direta'}).click();
+ const receiver=page.getByRole('dialog',{name:'Entrada direta'});
  await receiver.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const option=receiver.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(option).toBeAttached();
  await receiver.getByLabel('Variante (SKU)').selectOption((await option.getAttribute('value'))!);
  await receiver.getByLabel('Quantidade recebida').fill('2');
- await receiver.getByRole('button',{name:'Registrar entrada de estoque'}).click();
+ await receiver.getByLabel('Justificativa obrigatória').fill('Entrada de estoque excepcional para validar a operação');
+ await receiver.getByRole('button',{name:'Confirmar entrada direta'}).click();
  await expect(receiver.getByText(/Novo saldo em mãos: 2/)).toBeVisible();
  await receiver.getByRole('button',{name:'Fechar Receber estoque'}).click();
  await page.getByRole('button',{name:'Caixa',exact:true}).click();

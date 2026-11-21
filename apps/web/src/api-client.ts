@@ -188,7 +188,7 @@ export type InventoryMovement={
 };
 export type InventoryMovementFilters={
  variant_id?:string;movement_kind?:string;supplier_id?:string;purchase_id?:string;
- operator_id?:string;from?:string;to?:string;limit?:number;offset?:number;
+ operator_id?:string;source_type?:string;from?:string;to?:string;limit?:number;offset?:number;
 };
 export function listSpreadsheetHistory(
  session:Session,filters:InventoryMovementFilters={},fetchImpl:typeof fetch=fetch,signal?:AbortSignal

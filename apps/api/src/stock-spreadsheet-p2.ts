@@ -12,7 +12,7 @@ type BulkEdit={
 };
 type MovementFilters={
  variant_id?:string;movement_kind?:string;supplier_id?:string;purchase_id?:string;
- operator_id?:string;from?:string;to?:string;limit?:number;offset?:number;
+ operator_id?:string;source_type?:string;from?:string;to?:string;limit?:number;offset?:number;
 };
 type Existing={
  variant_id:string;product_id:string;name:string;category:string;sku:string;color:string;size:string;
@@ -144,7 +144,7 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
  app.get<{Querystring:MovementFilters}>('/v1/stock/spreadsheet/movements',{
   schema:{querystring:{type:'object',additionalProperties:false,properties:{
    variant_id:uuidProp,movement_kind:{type:'string',enum:['receipt','sale','return','adjustment']},
-   supplier_id:uuidProp,purchase_id:uuidProp,operator_id:uuidProp,
+   supplier_id:uuidProp,purchase_id:uuidProp,operator_id:uuidProp,source_type:{type:'string',enum:['direct_receipt','direct_receipt_reversal','purchase','spreadsheet_import','manual_receipt','sale','sale_return','manager_adjustment']},
    from:{type:'string',format:'date'},to:{type:'string',format:'date'},
    limit:{type:'integer',minimum:1,maximum:100,default:50},
    offset:{type:'integer',minimum:0,maximum:1000000,default:0}
@@ -154,7 +154,7 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
   const f=request.query,limit=f.limit??50,offset=f.offset??0,store=request.authContext!.storeId;
   if(f.from&&f.to&&f.from>f.to)throw new DomainError(422,'DATE_RANGE','Data inicial posterior à final');
   const args=[store,f.variant_id??null,f.movement_kind??'',f.supplier_id??null,f.purchase_id??null,
-   f.operator_id??null,f.from??null,f.to??null];
+   f.operator_id??null,f.from??null,f.to??null,f.source_type??''];
   const joins=
    ' FROM stock_movements m '+
    'JOIN product_variants v ON v.id=m.variant_id AND v.store_id=m.store_id '+
@@ -165,6 +165,10 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
    "LEFT JOIN sales sale ON m.source_type='sale' AND sale.id=m.source_id AND sale.store_id=m.store_id "+
    "LEFT JOIN cash_sale_returns refunded ON m.source_type='sale_return' AND refunded.id=m.source_id AND refunded.store_id=m.store_id "+
    'LEFT JOIN LATERAL (SELECT a.actor_id FROM audit_logs a WHERE a.store_id=m.store_id AND ('+
+   "(m.source_type='direct_receipt' AND a.action='inventory.direct_receipt' AND "+
+   "a.aggregate_id=m.variant_id AND a.detail->>'reference_id'=m.source_id::text) OR "+
+   "(m.source_type='direct_receipt_reversal' AND a.action='inventory.direct_receipt.reversal' AND "+
+   "a.detail->>'original_movement_id'=m.source_id::text) OR "+
    "(m.source_type='manual_receipt' AND a.action='inventory.receipt' AND "+
    "a.aggregate_id=m.variant_id AND a.detail->>'reference_id'=m.source_id::text) OR "+
    "(m.source_type='manager_adjustment' AND a.action='inventory.adjustment' AND "+
@@ -180,7 +184,8 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
    'AND ($5::uuid IS NULL OR po.id=$5::uuid) '+
    'AND ($6::uuid IS NULL OR staff.id=$6::uuid) '+
    'AND ($7::date IS NULL OR (m.occurred_at AT TIME ZONE st.timezone)::date >= $7::date) '+
-   'AND ($8::date IS NULL OR (m.occurred_at AT TIME ZONE st.timezone)::date <= $8::date)';
+   'AND ($8::date IS NULL OR (m.occurred_at AT TIME ZONE st.timezone)::date <= $8::date) '+
+   "AND ($9::text='' OR m.source_type=$9)";
   const [count,rows]=await Promise.all([
    db.query<{total:string}>('SELECT count(*)::text AS total '+joins,args),
    db.query<{
@@ -192,7 +197,7 @@ export function registerStockSpreadsheetP2(app:FastifyInstance,db:Pool){
     'm.qty_delta::text,m.source_type,m.source_id::text,po.id::text AS purchase_id,'+
     'supplier.id::text AS supplier_id,supplier.name AS supplier_name,'+
     'staff.id::text AS operator_id,staff.login AS operator_login,m.occurred_at '+
-    joins+' ORDER BY m.occurred_at DESC,m.id DESC LIMIT $9 OFFSET $10',[...args,limit,offset])
+    joins+' ORDER BY m.occurred_at DESC,m.id DESC LIMIT $10 OFFSET $11',[...args,limit,offset])
   ]);
   return {total:numberSafe(count.rows[0]?.total??'0','total'),limit,offset,
    items:rows.rows.map(r=>({...r,qty_delta:numberSafe(r.qty_delta,'quantidade'),

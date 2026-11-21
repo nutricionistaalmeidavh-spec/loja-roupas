@@ -1,20 +1,21 @@
 import {useEffect,useState} from 'react';
 import type {Session,InventoryHistoryOptions,InventoryMovement,InventoryMovementFilters} from './api-client.ts';
-import {listSpreadsheetHistory,listInventoryHistoryOptions} from './api-client.ts';
+import {listSpreadsheetHistory,listInventoryHistoryOptions,headers,jsonRequest} from './api-client.ts';
+import {requestId} from './request-id.ts';
 import {TaskDialog} from './TaskDialog.tsx';
 
 const labels:Record<string,string>={
  receipt:'Recebimento',sale:'Venda',return:'Devolução',adjustment:'Ajuste'
 };
 const origins:Record<string,string>={
- manual_receipt:'Entrada manual',spreadsheet_import:'Importação XLSX/CSV',
+ manual_receipt:'Entrada manual',direct_receipt:'Entrada direta',direct_receipt_reversal:'Estorno de entrada direta',spreadsheet_import:'Importação XLSX/CSV',
  purchase:'Pedido de compra',sale:'PDV',sale_return:'Pós-venda',
  manager_adjustment:'Ajuste gerencial'
 };
 type Filters={
- from:string;to:string;movement_kind:string;supplier_id:string;purchase_id:string;operator_id:string;
+ from:string;to:string;movement_kind:string;source_type:string;supplier_id:string;purchase_id:string;operator_id:string;
 };
-const empty:Filters={from:'',to:'',movement_kind:'',supplier_id:'',purchase_id:'',operator_id:''};
+const empty:Filters={from:'',to:'',movement_kind:'',source_type:'',supplier_id:'',purchase_id:'',operator_id:''};
 
 export function StockMovementHistory({session,variantId,sku,onClose}:{
  session:Session;variantId?:string;sku?:string;onClose:()=>void;
@@ -28,6 +29,20 @@ export function StockMovementHistory({session,variantId,sku,onClose}:{
  const [error,setError]=useState('');
  const [optionsError,setOptionsError]=useState('');
  const [refresh,setRefresh]=useState(0);
+ const [reversing,setReversing]=useState<InventoryMovement|null>(null);
+ const [reason,setReason]=useState('');
+ const [reversalKey,setReversalKey]=useState('');
+ const [reverseBusy,setReverseBusy]=useState(false);
+ async function reverse(){
+  if(!reversing||reason.trim().length<8)return;
+  setReverseBusy(true);setError('');
+  try{
+   await jsonRequest('/v1/stock/direct-receipt/'+reversing.id+'/reverse',{
+    method:'POST',headers:{...headers(session,reversalKey),'content-type':'application/json'},body:JSON.stringify({reason:reason.trim()})},fetch);
+   setReversing(null);setReason('');setRefresh(x=>x+1);
+  }catch(e){setError(e instanceof Error?e.message:'Não foi possível estornar a entrada');}
+  finally{setReverseBusy(false);}
+ }
  const limit=50;
  function setField<K extends keyof Filters>(key:K,value:Filters[K]){
   setFilters(current=>({...current,[key]:value}));setOffset(0);
@@ -72,6 +87,13 @@ export function StockMovementHistory({session,variantId,sku,onClose}:{
       {Object.entries(labels).map(([key,value])=><option value={key} key={key}>{value}</option>)}
      </select>
     </label>
+    <label>Origem
+     <select value={filters.source_type} onChange={e=>setField('source_type',e.target.value)}>
+      <option value="">Todas as origens</option>
+      <option value="direct_receipt">Entrada direta</option><option value="direct_receipt_reversal">Estorno de entrada direta</option>
+      <option value="purchase">Pedido de compra</option><option value="spreadsheet_import">Importação</option>
+     </select>
+    </label>
     <label>Fornecedor (pedidos)
      <select value={filters.supplier_id} onChange={e=>{setFilters(f=>({...f,supplier_id:e.target.value,purchase_id:''}));setOffset(0);}}>
       <option value="">Todos os fornecedores</option>
@@ -105,7 +127,7 @@ export function StockMovementHistory({session,variantId,sku,onClose}:{
    {!loading&&!error&&<p className="muted small">{total} movimentações encontradas — {offset+1} a {Math.min(offset+list.length,total)}</p>}
    <div className="sheet-history-table" role="region" aria-label="Histórico de movimentações" tabIndex={0}>
     <table>
-     <thead><tr><th>Data</th><th>SKU</th><th>Movimento</th><th>Qtd.</th><th>Origem</th><th>Fornecedor / Pedido</th><th>Operador</th></tr></thead>
+     <thead><tr><th>Data</th><th>SKU</th><th>Movimento</th><th>Qtd.</th><th>Origem</th><th>Fornecedor / Pedido</th><th>Operador</th>{session.roles.includes('manager')&&<th>Ação</th>}</tr></thead>
      <tbody>{list.map(m=><tr key={m.id}>
       <td>{new Date(m.occurred_at).toLocaleString('pt-BR')}</td>
       <td>{m.sku}</td>
@@ -114,10 +136,18 @@ export function StockMovementHistory({session,variantId,sku,onClose}:{
       <td>{origins[m.source_type]??m.source_type}</td>
       <td>{m.supplier_name??'—'}{m.purchase_id?' · '+m.purchase_id.slice(0,8):''}</td>
       <td>{m.operator_login??'Não registrado'}</td>
+      {session.roles.includes('manager')&&<td>{m.source_type==='direct_receipt'&&<button type="button" className="light-button" onClick={()=>{setReversing(m);setReason('');setReversalKey(requestId());}}>Estornar</button>}</td>}
      </tr>)}</tbody>
     </table>
    </div>
    {!loading&&!error&&list.length===0&&<p className="muted">Nenhum movimento encontrado para os filtros.</p>}
+   {reversing&&<section className="management-form" aria-label="Estorno de entrada direta">
+    <h3>Estornar entrada direta — {reversing.sku}</h3>
+    <p>Esta operação subtrai {reversing.qty_delta} peças. O histórico original será preservado. O sistema bloqueará o estorno se o saldo disponível for insuficiente.</p>
+    <label>Justificativa obrigatória<input value={reason} minLength={8} maxLength={250} disabled={reverseBusy} onChange={e=>setReason(e.target.value)}/></label>
+    <div className="workspace-actions"><button type="button" className="light-button" disabled={reverseBusy} onClick={()=>setReversing(null)}>Cancelar</button>
+    <button type="button" className="primary-action" disabled={reverseBusy||reason.trim().length<8} onClick={()=>void reverse()}>{reverseBusy?'Estornando…':'Confirmar estorno'}</button></div>
+   </section>}
    <footer className="sheet-footer">
     <span>{total} registros · 50 por página</span>
     <div className="workspace-actions">

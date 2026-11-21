@@ -69,7 +69,7 @@ test('M2 final: edição otimista, paginação, imagem local e ajuste auditado',
 
     const receipt=await app.inject({method:'POST',url:'/v1/stock/receipts',
       headers:{...headers,'idempotency-key':randomUUID()},
-      payload:{variant_id:variantId,reference_id:randomUUID(),quantity:6}});
+      payload:{variant_id:variantId,reference_id:randomUUID(),quantity:6,note:'Entrada direta auditada para teste'}});
     assert.equal(receipt.statusCode,201,receipt.body);
     const adjust=await app.inject({method:'POST',url:'/v1/stock/adjustments',
       headers:{...headers,'idempotency-key':randomUUID()},

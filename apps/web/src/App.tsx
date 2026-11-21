@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
-import { ApiError, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
+import { ApiError, headers, jsonRequest, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
@@ -80,8 +80,17 @@ export function App() {
   const [cartOpen,setCartOpen] = useState(false);
   const [scanBusy,setScanBusy] = useState(false);
   const [stockLoading,setStockLoading] = useState(false);
+  const [directAccess,setDirectAccess]=useState(false);
+  useEffect(()=>{
+    if(!session){setDirectAccess(false);return;}
+    let active=true;
+    void jsonRequest<{allowed:boolean}>('/v1/stock/direct-receipt/access',{headers:headers(session)},fetch)
+      .then(data=>{if(active)setDirectAccess(data.allowed);})
+      .catch(()=>{if(active)setDirectAccess(false);});
+    return ()=>{active=false;};
+  },[session]);
   const manager = session?.roles.includes('manager')??false;
-  const canReceive = manager || (session?.roles.includes('stocker')??false);
+  const canReceive = manager || (session?.roles.includes('stocker')??false) || directAccess;
   const canCash = manager || (session?.roles.includes('cashier')??false);
   const cashId = cashState?.active ? cashState.id : null;
   const filtered = products;
@@ -417,17 +426,17 @@ export function App() {
         <section className="workspace-hero">
           <div><h2>Estoque da loja</h2><p>Consulte e registre movimentações apenas quando necessário.</p></div>
           <div className="workspace-actions">
-            <button className="primary-action" onClick={()=>setStockAction('receive')}>Receber estoque</button>
+            {directAccess&&<button className="primary-action" onClick={()=>setStockAction('receive')}>Entrada direta</button>}
             {manager&&<button className="light-button" onClick={()=>setStockAction('adjust')}>Ajustar estoque</button>}
           </div>
         </section>
         <Suspense fallback={<p role="status">Carregando planilha de estoque…</p>}>
           <InventorySpreadsheet session={session} onSaved={refreshed}
-            canEdit={manager} canReceive={canReceive}/>
+            canEdit={manager} canReceive={directAccess}/>
         </Suspense>
       </div>}
     </main>
-    {page==='estoque'&&canReceive&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide busy={stockLocked}
+    {page==='estoque'&&directAccess&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide busy={stockLocked}
       onClose={()=>setStockAction(null)}>
       <div className="stock-task-layout">
         <div className="management-form">

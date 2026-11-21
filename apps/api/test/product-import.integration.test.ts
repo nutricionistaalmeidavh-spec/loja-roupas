@@ -20,7 +20,7 @@ test('importação em lote valida RBAC, atomicidade, estoque e reenvio idempoten
     const {token,tokenHash}=issueSession();
     await db.query("INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '8 hours')",
       [user,tokenHash]);
-    const headers={authorization:'Bearer '+token,'x-store-id':store};
+    const headers={authorization:'Bearer '+token,'x-store-id':store,'x-stock-import-reason':'Carga inicial validada no inventário'};
     const suffix=randomUUID().slice(0,12).toUpperCase();
     const payload={products:[
       {name:'Camisa linho CSV',category:'Feminino',variants:[

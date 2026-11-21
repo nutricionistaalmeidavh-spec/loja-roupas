@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { registerAuth } from './auth.ts';
 import { registerCatalog } from './catalog.ts';
 import { registerMutations } from './mutations.ts';
+import {registerDirectReceiptReversal} from './direct-receipt-reversal.ts';
 import { registerCatalogAdmin } from './catalog-admin.ts';
 import { registerCashReturns } from './cash-returns.ts';
 import { registerCash } from './cash.ts';
@@ -36,6 +37,7 @@ export function buildApp(db: Pool) {
   });
   registerCatalog(app, db);
   registerMutations(app, db);
+  registerDirectReceiptReversal(app,db);
   registerProductImport(app, db);
   registerCatalogAdmin(app, db);
   registerCash(app, db);
