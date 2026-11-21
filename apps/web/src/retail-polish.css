@@ -315,3 +315,11 @@ input,select,textarea{accent-color:var(--retail-primary)}
  .retail-toast{animation:none}
 }
 @media print{.retail-toast,.mobile-navigation,.mobile-cart{display:none!important}}
+
+/* Prévia do upload sem serviço externo e sem data URL na persistência. */
+.photo-upload-preview{display:flex;align-items:center;gap:16px;padding:13px;background:#faf9f7;border:1px solid var(--retail-border);border-radius:11px;max-width:540px}
+.photo-upload-preview img{width:100px;height:125px;object-fit:contain;background:#f2f1ee;border-radius:8px;flex-shrink:0}
+.photo-upload-preview>div{display:grid;gap:5px;min-width:0}
+.photo-upload-preview strong{font-size:13px}
+.photo-upload-preview span,.photo-upload-preview p{font-size:12px;line-height:1.5;color:var(--retail-muted);margin:0;overflow-wrap:anywhere}
+@media(max-width:390px){.photo-upload-preview img{width:72px;height:94px}}
