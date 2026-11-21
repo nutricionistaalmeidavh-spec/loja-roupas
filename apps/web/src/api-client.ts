@@ -121,6 +121,36 @@ export async function fetchProductPhoto(session:Session,productId:string,fetchIm
  return response.blob();
 }
 
+export type ProductGalleryItem={id:string;position:number;sha256:string;variant_id:string|null;primary:boolean};
+export function listProductGallery(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal){
+ return jsonRequest<{items:ProductGalleryItem[]}>('/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery',
+  {method:'GET',headers:headers(session),signal},fetchImpl);
+}
+export function uploadGalleryPhoto(session:Session,productId:string,file:Blob,key:string,
+ variantId?:string|null,fetchImpl:typeof fetch=fetch){
+ const path='/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery'+
+  (variantId?'?variant_id='+encodeURIComponent(variantId):'');
+ return jsonRequest<{id:string;position:number;sha256:string;variant_id:string|null}>(path,{
+  method:'POST',headers:{...headers(session,key),'content-type':file.type},body:file
+ },fetchImpl);
+}
+export function deleteGalleryPhoto(session:Session,productId:string,photoId:string,key:string,
+ fetchImpl:typeof fetch=fetch){
+ return jsonRequest<{deleted:boolean;id:string}>(
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery/'+encodeURIComponent(photoId),
+  {method:'DELETE',headers:headers(session,key)},fetchImpl);
+}
+export async function fetchGalleryThumbnail(session:Session,productId:string,photoId:string,
+ version:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal){
+ const path='/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery/'+encodeURIComponent(photoId)+
+  '/thumbnail?v='+encodeURIComponent(version);
+ let response:Response;
+ try{response=await fetchImpl(path,{headers:headers(session),cache:'default',signal});}
+ catch{throw new ApiError(0,'NETWORK_ERROR','Miniatura indisponível no servidor local');}
+ if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a miniatura');
+ return response.blob();
+}
+
 export type VariantAttributes={sku:string;color:string;size:string;barcode?:string|null;expected_revision:number};
 export function addProductVariant(session:Session,id:string,variant:{
  sku:string;color:string;size:string;barcode?:string|null;price_cents:number;expected_product_revision:number
