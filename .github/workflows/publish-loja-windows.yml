@@ -27,6 +27,7 @@ jobs:
           node --check apps/desktop/src/updates.cjs
           node --check apps/desktop/src/desktop-updater.cjs
           node --check apps/desktop/src/update-preload.cjs
+          node --check apps/desktop/src/recovery-preload.cjs
           $tokens=$null
           $issues=$null
           [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path apps/desktop/src/update-helper.ps1).Path,[ref]$tokens,[ref]$issues) | Out-Null
@@ -41,6 +42,10 @@ jobs:
       - name: Testar e compilar cliente Windows e PostgreSQL
         shell: pwsh
         run: |
+          pnpm --filter @loja/api typecheck
+          if($LASTEXITCODE -ne 0){throw 'Typecheck API falhou'}
+          pnpm --filter @loja/api test
+          if($LASTEXITCODE -ne 0){throw 'Testes API falharam'}
           pnpm --filter @loja/desktop test
           if($LASTEXITCODE -ne 0){throw 'Testes do desktop falharam'}
           pnpm --filter @loja/desktop build
@@ -53,6 +58,10 @@ jobs:
           foreach($file in @(
             "$root/app/main.cjs",
             "$root/app/update-preload.cjs",
+            "$root/app/recovery-preload.cjs",
+            "$root/app/recovery.html",
+            "$root/runtime/api/src/reset-local-admin.ts",
+            "$root/runtime/prerequisites/vc_redist.x64.exe",
             "$root/app/desktop-updater.cjs",
             "$root/app/updates.cjs",
             "$root/app/update-helper.ps1",
@@ -63,6 +72,10 @@ jobs:
           )){
             if(!(Test-Path -LiteralPath $file -PathType Leaf)){throw "Arquivo ausente: $file"}
           }
+          & "$root/runtime/postgres/bin/initdb.exe" --version
+          if($LASTEXITCODE -ne 0){throw 'initdb não inicia: DLL ausente'}
+          & "$root/runtime/postgres/bin/pg_ctl.exe" --version
+          if($LASTEXITCODE -ne 0){throw 'pg_ctl não inicia: DLL ausente'}
           $version=(Get-Content "$root/app/package.json" -Raw | ConvertFrom-Json).version
           if($version -ne '0.2.0'){throw 'Versão embutida divergente'}
       - name: Gerar instalador NSIS e executar testes reais
