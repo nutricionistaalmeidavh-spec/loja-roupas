@@ -31,6 +31,12 @@ test('entrada direta exige grant, motivo e impede duplicidade', {skip:!database&
   assert.deepEqual((await receipt()).json(),first.json());
   const stock=await db.query('SELECT on_hand FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[store.id,variant]);
   assert.equal(Number(stock.rows[0].on_hand),3);
+  const reversePath='/v1/stock/direct-receipt/'+first.json().movement_id+'/reverse';
+  const reversed=await app.inject({method:'POST',url:reversePath,headers:h(admin),payload:{reason:'Entrada registrada em duplicidade no inventário'}});
+  assert.equal(reversed.statusCode,200,reversed.body);
+  assert.equal(reversed.json().on_hand,0);
+  const repeat=await app.inject({method:'POST',url:reversePath,headers:h(admin),payload:{reason:'Entrada registrada em duplicidade no inventário'}});
+  assert.equal(repeat.statusCode,409,repeat.body);
   const revoke=await app.inject({method:'PUT',url:'/v1/stock/direct-receipt/grants/'+stocker.id,headers:h(admin),payload:{enabled:false}});
   assert.equal(revoke.statusCode,200,revoke.body);
   assert.equal((await app.inject({method:'POST',url:'/v1/stock/receipts',headers:h(operator),payload:{...payload,reference_id:randomUUID()}})).statusCode,403);
