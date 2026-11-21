@@ -38,3 +38,15 @@ test('P2: ações e formulários mantêm foco acessível após sair de modal',as
  await expect(page.getByRole('dialog',{name:'Novo produto'})).toBeHidden();
  await expect(trigger).toBeFocused();
 });
+
+test('tour automático não cobre comando operacional fora do guia',async({page})=>{
+ await page.goto('/');
+ await page.getByLabel('Usuário').fill('qa-admin');
+ await page.getByLabel('Senha',{exact:true}).fill('Senha-QA-Somente-CI-2026');
+ await page.getByRole('button',{name:'Entrar na loja'}).click();
+ const guide=page.getByRole('dialog',{name:'Guia inicial da loja'});
+ await expect(guide).toBeVisible();
+ await page.getByRole('button',{name:'Caixa',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Operação de caixa'})).toBeVisible();
+ await expect(guide).toBeHidden();
+});
