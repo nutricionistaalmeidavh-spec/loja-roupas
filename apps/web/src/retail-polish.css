@@ -1,0 +1,164 @@
+/* Refinamento Retail Fashion POS — único owner dos tokens visuais D4 */
+:root{
+ --retail-canvas:#f7f7f7;--retail-surface:#fff;--retail-ink:#111;
+ --retail-muted:#60646a;--retail-border:#e8e8e8;--retail-primary:#1e1e1e;
+ --retail-brand:#54463b;--retail-soft:#f5f1ea;--retail-focus:#86684b;
+ --retail-success:#286b4a;--retail-danger:#a02d2d;--retail-speed:160ms;
+}
+html{scrollbar-color:#c5c4c2 var(--retail-canvas)}
+body{background:var(--retail-canvas);color:var(--retail-ink)}
+::selection{background:#dfd5c6;color:#111}
+button,select,input,textarea{font-family:inherit}
+button{transition:background-color var(--retail-speed) ease-out,border-color var(--retail-speed) ease-out,color var(--retail-speed) ease-out}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--retail-focus);outline-offset:2px}
+.shell{gap:14px;max-width:1920px;margin:auto}
+.icon-rail{width:66px;position:sticky;top:18px;height:calc(100dvh - 36px);min-height:360px;gap:10px;box-shadow:0 8px 24px #00000008}
+.icon-rail button{width:44px;min-height:44px;display:grid;place-items:center;color:#5c5c5c}
+.icon-rail button svg{display:block}
+.icon-rail button.active{background:var(--retail-primary);color:#fff}
+.icon-rail button:hover:not(.active){color:var(--retail-primary);background:#f1f0ed}
+.icon-rail .logo{margin-bottom:15px}
+.topbar{min-height:78px;height:auto;padding:17px 22px;gap:14px}
+.topbar h1{font-size:clamp(20px,1.8vw,27px);letter-spacing:-.03em}
+.topbar span{max-width:420px;color:var(--retail-muted);overflow-wrap:anywhere}
+.header-actions{flex-wrap:wrap;justify-content:flex-end}
+.demo-status{border:1px solid #e5ded3;background:var(--retail-soft);color:var(--retail-brand)!important}
+.help-tour,.mobile-logout,.light-button,.management-jump a{min-height:44px}
+.work-area{grid-template-columns:minmax(0,1fr) 350px;gap:16px}
+.heading{margin:4px 0 13px}
+.heading h2{font-weight:740;letter-spacing:-.025em}
+.heading p{margin:3px 0 0;color:var(--retail-muted)}
+.search-row{position:relative;min-width:0}
+.search-row input{height:48px;padding-right:44px}
+.search-clear{position:absolute;right:171px;top:3px;width:42px;height:42px;display:grid;place-items:center;background:transparent;border:0;border-radius:8px;color:#626262}
+.search-clear:hover{background:#f2f2f2}
+.scan-button{min-height:48px;min-width:158px}
+.categories{gap:8px;margin:13px 0 17px;scrollbar-width:thin}
+.categories button{min-height:44px;padding:8px 15px}
+.product-grid{gap:14px}
+.product-card{padding:10px;border-color:var(--retail-border);transition:border-color var(--retail-speed) ease-out,box-shadow var(--retail-speed) ease-out}
+.product-card:hover{border-color:#cac7c2;box-shadow:0 9px 28px #0000000c}
+.product-visual{height:clamp(155px,18vw,235px);background:#f3f2f0;color:#837d76}
+.product-visual svg{max-width:53%;height:66%;opacity:.55}
+.product-visual.dress,.product-visual.skirt{color:#938579}
+.product-visual.generic{color:#aaa59c}
+.garment-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px}
+.garment-placeholder svg{flex-shrink:0}
+.garment-placeholder span{color:#595959;font-size:11px}
+.card-copy{padding:11px 3px 3px}
+.card-copy h3{font-size:14px;line-height:1.35;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;min-height:38px;overflow:hidden}
+.price{font-size:17px;line-height:1.2;font-variant-numeric:tabular-nums;margin:6px 0 11px}
+.sizes{gap:6px;min-height:40px}
+.product-card .sizes button{min-height:40px;min-width:40px;border-color:#d9d9d9;border-radius:7px}
+.card-bottom{gap:6px;flex-wrap:wrap}
+.swatches button{width:40px;height:40px}
+.swatch{width:21px;height:21px}
+.add{display:flex;align-items:center;justify-content:center;gap:5px;width:auto;min-width:106px;height:42px;padding:0 11px;border-radius:8px;font-size:12px;font-weight:740;white-space:nowrap}
+.add:hover:not(:disabled),.primary-action:hover:not(:disabled),.checkout-button:hover:not(:disabled),.scan-button:hover:not(:disabled){background:#35312f}
+.stock-hint{font-size:12px;line-height:1.4;min-height:17px}
+.cart-panel{height:calc(100dvh - 134px);min-height:430px;max-height:860px;border-color:var(--retail-border)}
+.cart-content{padding:21px 19px 16px}
+.cart-head h2{font-size:20px;letter-spacing:-.03em}
+.cart-line{gap:12px}
+.cart-description strong{font-size:13px;line-height:1.35}
+.cart-description span{font-size:12px}
+.cart-line .qty button{width:44px;min-width:44px;min-height:44px;font-size:16px}
+.cart-footer .total-row strong{font-size:23px;font-variant-numeric:tabular-nums}
+.empty-cart{color:var(--retail-muted);line-height:1.6;padding:16px 4px}
+.checkout-button{min-height:50px}
+.login-panel{padding:33px;box-shadow:0 18px 55px #0000000e}
+.login-panel h1{letter-spacing:-.035em;font-size:clamp(24px,4vw,29px)}
+.login-panel .eyebrow{color:var(--retail-brand)}
+.password-field{position:relative;display:block;width:100%}
+.password-field input{padding-right:95px}
+.password-toggle{position:absolute;right:4px;top:4px;bottom:4px;min-width:82px;border:0;background:transparent;border-radius:6px;color:#474747;font-size:12px;font-weight:720}
+.password-toggle:hover{background:#f2f2f2}
+.login-help{border-top:1px solid var(--retail-border);padding-top:16px;margin-top:22px;color:var(--retail-muted)}
+.login-help summary{cursor:pointer;color:#4d4b47;font-weight:700;font-size:12px}
+.login-help p{font-size:12px;margin:10px 0 0}
+.workspace-hero,.workspace-card,.stock-spreadsheet,.operation-panel section{border-color:var(--retail-border)}
+.workspace-hero h2,.sheet-toolbar h2{letter-spacing:-.035em}
+.catalog-list-item:hover{background:#faf9f7}
+.management-jump{border-color:var(--retail-border)}
+.management-section-head{margin-bottom:13px}
+.management-section-head h2{font-size:20px;letter-spacing:-.025em}
+.management-section-head p{font-size:13px}
+.management-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}
+.management-kpis>div{background:#faf9f7;border:1px solid var(--retail-border);border-radius:12px;min-width:0;padding:18px;display:grid;gap:6px}
+.management-kpis span{color:var(--retail-muted);font-size:12px}
+.management-kpis strong{font-size:clamp(25px,3vw,34px);font-variant-numeric:tabular-nums;letter-spacing:-.04em;line-height:1.1}
+.management-kpis small{color:#6c6760;font-size:11px}
+.management-loading,.management-error{padding:25px;border:1px dashed #ccc5bb;border-radius:11px;color:#555}
+.operation-panel th{background:#faf9f7;color:#46423d;font-size:12px;white-space:nowrap}
+.operation-panel td{font-variant-numeric:tabular-nums}
+.checkout-modal{border:1px solid #ede9e4;box-shadow:0 24px 75px #0000002e}
+.checkout-header h2{letter-spacing:-.03em}
+.checkout-totals{background:#faf9f7}
+.checkout-totals .total-row:first-child strong{font-size:24px}
+.task-dialog,.mobile-drawer,.checkout-modal{animation:retail-enter 180ms cubic-bezier(.2,.7,.2,1) both}
+@keyframes retail-enter{from{opacity:.92;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:1270px){
+ .work-area{grid-template-columns:minmax(0,1fr) 310px}
+ .product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .product-visual{height:clamp(150px,21vw,220px)}
+}
+@media(max-width:1023px){
+ .icon-rail{top:9px;height:calc(100dvh - 18px)}
+ .work-area{display:block}
+ .product-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .mobile-cart{bottom:calc(12px + env(safe-area-inset-bottom,0px));min-height:52px}
+ .mobile-drawer{padding-bottom:env(safe-area-inset-bottom,0px)}
+ .drawer-backdrop{background:#1119}
+ .close-drawer{min-height:48px;font-weight:650}
+}
+@media(max-width:600px){
+ .shell{padding:8px;min-width:0}
+ .icon-rail{display:none}
+ .topbar{padding:14px;gap:10px;align-items:flex-start}
+ .topbar h1{font-size:21px}
+ .topbar span{font-size:12px}
+ .header-actions{gap:6px}
+ .header-actions .help-tour,.header-actions .mobile-logout{min-height:40px;padding:8px 9px}
+ .mobile-navigation{display:flex;align-items:center;gap:12px;margin-top:9px;background:#fff;border:1px solid var(--retail-border);border-radius:11px;padding:9px 12px}
+ .mobile-navigation label{color:#595959;font-weight:700;font-size:12px}
+ .mobile-navigation select{flex:1;min-height:44px}
+ .work-area{padding-top:14px}
+ .heading h2{font-size:19px}
+ .heading p{font-size:12px}
+ .search-row{display:grid;grid-template-columns:minmax(0,1fr)}
+ .search-row input{min-height:48px}
+ .search-clear{top:3px;right:4px}
+ .scan-button{width:100%;height:44px;min-height:44px}
+ .categories{margin:13px 0}
+ .categories button{min-height:44px}
+ .product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding-bottom:100px}
+ .product-card{padding:8px}
+ .product-visual{height:145px}
+ .card-copy{padding:9px 2px 3px}
+ .card-copy h3{font-size:12px;min-height:33px}
+ .price{font-size:15px;margin:5px 0 9px}
+ .product-card .sizes button{min-width:44px;min-height:44px;padding:4px}
+ .card-bottom{display:flex;align-items:stretch;flex-direction:column;gap:7px}
+ .swatches button{width:44px;height:44px}
+ .add{width:100%;height:44px;min-height:44px}
+ .stock-hint{font-size:11px}
+ .management-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .management-kpis>div{padding:14px}
+ .management-kpis>div:last-child{grid-column:1/-1}
+ .operation-panel{padding:9px}
+ .management-jump{display:flex;flex-wrap:nowrap;overflow-x:auto}
+ .management-jump a{min-height:44px}
+ .login-panel{padding:25px}
+}
+@media(max-width:365px){
+ .product-grid{grid-template-columns:minmax(0,1fr)}
+ .product-visual{height:172px}
+ .card-bottom{flex-direction:row;align-items:center}
+ .add{width:auto;min-width:112px}
+ .management-kpis{grid-template-columns:1fr}
+ .management-kpis>div:last-child{grid-column:auto}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{scroll-behavior:auto!important;animation-duration:0s!important;transition-duration:0s!important}
+}
+@media print{.task-dialog,.mobile-drawer,.checkout-modal{animation:none}}
