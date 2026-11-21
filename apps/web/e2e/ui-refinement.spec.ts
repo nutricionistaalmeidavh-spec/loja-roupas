@@ -10,9 +10,9 @@ async function openStore(page:import('@playwright/test').Page) {
 
 test('login separa ajuda técnica e permite conferir a senha',async({page})=>{
   await page.goto('/');
-  await expect(page.getByRole('button',{name:'Mostrar senha'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Mostrar caracteres'})).toBeVisible();
   await page.getByLabel('Senha',{exact:true}).fill('teste');
-  await page.getByRole('button',{name:'Mostrar senha'}).click();
+  await page.getByRole('button',{name:'Mostrar caracteres'}).click();
   await expect(page.getByLabel('Senha',{exact:true})).toHaveAttribute('type','text');
   await expect(page.getByText('Primeiro acesso ou instalação')).toBeVisible();
 });
