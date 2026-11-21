@@ -61,7 +61,13 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
       JOIN product_variants v0 ON v0.product_id=p0.id AND v0.store_id=p0.store_id
       WHERE p0.store_id=$1 AND (
         ($7 AND (upper(v0.sku)=upper($2) OR upper(v0.barcode)=upper($2))) OR
-        (NOT $7 AND ($2='' OR p0.name ILIKE '%'||$2||'%' OR v0.sku ILIKE '%'||$2||'%' OR v0.barcode=$2))
+        (NOT $7 AND ($2='' OR p0.id IN (
+          SELECT p2.id FROM products p2 WHERE p2.store_id=$1 AND p2.name ILIKE '%'||$2||'%'
+          UNION
+          SELECT v2.product_id FROM product_variants v2 WHERE v2.store_id=$1 AND v2.sku ILIKE '%'||$2||'%'
+          UNION
+          SELECT v3.product_id FROM product_variants v3 WHERE v3.store_id=$1 AND v3.barcode=$2
+        )))
       )
       AND ($4::text IS NULL OR (p0.name,p0.id) > ($4::text,$5::uuid))
       AND ($6='' OR p0.category=$6)
