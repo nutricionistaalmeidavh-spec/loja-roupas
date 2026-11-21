@@ -1,13 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
+import type {SaleReturnLookup,ReturnItem,CashReturnRequest} from '@loja/domain/operations';
 import type {FormEvent} from 'react';
 import {ApiError,headers,jsonRequest} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {requestId} from './request-id.ts';
 
-type SaleLine={id:string;product_name:string;sku:string;color:string;size:string;quantity:number;
  unit_price_cents:number;returned_quantity:number;available_to_return:number};
-type Sale={sale_number:string;status:string;total_cents:string;cash_only:boolean;lines:SaleLine[]};
 type Result={id:string;refunded_cents:number;status:string};
+type Sale=SaleReturnLookup;
 type Selection={quantity:string;condition:'resellable'|'quarantine'};
 const currency=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
 const money=(cents:number)=>currency.format(cents/100);
@@ -44,7 +44,7 @@ export function CashReturnForm({session,cashId,onReturned,onLockChange}:{
  function select(id:string,update:Partial<Selection>){
   setSelection(current=>({...current,[id]:{...current[id],...update}}));
  }
- const items=(sale?.lines??[]).flatMap(line=>{
+ const items:ReturnItem[]=(sale?.lines??[]).flatMap(line=>{
   const entry=selection[line.id];
   if(!entry)return [];
   const quantity=Number(entry.quantity);
@@ -62,7 +62,8 @@ export function CashReturnForm({session,cashId,onReturned,onLockChange}:{
  async function record(event:FormEvent){
   event.preventDefault();
   if(!sale||!cashId||busy||!confirmed||invalid||!items.length)return;
-  const body=JSON.stringify({cash_session_id:cashId,reason:reason.trim(),items});
+  const payload:CashReturnRequest={cash_session_id:cashId,reason:reason.trim(),items};
+  const body=JSON.stringify(payload);
   if(pending.current&&pending.current.body!==body){
    setError('A devolução está pendente. Não altere a seleção antes da recuperação.');return;
   }
