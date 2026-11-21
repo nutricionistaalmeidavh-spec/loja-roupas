@@ -17,7 +17,7 @@ small{display:block;margin-top:20px;color:#777}
 <h1 id="title">Preparando sua loja</h1>
 <p id="intro">Tudo funcionará neste computador, sem servidor contratado, Docker ou assinatura.</p>
 <form id="activation" hidden><p>Esta edição comercial precisa ser ativada apenas no computador principal.</p><label>E-mail vinculado à licença<input name="email" type="email" autocomplete="email" required/></label><label>Código de seis dígitos<input name="code" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" required/></label><p id="activationError" role="alert"></p><button class="primary" type="submit">Ativar Loja Roupas</button></form><div id="loading"><progress aria-label="Preparando o sistema"></progress><p id="status" role="status">Verificando componentes…</p></div>
-<div id="failure" hidden><p id="failureMessage" role="alert"></p><button type="button" id="retry">Tentar novamente</button></div><form id="first" hidden>
+<div id="failure" hidden><p id="failureMessage" role="alert"></p><button type="button" class="primary" id="installVc" hidden>Instalar componente gratuito do Windows</button><p id="vcHint" hidden>Conclua o instalador da Microsoft, depois clique em Tentar novamente. Nenhum dado da loja será apagado.</p><button type="button" id="retry">Tentar novamente</button></div><form id="first" hidden>
 <label>Nome da loja<input name="name" maxlength="120" required placeholder="Ex.: Boutique Central" autocomplete="organization"/></label>
 <label>Usuário administrador<input name="login" maxlength="80" required placeholder="Ex.: gerente" autocomplete="username"/></label>
 <label>Senha inicial<input name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required/></label>
@@ -37,7 +37,10 @@ small{display:block;margin-top:20px;color:#777}
 const $=id=>document.getElementById(id);
 function render(state){
  $('status').textContent=state.status||'Preparando…';
- if(state.error){$('loading').hidden=true;$('activation').hidden=true;$('first').hidden=true;$('failure').hidden=false;$('failureMessage').textContent=state.error;$('title').textContent='Não foi possível iniciar';return;}
+ if(state.error){$('loading').hidden=true;$('activation').hidden=true;$('first').hidden=true;$('failure').hidden=false;$('failureMessage').textContent=state.error;
+ const needRuntime=state.error.includes('0xC0000135');
+ $('installVc').hidden=!needRuntime;$('vcHint').hidden=!needRuntime;
+ $('title').textContent='Não foi possível iniciar';return;}
  $('failure').hidden=true;
  if(state.activationRequired){$('loading').hidden=true;$('first').hidden=true;$('activation').hidden=false;$('title').textContent='Ative sua licença comercial';$('intro').textContent='Use o código enviado após a liberação na Central ArtiSys. Seu caixa e dados serão locais, inclusive offline após ativação.';return;}
  $('activation').hidden=true;
@@ -57,6 +60,12 @@ $('first').addEventListener('submit',async event=>{
  const data=Object.fromEntries(new FormData(event.target).entries());
  try{const result=await window.lojaSetup.create(data);if(!result?.ok)throw Error('Não foi possível concluir');$('status').textContent='Loja criada. Abrindo o PDV…';}
  catch(error){$('error').textContent=error.message;button.disabled=false;}
+});
+$('installVc').addEventListener('click',async()=>{
+ const button=$('installVc');button.disabled=true;
+ try{await window.lojaSetup.installVc();$('vcHint').textContent='Conclua a instalação do componente Windows e selecione Tentar novamente.';}
+ catch(error){$('failureMessage').textContent=error.message;}
+ finally{button.disabled=false;}
 });
 $('retry').addEventListener('click',()=>{ $('failure').hidden=true;$('loading').hidden=false;window.lojaSetup.retry().catch(error=>{$('failure').hidden=false;$('failureMessage').textContent=error.message;}); });
 $('showRemote').addEventListener('click',()=>{$('remote').hidden=!$('remote').hidden});

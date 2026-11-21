@@ -1,0 +1,41 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'"/>
+<title>Recuperar senha da loja</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f7f6f4;color:#242424;font:15px/1.55 system-ui,'Segoe UI',sans-serif}
+main{max-width:520px;margin:32px auto;padding:32px;background:#fff;border-radius:18px;border:1px solid #e7e5e2}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.14em;color:#917c5d}h1{font-size:25px;margin:12px 0}
+p{color:#606060}label{display:grid;gap:6px;margin-top:15px;font-weight:650}
+input{width:100%;font:inherit;border:1px solid #d5d5d5;border-radius:9px;padding:11px}
+button{min-height:46px;padding:10px 16px;border-radius:9px;font:inherit;cursor:pointer}
+.primary{background:#242424;color:white;border:0;width:100%;margin-top:20px;font-weight:700}
+button:disabled{opacity:.5}#error{color:#a62a24}#success{color:#25573c}
+</style></head><body><main>
+<div class="eyebrow">LOJA DE ROUPAS · COMPUTADOR PRINCIPAL</div>
+<h1>Recuperar acesso ao administrador</h1>
+<p>Este procedimento é <strong>local</strong> e depende de acesso à conta Windows que armazena o banco da loja. Não funciona pela rede ou por uma conta em nuvem. Nenhum produto, venda ou estoque será apagado.</p>
+<form id="reset">
+<label>Usuário administrador<input name="login" required maxlength="80" autocomplete="username" placeholder="Ex.: admin"/></label>
+<label>Nova senha<input name="password" type="password" minlength="12" maxlength="256" autocomplete="new-password" required/></label>
+<label>Confirmar nova senha<input name="confirmation" type="password" minlength="12" maxlength="256" autocomplete="new-password" required/></label>
+<p id="error" role="alert"></p>
+<button class="primary" type="submit">Redefinir senha neste computador</button>
+</form>
+<div id="done" hidden><p id="success" role="status">Senha alterada. As sessões anteriores foram revogadas. Reinicie o aplicativo para liberar o contador de tentativas.</p>
+<button class="primary" id="restart" type="button">Reiniciar e entrar com a nova senha</button></div>
+</main>
+<script>
+const form=document.getElementById('reset'),error=document.getElementById('error');
+form.addEventListener('submit',async event=>{
+ event.preventDefault();
+ const button=form.querySelector('button');button.disabled=true;error.textContent='';
+ const data=Object.fromEntries(new FormData(form).entries());
+ if(data.password!==data.confirmation){error.textContent='As senhas não conferem.';button.disabled=false;return;}
+ try{
+  await window.lojaRecoveryNative.reset({login:data.login,password:data.password});
+  form.reset();form.hidden=true;document.getElementById('done').hidden=false;
+ }catch(err){error.textContent=err.message||'Falha na recuperação local.';button.disabled=false;}
+});
+document.getElementById('restart').addEventListener('click',()=>window.lojaRecoveryNative.restart());
+</script></body></html>

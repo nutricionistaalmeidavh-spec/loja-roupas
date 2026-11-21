@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, login } from './api-client.ts';
 import type { LoginResult, Session } from './api-client.ts';
+
+declare global {
+  interface Window {
+    lojaRecovery?: {available:()=>Promise<boolean>; open:()=>Promise<{ok:boolean}>};
+  }
+}
 
 export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)=>void}) {
   const [username,setUsername]=useState('');
@@ -9,6 +15,12 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
   const [pending,setPending]=useState(false);
   const [error,setError]=useState('');
   const [result,setResult]=useState<LoginResult|null>(null);
+  const [localRecovery,setLocalRecovery]=useState(false);
+  useEffect(()=>{
+    let active=true;
+    void window.lojaRecovery?.available().then(value=>{if(active)setLocalRecovery(value);}).catch(()=>{});
+    return ()=>{active=false;};
+  },[]);
 
   async function submit(event:FormEvent) {
     event.preventDefault();
@@ -44,6 +56,10 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
       <label>Senha<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha"/></label>
       {error&&<p className="error" role="alert">{error}</p>}
       <button className="primary-action" disabled={pending}>{pending?'Entrando…':'Entrar na loja'}</button>
+      {localRecovery&&<button type="button" className="text-btn"
+        onClick={()=>void window.lojaRecovery?.open().catch(e=>setError(e instanceof Error?e.message:'Não foi possível abrir a recuperação.'))}>
+        Esqueci minha senha · Recuperar neste computador
+      </button>}
     </form>}
     <p className="login-help">Primeiro acesso no Windows: abra o aplicativo instalado e siga o assistente para criar sua loja. Nenhuma instalação separada de banco ou Docker é necessária. Para Linux/servidor LAN, utilize o instalador local documentado.</p>
   </section></div>;
