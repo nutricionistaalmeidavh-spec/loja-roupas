@@ -85,7 +85,7 @@ test('P0: entrada por conferência, devolução parcial e quarentena sem duplici
   assert.equal((await stock()).rows[0].on_hand,'1','Peça avariada não volta ao vendável');
   const available=(await app.inject({url:salePath,headers})).json().lines[0].available_to_return;
   assert.equal(available,2);
-  const [good,excess]=await Promise.all([refund(1,'resellable'),refund(2,'resellable')]);
+  const [good,excess]=await Promise.all([refund(1,'resellable'),refund(3,'resellable')]);
   assert.deepEqual([good.statusCode,excess.statusCode].sort(),[201,409]);
   assert.equal((await stock()).rows[0].on_hand,'2');
   assert.equal((await app.inject({url:'/v1/sales/'+sold.json().id,headers})).json().status,'partially_returned');
