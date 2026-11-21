@@ -32,6 +32,17 @@ test('P0–P2: catálogo percorre todas as páginas e mantém foto principal + g
   assert.equal(second.json().next_cursor,null);
   const ids=[...first.json().items,...second.json().items].map((p:{id:string})=>p.id);
   assert.equal(new Set(ids).size,55);
+  const stockFirst=await app.inject({url:'/v1/stock/spreadsheet?limit=50',headers});
+  assert.equal(stockFirst.statusCode,200,stockFirst.body);
+  assert.equal(stockFirst.json().items.length,50);
+  assert.ok(stockFirst.json().next_cursor);
+  const stockSecond=await app.inject({url:'/v1/stock/spreadsheet?limit=50&cursor='+encodeURIComponent(stockFirst.json().next_cursor),headers});
+  assert.equal(stockSecond.statusCode,200,stockSecond.body);
+  assert.equal(stockSecond.json().items.length,5);
+  assert.equal(stockSecond.json().next_cursor,null);
+  assert.equal(new Set([...stockFirst.json().items,...stockSecond.json().items].map(x=>x.variant_id)).size,55);
+  const indexes=await db.query<{name:string}>("SELECT indexname AS name FROM pg_indexes WHERE schemaname='public' AND indexname LIKE 'catalog_%'");
+  assert.ok(indexes.rows.some(x=>x.name==='catalog_products_name_trgm'));
   const selected=inserted.rows[0].id;
   const variant=(await db.query<{id:string}>('SELECT id::text FROM product_variants WHERE store_id=$1 AND product_id=$2',[store,selected])).rows[0].id;
   const original=await sharp({create:{width:400,height:500,channels:3,background:'#aabbcc'}}).png().toBuffer();
