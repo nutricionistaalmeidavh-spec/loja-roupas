@@ -296,7 +296,7 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
   </div>;
 }
 
-type Hold = {id:string; sku:string; quantity:number};
+type Hold = {id:string; sku:string; quantity:number; stale:boolean; state:'active'|'released'};
 export function StockHolds({session,variant,onChanged}:{
   session:Session; variant?:{id:string;sku:string}; onChanged?:()=>void;
 }) {
@@ -348,7 +348,7 @@ export function StockHolds({session,variant,onChanged}:{
         value={quantity} disabled={busy} onChange={event=>setQuantity(event.target.value)}/></label>
       <button className="light-button" disabled={busy}>Reservar</button>
     </form> : <ul>{holds.map(hold => <li key={hold.id}>
-      {hold.sku} · {hold.quantity} un. <button className="light-button" disabled={busy}
+      {hold.sku} · {hold.quantity} un. · {hold.stale&&<strong>Reserva com mais de 24 horas: revisar</strong>}{' '}<button className="light-button" disabled={busy}
         onClick={() => void change(hold.id)}>Liberar reserva</button>
     </li>)}</ul>}
     {status && <p role="status">{status}</p>}
