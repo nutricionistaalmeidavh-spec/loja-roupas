@@ -5,7 +5,7 @@ import { PublishVariant, StockHolds } from './StoreOperations.tsx';
 import { requestId } from './request-id.ts';
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { ApiError, adjustStock, listCatalog, listMovements, patchProduct, patchVariantPrice, uploadPhoto, addProductVariant, patchVariantAttributes } from './api-client.ts';
+import { ApiError, adjustStock, listCatalog, getCatalogProduct, listMovements, patchProduct, patchVariantPrice, uploadPhoto, addProductVariant, patchVariantAttributes } from './api-client.ts';
 import type { Session, StockMovement } from './api-client.ts';
 import { mapCatalog, reaisToCents } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
@@ -43,9 +43,15 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
  useEffect(()=>{
   const controller=new AbortController();
   setLoading(true);
-  const timer=setTimeout(()=>void listCatalog(session,search,fetch,controller.signal).then(data=>{
+  const timer=setTimeout(()=>void Promise.all([
+   listCatalog(session,search,fetch,controller.signal),
+   initialProductId?getCatalogProduct(session,initialProductId,fetch,controller.signal).catch(()=>null):Promise.resolve(null)
+  ]).then(([data,exact])=>{
    if(!controller.signal.aborted){
-     const incoming=mapCatalog(data);setProducts(incoming);
+     const incoming=mapCatalog(data);
+     if(exact?.item&&!incoming.some(p=>p.id===exact.item.id))
+      incoming.push(...mapCatalog({items:[exact.item],next_cursor:null}));
+     setProducts(incoming);
      const chosen=incoming.find(p=>p.id===initialProductId);
      if(chosen){setProductId(chosen.id);setName(chosen.name);setCategory(chosen.category);}
    }
@@ -53,7 +59,7 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
    if(!controller.signal.aborted)setLoading(false);
   }),250);
   return ()=>{clearTimeout(timer);controller.abort();};
- },[session,search,refresh]);
+ },[session,search,refresh,initialProductId]);
  function selectProduct(id:string){
   setProductId(id);setVariantId('');setPending(null);
   const p=products.find(p=>p.id===id);setName(p?.name??'');setCategory(p?.category??'');
