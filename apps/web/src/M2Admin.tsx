@@ -1,4 +1,5 @@
 import { ProductFields } from './ProductFields.tsx';
+import { ProductGallery } from './ProductGallery.tsx';
 import { BarcodeLabel } from './BarcodeLabel.tsx';
 import { PublishVariant, StockHolds } from './StoreOperations.tsx';
 import { requestId } from './request-id.ts';
@@ -189,6 +190,7 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
     </div>}
     <button type="submit" className="light-button" disabled={!photo||busy}>Enviar fotografia local</button>
    </form>
+   <ProductGallery key={current.id} session={session} product={current} onSaved={()=>{setRefresh(n=>n+1);onSaved();}}/>
   </>}
   {error&&<p role="alert" className="error">{error}</p>}
   {notice&&<p role="status" className="notice">{notice}</p>}
