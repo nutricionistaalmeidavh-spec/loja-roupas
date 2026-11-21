@@ -4,7 +4,7 @@ import {requirePermission} from './auth.ts';
 import {DomainError,requireIdempotencyKey,withIdempotentTransaction} from './transactions.ts';
 
 const uuid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
-type SheetQuery={query?:string;category?:string;limit?:number;offset?:number};
+type SheetQuery={query?:string;category?:string;limit?:number;offset?:number;cursor?:string};
 type SheetPatch={
  name:string;category:string;sku:string;color:string;size:string;
  barcode?:string|null;price_cents:number;
@@ -33,24 +33,48 @@ function safeCount(value:string,field:string){
  return n;
 }
 
+type SheetCursor={name:string;sku:string;id:string};
+function decodeSheetCursor(raw?:string):SheetCursor|null{
+ if(!raw)return null;
+ if(raw.length>512)throw new DomainError(400,'BAD_CURSOR','Cursor da planilha inválido');
+ try{
+  const entry=JSON.parse(Buffer.from(raw,'base64url').toString('utf8')) as SheetCursor;
+  if(typeof entry.name!=='string'||entry.name.length>200||
+    typeof entry.sku!=='string'||entry.sku.length>64||
+    typeof entry.id!=='string'||!new RegExp(uuid).test(entry.id))throw Error('invalid');
+  return entry;
+ }catch{throw new DomainError(400,'BAD_CURSOR','Cursor da planilha inválido');}
+}
+function encodeSheetCursor(row:DbRow){
+ return Buffer.from(JSON.stringify({name:row.name,sku:row.sku,id:row.variant_id})).toString('base64url');
+}
+
 export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
  app.get<{Querystring:SheetQuery}>('/v1/stock/spreadsheet',{
   schema:{querystring:{type:'object',additionalProperties:false,properties:{
    query:{type:'string',maxLength:100,default:''},
    category:{type:'string',maxLength:100,default:''},
    limit:{type:'integer',minimum:1,maximum:100,default:50},
-   offset:{type:'integer',minimum:0,maximum:1000000,default:0}
+   offset:{type:'integer',minimum:0,maximum:1000000,default:0},
+   cursor:{type:'string',maxLength:512}
   }}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'stock.read'))return reply;
-  const {query='',category='',limit=50,offset=0}=request.query,store=request.authContext!.storeId;
-  const args=[store,query.trim(),category.trim(),limit,offset];
+  const {query='',category='',limit=50,offset=0,cursor}=request.query,store=request.authContext!.storeId;
+  const after=decodeSheetCursor(cursor);
+  const args=[store,query.trim(),category.trim(),limit+1,after?0:offset,
+   after?.name??null,after?.sku??null,after?.id??null];
   const filter="v.store_id=$1 AND ($2='' OR p.name ILIKE '%'||$2||'%' OR v.sku ILIKE '%'||$2||'%' OR v.barcode=$2) AND ($3='' OR p.category=$3)";
   const [count,records,categories]=await Promise.all([
    db.query<{total:string}>('SELECT count(*)::text AS total FROM product_variants v JOIN products p '+
     'ON p.id=v.product_id AND p.store_id=v.store_id WHERE '+filter,args.slice(0,3)),
-   db.query<DbRow>('SELECT '+rowColumns+
-    ' FROM product_variants v JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id '+
+   db.query<DbRow>('WITH page AS MATERIALIZED ('+
+    'SELECT v.id FROM product_variants v JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id WHERE '+
+    filter+(after?' AND (p.name,v.sku,v.id) > ($6::text,$7::text,$8::uuid)':'')+
+    ' ORDER BY p.name,v.sku,v.id LIMIT $4 OFFSET $5) '+
+    'SELECT '+rowColumns+
+    ' FROM page pg JOIN product_variants v ON v.id=pg.id AND v.store_id=$1 '+
+    'JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id '+
     'LEFT JOIN stock_balances b ON b.store_id=v.store_id AND b.variant_id=v.id '+
     'LEFT JOIN LATERAL ('+
     " SELECT coalesce(sum(CASE WHEN movement_kind='receipt' THEN qty_delta ELSE 0 END),0) AS entries,"+
@@ -59,12 +83,13 @@ export function registerStockSpreadsheet(app:FastifyInstance,db:Pool){
     " coalesce(sum(CASE WHEN movement_kind='adjustment' THEN qty_delta ELSE 0 END),0) AS adjustments,"+
     ' max(occurred_at) AS last_movement_at FROM stock_movements m '+
     ' WHERE m.store_id=v.store_id AND m.variant_id=v.id'+
-    ') m ON true WHERE '+filter+
-    ' ORDER BY p.name,v.sku,v.id LIMIT $4 OFFSET $5',args),
+    ') m ON true ORDER BY p.name,v.sku,v.id',args),
    db.query<{category:string}>('SELECT DISTINCT category FROM products WHERE store_id=$1 ORDER BY category',[store])
   ]);
+  const items=records.rows.slice(0,limit);
   return {total:safeCount(count.rows[0]?.total??'0','total'),limit,offset,categories:categories.rows.map(x=>x.category),
-   items:records.rows.map(row=>({
+   next_cursor:records.rows.length>limit?encodeSheetCursor(items[items.length-1]):null,
+   items:items.map(row=>({
     product_id:row.product_id,variant_id:row.variant_id,name:row.name,category:row.category,
     sku:row.sku,color:row.color,size:row.size,barcode:row.barcode,
     price_cents:safeCount(row.price_cents,'preço'),
