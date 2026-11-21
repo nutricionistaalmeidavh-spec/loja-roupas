@@ -104,7 +104,7 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.equal(saleForReturn.json().cash_only,true);
     const refundKey = randomUUID();
     const refund = (key:string) => app.inject({method:'POST',url:salePath+'/cash-return',headers:write(key),
-      payload:{cash_session_id:opened.json().id,reason:'Cliente devolveu a peça em condição de venda'}});
+      payload:{cash_session_id:opened.json().id,reason:'Cliente devolveu a peça em condição de venda',items:[{sale_line_id:saleForReturn.json().lines[0].id,quantity:1,condition:'resellable'}]}});
     const refunded = await refund(refundKey);
     assert.equal(refunded.statusCode,201,refunded.body);
     assert.equal(refunded.json().expected_cash_cents,0);
@@ -166,14 +166,14 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
       payload:{supplier_id:supplier.json().id,variant_id:variantId,quantity:4,unit_cost_cents:500}});
     assert.equal(purchase.statusCode,201,purchase.body);
     const receive=(key:string)=>app.inject({method:'POST',url:'/v1/management/purchases/'+purchase.json().id+'/receive',
-      headers:write(key)});
+      headers:write(key),payload:{received_quantity:4,accepted_quantity:3,reason:'Uma peça reprovada na conferência'}});
     const receiveKey=randomUUID();
     const outcomes=await Promise.all([receive(receiveKey),receive(receiveKey)]);
     assert.deepEqual(outcomes.map(result=>result.statusCode),[200,200]);
     assert.deepEqual(outcomes[0].json(),outcomes[1].json());
     assert.equal((await receive(randomUUID())).statusCode,409);
     const updated=await db.query('SELECT on_hand FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[store.id,variantId]);
-    assert.equal(updated.rows[0].on_hand,'5');
+    assert.equal(updated.rows[0].on_hand,'4');
     const byCode=await app.inject({url:'/v1/catalog/products?exact=true&query=qa-01',headers});
     assert.equal(byCode.statusCode,200,byCode.body);
     assert.equal(byCode.json().items[0].id,productId);
@@ -199,7 +199,7 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.equal(analytics.months.at(-1).gross_cents,'1234');
     assert.equal(analytics.months.at(-1).refunded_cents,'1234');
     assert.equal(analytics.forecast.estimate_cents,null);
-    assert.equal(analytics.low_stock[0].available,'5');
+    assert.equal(analytics.low_stock[0].available,'4');
     assert.equal(analytics.suppliers[0].received,1);
     assert.equal(analytics.suppliers[0].average_days,null);
     assert.equal((await app.inject({url:intelligence,headers:{...headers,'x-store-id':otherStore.id}})).statusCode,401);
@@ -226,7 +226,7 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
 
     const qualityUrl='/v1/management/purchases/'+purchase.json().id+'/quality';
     assert.equal((await app.inject({method:'PUT',url:qualityUrl,headers:write(),payload:{accepted_quantity:5}})).statusCode,409);
-    assert.equal((await app.inject({method:'PUT',url:qualityUrl,headers:write(),payload:{accepted_quantity:3}})).statusCode,200);
+    assert.equal((await app.inject({method:'PUT',url:qualityUrl,headers:write(),payload:{accepted_quantity:3}})).statusCode,409);
     const datedPurchase=await app.inject({method:'POST',url:'/v1/management/purchases',headers:write(),
       payload:{supplier_id:supplier.json().id,variant_id:variantId,quantity:2,unit_cost_cents:500,promised_on:'2030-01-01'}});
     assert.equal(datedPurchase.statusCode,201,datedPurchase.body);
