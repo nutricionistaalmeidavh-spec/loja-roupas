@@ -80,7 +80,16 @@ try{
  await appWindow.reload();
  await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:15000});
  await appWindow.getByRole('button',{name:'Entrar na loja'}).waitFor();
- console.info('Windows one-computer: local PostgreSQL, login and stable renderer reload operational');
+ // Simulate a broken JS bundle after an update: it must show the HTML
+ // recovery card instead of a totally white Electron window.
+ await appWindow.route('**/assets/*.js',route=>route.abort());
+ await appWindow.reload({waitUntil:'domcontentloaded'});
+ await appWindow.getByRole('heading',{name:'Abrindo sua loja…'}).waitFor({timeout:15000});
+ await appWindow.getByText('Tentar carregar novamente').waitFor();
+ await appWindow.unroute('**/assets/*.js');
+ await appWindow.reload();
+ await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:15000});
+ console.info('Windows one-computer: local PostgreSQL, login, reload and missing-JS fallback operational');
 }finally{
  await instance?.close();
  await rm(userData,{recursive:true,force:true,maxRetries:8,retryDelay:500}).catch(error=>console.warn('Cleanup failed',error.message));
