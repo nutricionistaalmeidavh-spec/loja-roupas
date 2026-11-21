@@ -219,6 +219,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
         .catch(err=>{setExportStatus('');setError(err instanceof Error?err.message:'Falha na exportação filtrada');})
         .finally(()=>setExporting(false));
       }}>{exporting?'Exportando…':'Exportar resultados filtrados XLSX'}</button>
+    {canEdit&&<button type="button" className="light-button" onClick={()=>setPermissionsOpen(true)}>Autorizar entrada direta</button>}
     <button type="button" className="light-button" onClick={()=>setFullHistoryOpen(true)}>
       Histórico completo
     </button>
