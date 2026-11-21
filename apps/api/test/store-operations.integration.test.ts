@@ -34,7 +34,7 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
       VALUES($1,$2,'image/png',$3,repeat('a',64),$4,'image/webp')`,[store.id,productId,original,thumb]);
     assert.equal((await app.inject({url:publicPhoto})).statusCode,404);
     const received = await app.inject({method:'POST',url:'/v1/stock/receipts',headers:write(),
-      payload:{variant_id:variantId,reference_id:randomUUID(),quantity:1}});
+      payload:{variant_id:variantId,reference_id:randomUUID(),quantity:1,note:'Entrada direta auditada para teste'}});
     assert.equal(received.statusCode,201,received.body);
     const storefront = () => app.inject({url:'/v1/storefront/'+store.id});
     const hidden = await storefront();
