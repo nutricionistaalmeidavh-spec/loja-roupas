@@ -74,7 +74,22 @@ try{
  await appWindow.getByRole('button',{name:'Entrar na loja'}).click();
  await appWindow.getByRole('dialog',{name:'Guia inicial da loja'}).waitFor({timeout:12000});
  await appWindow.getByRole('button',{name:'Reabrir tour'}).waitFor();
- console.info('Windows one-computer: PostgreSQL, API, web, offline password recovery and tour operational');
+ // Ensure the interface stays rendered after the first login and after a reload.
+ await appWindow.waitForTimeout(2500);
+ await appWindow.getByRole('button',{name:'Reabrir tour'}).waitFor();
+ await appWindow.reload();
+ await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:15000});
+ await appWindow.getByRole('button',{name:'Entrar na loja'}).waitFor();
+ // Simulate a broken JS bundle after an update: it must show the HTML
+ // recovery card instead of a totally white Electron window.
+ await appWindow.route('**/assets/*.js',route=>route.abort());
+ await appWindow.reload({waitUntil:'domcontentloaded'});
+ await appWindow.getByRole('heading',{name:'Abrindo sua loja…'}).waitFor({timeout:15000});
+ await appWindow.getByText('Tentar carregar novamente').waitFor();
+ await appWindow.unroute('**/assets/*.js');
+ await appWindow.reload();
+ await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:15000});
+ console.info('Windows one-computer: local PostgreSQL, login, reload and missing-JS fallback operational');
 }finally{
  await instance?.close();
  await rm(userData,{recursive:true,force:true,maxRetries:8,retryDelay:500}).catch(error=>console.warn('Cleanup failed',error.message));
