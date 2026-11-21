@@ -13,3 +13,10 @@ contextBridge.exposeInMainWorld('lojaUpdates',{
   return ()=>ipcRenderer.removeListener('loja:updates:progress',listener);
  }
 });
+
+ // The web renderer can only request a separate native recovery dialog.
+ // It cannot update passwords, read files, or query PostgreSQL directly.
+ contextBridge.exposeInMainWorld('lojaRecovery',{
+  available:()=>ipcRenderer.invoke('loja:recovery:available'),
+  open:()=>ipcRenderer.invoke('loja:recovery:open')
+ });
