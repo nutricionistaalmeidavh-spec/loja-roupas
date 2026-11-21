@@ -6,6 +6,46 @@ security:
   - bearer: []
     store: []
 paths:
+  /v1/management/operations/summary:
+    get:
+      summary: Central de ações operacional canônica da loja selecionada
+      description: Métricas do PostgreSQL por store_id. Não contém informações de outras lojas.
+      responses:
+        '200':
+          description: Contagens operacionais e data de geração
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [counts, generated_at]
+                properties:
+                  generated_at: { type: string, format: date-time }
+                  counts:
+                    type: object
+                    additionalProperties: false
+                    required:
+                      - purchases_to_receive
+                      - purchase_quarantine_units
+                      - purchase_missing_units
+                      - pickups_pending
+                      - holds_active
+                      - print_jobs_pending
+                      - returned_quarantine_units
+                      - partially_returned_sales
+                      - low_stock_variants
+                    properties:
+                      purchases_to_receive: { type: integer, minimum: 0 }
+                      purchase_quarantine_units: { type: integer, minimum: 0 }
+                      purchase_missing_units: { type: integer, minimum: 0 }
+                      pickups_pending: { type: integer, minimum: 0 }
+                      holds_active: { type: integer, minimum: 0 }
+                      print_jobs_pending: { type: integer, minimum: 0 }
+                      returned_quarantine_units: { type: integer, minimum: 0 }
+                      partially_returned_sales: { type: integer, minimum: 0 }
+                      low_stock_variants: { type: integer, minimum: 0 }
+        '401': { description: Sessão ou loja sem autorização }
+        '403': { description: Sem permissão de leitura gerencial }
   /v1/sales/{id}/print-requests:
     parameters:
       - $ref: '#/components/parameters/Id'
