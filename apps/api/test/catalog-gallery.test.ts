@@ -41,7 +41,7 @@ test('galeria exige sessão e filtra todas as imagens por produto e loja',async(
  const notModified=await app.inject({url:thumbnail,headers:{...authorized,'if-none-match':'"'+sha+'"'}});
  assert.equal(notModified.statusCode,304);
  const wrong=await app.inject({url:'/v1/catalog/products/'+product+'/gallery/not-a-uuid',headers:authorized});
- assert.equal(wrong.statusCode,404);
+ assert.equal(wrong.statusCode,400);
  await app.close();
 });
 test('upload da galeria rejeita binários falsificados antes de escrever no banco',async()=>{
