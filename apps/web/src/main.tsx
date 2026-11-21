@@ -4,6 +4,7 @@ import { App } from './App.tsx';
 import { UpdateStartupDialog } from './DesktopUpdates.tsx';
 import './styles.css';
 import './tour.css';
+import './retail-polish.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Elemento root ausente');
