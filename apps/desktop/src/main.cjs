@@ -144,6 +144,16 @@ async function startLocal(){
 }
 function registerSetupHandlers(){
  ipcMain.handle('loja:setup-state',event=>{setupAllowed(event);return setupState;});
+ ipcMain.handle('loja:setup-install-vc',async event=>{
+  setupAllowed(event);
+  if(!setupState.error.includes('0xC0000135'))throw new Error('O requisito de compatibilidade não foi solicitado.');
+  const installer=path.join(process.resourcesPath,'runtime','prerequisites','vc_redist.x64.exe');
+  if(!existsSync(installer))throw new Error('O instalador não contém o requisito VC++ offline.');
+  // Explicit action only; the Windows installer may request elevation.
+  const error=await shell.openPath(installer);
+  if(error)throw new Error('Não foi possível iniciar o requisito de compatibilidade: '+error);
+  return {ok:true};
+ });
  ipcMain.handle('loja:setup-activate',async(event,input)=>{
   setupAllowed(event);
   if(!commercialEdition)throw new Error('Ativação comercial indisponível na edição livre.');
