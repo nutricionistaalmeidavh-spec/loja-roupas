@@ -47,3 +47,12 @@ test('diagnostics never expose URLs, tokens or passwords',()=>{
  assert.equal(JSON.stringify(result).includes('3290'),false);
  assert.equal(result.kind,'navigation');
 });
+
+test('normal window shutdown never triggers a crash dialog',async()=>{
+ const window=fakeWindow();const reports=[];
+ attachWindowHealth({window,notify:report=>reports.push(report)});
+ window.webContents.emit('render-process-gone',{}, {reason:'clean-exit',exitCode:0});
+ window.webContents.emit('render-process-gone',{}, {reason:'killed',exitCode:0});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(reports.length,0);
+});
