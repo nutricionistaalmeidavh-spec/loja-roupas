@@ -28,7 +28,7 @@ test('P2: lote atômico, repetição idempotente, conflitos e histórico filtrad
   const variants=created.json().variants as Array<{id:string;sku:string}>;
   for(const v of variants){
    const rc=await app.inject({method:'POST',url:'/v1/stock/receipts',headers:{...headers,'idempotency-key':randomUUID()},
-    payload:{variant_id:v.id,reference_id:randomUUID(),quantity:9}});
+    payload:{variant_id:v.id,reference_id:randomUUID(),quantity:9,note:'Entrada direta auditada para teste'}});
    assert.equal(rc.statusCode,201,rc.body);
   }
   const list=await app.inject({method:'GET',url:'/v1/stock/spreadsheet?query=P2-'+random,headers});
