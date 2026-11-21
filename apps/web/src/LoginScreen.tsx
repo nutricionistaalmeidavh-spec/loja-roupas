@@ -54,7 +54,7 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
       </button>)}
     </div>:<form onSubmit={event=>void submit(event)} className="login-form">
       <label>Usuário<input required autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} placeholder="Login do operador"/></label>
-      <label>Senha<span className="password-field"><input type={showPassword?'text':'password'} required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha"/><button type="button" className="password-toggle" aria-label={showPassword?'Ocultar senha':'Mostrar senha'} aria-pressed={showPassword} onClick={()=>setShowPassword(v=>!v)}>{showPassword?'Ocultar':'Mostrar'}</button></span></label>
+      <div className="password-control"><label htmlFor="login-password">Senha</label><span className="password-field"><input id="login-password" type={showPassword?'text':'password'} required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha"/><button type="button" className="password-toggle" aria-label={showPassword?'Ocultar caracteres':'Mostrar caracteres'} aria-pressed={showPassword} onClick={()=>setShowPassword(v=>!v)}>{showPassword?'Ocultar':'Mostrar'}</button></span></div>
       {error&&<p className="error" role="alert">{error}</p>}
       <button className="primary-action" disabled={pending}>{pending?'Entrando…':'Entrar na loja'}</button>
       {localRecovery&&<button type="button" className="text-btn"
