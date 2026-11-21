@@ -21,6 +21,7 @@ test('operador identifica sua loja pelo nome e navega por ícones',async({page})
   await openStore(page);
   await expect(page.getByText('Loja QA',{exact:false})).toBeVisible();
   await expect(page.locator('.icon-rail svg')).toHaveCount(7);
+  await expect(page.getByRole('button',{name:'PDV',exact:true})).toHaveAttribute('aria-current','page');
   await expect(page.locator('.topbar')).not.toContainText(/manager|[a-f0-9]{8}-/i);
 });
 
