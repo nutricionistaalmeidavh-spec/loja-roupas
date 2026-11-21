@@ -84,8 +84,26 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await storefront.reload();
   await expect(item.getByText('Esgotado')).toBeVisible();
 
+  // Contrato automatizado de impressão: spool local, preview, chamada ao driver e ACK.
+  // Nenhum periférico real é pressuposto por este teste.
+  const detail=await request.get('/v1/management/sales/by-number/'+saleNumber,{headers:headers()});
+  expect(detail.ok()).toBeTruthy();
+  const printJob=await request.post('/v1/sales/'+(await detail.json()).id+'/print-requests',{
+    headers:headers(),data:{paper_mm:80}});
+  expect(printJob.status()).toBe(201);
   await page.getByRole('button',{name:'Nova venda',exact:true}).click();
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('link',{name:'Operações'}).click();
+  await page.getByRole('listitem').filter({hasText:'Venda '+saleNumber})
+    .getByRole('button',{name:'Abrir comprovante'}).click();
+  await expect(page.locator('.receipt-print')).toContainText('COMPROVANTE NÃO FISCAL');
+  await page.evaluate(()=>{
+    window.print=()=>{document.body.dataset.qaPrintTriggered='true';};
+  });
+  await page.getByRole('button',{name:'Imprimir na impressora deste terminal'}).click();
+  await expect(page.locator('body')).toHaveAttribute('data-qa-print-triggered','true');
+  await page.getByRole('button',{name:'Confirmar impressão'}).click();
+  await expect(page.getByText('Impressão confirmada.')).toBeVisible();
   await page.getByRole('link',{name:'Pós-venda'}).click();
   await page.getByRole('button',{name:'Nova devolução'}).click();
   await page.getByLabel('Número da venda').fill(saleNumber!);
