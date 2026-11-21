@@ -123,9 +123,10 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await expect(storefront.getByText('Pedido cancelado pela loja.')).toBeVisible();
 
   await page.setViewportSize({width:390,height:844});
-  await page.getByLabel('Página',{exact:true}).selectOption('pdv');
+  const mobile=page.getByRole('navigation',{name:'Navegação da loja'});
+  await mobile.getByRole('button',{name:'PDV',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Nova venda',exact:true})).toBeVisible();
-  await page.getByLabel('Página',{exact:true}).selectOption('gestao');
+  await mobile.getByRole('button',{name:'Gestão',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Vendas e devoluções nos últimos 30 dias'})).toBeVisible();
 
 });

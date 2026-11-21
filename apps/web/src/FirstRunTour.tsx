@@ -47,6 +47,16 @@ export function FirstRunTour({storeId,roles,replayToken,suspended=false,onNaviga
  },[visible,index,storeId]);
  useEffect(()=>{
   if(!visible)return;
+  const dismissOnOutside=(event:PointerEvent)=>{
+   const element=event.target;
+   if(element instanceof Element&&element.closest('.tour-card'))return;
+   saveFlag(key,'skipped');setOpen(false);
+  };
+  document.addEventListener('pointerdown',dismissOnOutside,true);
+  return ()=>document.removeEventListener('pointerdown',dismissOnOutside,true);
+ },[visible,key]);
+ useEffect(()=>{
+  if(!visible)return;
   const escape=(event:KeyboardEvent)=>{
    if(event.key==='Escape'){event.preventDefault();saveFlag(key,'skipped');setOpen(false);}
   };
