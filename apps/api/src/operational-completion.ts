@@ -39,7 +39,7 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
 
   app.get('/v1/management/purchases',async(request,reply)=>{
     if(requirePermission(request,reply,'purchase.read'))return reply;
-    const result=await db.query(`SELECT p.id,p.quantity,p.unit_cost_cents::text,p.received_at,p.promised_on::text,p.accepted_quantity,s.name AS supplier,v.sku
+    const result=await db.query(`SELECT p.id,p.quantity,p.unit_cost_cents::text,p.received_at,p.promised_on::text,p.accepted_quantity,p.received_quantity,p.rejected_quantity,p.missing_quantity,p.quality_finalized,s.name AS supplier,v.sku
       FROM purchase_orders p JOIN suppliers s ON s.id=p.supplier_id AND s.store_id=p.store_id
       JOIN product_variants v ON v.id=p.variant_id AND v.store_id=p.store_id
       WHERE p.store_id=$1 ORDER BY (p.received_at IS NULL) DESC,p.created_at DESC,p.id LIMIT 100`,
@@ -65,46 +65,62 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
     return reply.code(201).send(out.result);
   });
 
-  app.post<{Params:{id:string}}>('/v1/management/purchases/:id/receive',{schema:{params}},async(request,reply)=>{
+  app.post<{Params:{id:string};Body:{received_quantity:number;accepted_quantity:number;reason?:string}}>(
+  '/v1/management/purchases/:id/receive',{
+    schema:{params,body:{type:'object',additionalProperties:false,
+      required:['received_quantity','accepted_quantity'],properties:{
+        received_quantity:{type:'integer',minimum:1,maximum:100000},
+        accepted_quantity:{type:'integer',minimum:0,maximum:100000},
+        reason:{type:'string',maxLength:250}
+      }}}
+  },async(request,reply)=>{
     if(requirePermission(request,reply,'stock.receive'))return reply;
     const auth=request.authContext!,{id}=request.params;
-    const out=await withIdempotentTransaction(db,auth,'purchase.receive:'+id,key(request),{},async client=>{
-      const purchase=await client.query<{variant_id:string;quantity:number}>(`UPDATE purchase_orders SET received_at=now()
-        WHERE store_id=$1 AND id=$2 AND received_at IS NULL RETURNING variant_id,quantity`,[auth.storeId,id]);
+    const {received_quantity,accepted_quantity}=request.body;
+    const reason=request.body.reason?.trim()??'';
+    const out=await withIdempotentTransaction(db,auth,'purchase.receive:'+id,key(request),request.body,async client=>{
+      const purchase=await client.query<{variant_id:string;quantity:number;received_at:Date|null}>(`SELECT variant_id,quantity,received_at
+        FROM purchase_orders WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,id]);
       const line=purchase.rows[0];
-      if(!line)throw new DomainError(409,'PURCHASE_UNAVAILABLE','Compra já recebida ou indisponível');
-      const balance=await client.query<{revision:string}>(`INSERT INTO stock_balances(store_id,variant_id,on_hand,reserved,revision)
-        VALUES($1,$2,$3,0,1) ON CONFLICT(store_id,variant_id) DO UPDATE
-        SET on_hand=stock_balances.on_hand+EXCLUDED.on_hand,revision=stock_balances.revision+1 RETURNING revision`,
-        [auth.storeId,line.variant_id,line.quantity]);
-      await client.query(`INSERT INTO stock_movements(store_id,variant_id,source_type,source_id,movement_kind,qty_delta)
-        VALUES($1,$2,'purchase',$3,'receipt',$4)`,[auth.storeId,line.variant_id,id,line.quantity]);
-      const revision=balance.rows[0].revision;
-      await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
-        VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,
-        [auth.storeId,line.variant_id,revision,JSON.stringify({variant_id:line.variant_id,revision,purchase_id:id})]);
-      await audit(client,auth,'purchase.receive',id);
-      return {id,received:true};
+      if(!line||line.received_at)throw new DomainError(409,'PURCHASE_UNAVAILABLE','Compra já recebida ou indisponível');
+      if(received_quantity>line.quantity||accepted_quantity>received_quantity)
+        throw new DomainError(422,'RECEIPT_QUANTITY','Aprovadas não podem exceder recebidas ou pedidas');
+      const rejected_quantity=received_quantity-accepted_quantity;
+      const missing_quantity=line.quantity-received_quantity;
+      if((rejected_quantity>0||missing_quantity>0)&&reason.length<8)
+        throw new DomainError(422,'RECEIPT_REASON','Justifique avarias ou divergências com ao menos 8 caracteres');
+      await client.query(`UPDATE purchase_orders SET received_at=now(),quality_finalized=true,
+        received_quantity=$3,accepted_quantity=$4,rejected_quantity=$5,missing_quantity=$6
+        WHERE store_id=$1 AND id=$2`,
+        [auth.storeId,id,received_quantity,accepted_quantity,rejected_quantity,missing_quantity]);
+      if(accepted_quantity>0) {
+        const balance=await client.query<{revision:string}>(`INSERT INTO stock_balances(store_id,variant_id,on_hand,reserved,revision)
+          VALUES($1,$2,$3,0,1) ON CONFLICT(store_id,variant_id) DO UPDATE
+          SET on_hand=stock_balances.on_hand+EXCLUDED.on_hand,revision=stock_balances.revision+1 RETURNING revision`,
+          [auth.storeId,line.variant_id,accepted_quantity]);
+        await client.query(`INSERT INTO stock_movements(store_id,variant_id,source_type,source_id,movement_kind,qty_delta)
+          VALUES($1,$2,'purchase',$3,'receipt',$4)`,[auth.storeId,line.variant_id,id,accepted_quantity]);
+        const revision=balance.rows[0].revision;
+        await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
+          VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,
+          [auth.storeId,line.variant_id,revision,JSON.stringify({variant_id:line.variant_id,revision,purchase_id:id})]);
+      }
+      await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
+        VALUES($1,$2,'purchase.receive.checked',$3,$4::jsonb)`,
+        [auth.storeId,auth.userId,id,JSON.stringify({received_quantity,accepted_quantity,rejected_quantity,missing_quantity,reason})]);
+      return {id,received:true,received_quantity,accepted_quantity,rejected_quantity,missing_quantity};
     });
     return out.result;
   });
 
+  // Qualidade é finalizada na conferência, na mesma transação que libera apenas peças aprovadas.
+  // O endpoint legado não pode reescrever a classificação sem movimentação compensatória.
   app.put<{Params:{id:string};Body:{accepted_quantity:number}}>('/v1/management/purchases/:id/quality',{
     schema:{params,body:{type:'object',additionalProperties:false,required:['accepted_quantity'],
       properties:{accepted_quantity:{type:'integer',minimum:0,maximum:100000}}}},
   },async(request,reply)=>{
     if(requirePermission(request,reply,'purchase.write'))return reply;
-    const auth=request.authContext!,{id}=request.params,{accepted_quantity}=request.body;
-    const out=await withIdempotentTransaction(db,auth,'purchase.quality:'+id,key(request),request.body,async client=>{
-      const result=await client.query(`UPDATE purchase_orders SET accepted_quantity=$3
-        WHERE store_id=$1 AND id=$2 AND received_at IS NOT NULL AND quantity >= $3 RETURNING id`,
-        [auth.storeId,id,accepted_quantity]);
-      if(!result.rowCount)throw new DomainError(409,'QUALITY_UNAVAILABLE','Compra ainda não recebida ou quantidade aprovada inválida');
-      await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
-        VALUES($1,$2,'purchase.quality',$3,$4::jsonb)`,[auth.storeId,auth.userId,id,JSON.stringify({accepted_quantity})]);
-      return {id,accepted_quantity};
-    });
-    return out.result;
+    throw new DomainError(409,'QUALITY_IMMUTABLE','Conferência concluída. Use ajuste auditado de estoque para reclassificar peças.');
   });
 
   app.get('/v1/management/pickup-orders',async(request,reply)=>{
