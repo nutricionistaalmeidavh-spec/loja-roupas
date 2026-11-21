@@ -40,3 +40,34 @@ test('marketplace sem lojas mostra estado vazio, sem produtos fictícios',async(
  assert.deepEqual(data.items,[]);
  assert.deepEqual(data.stores,[]);
 });
+
+test('marketplace pagina por data e ID sem repetir a primeira página de 36 peças',async()=>{
+ const seen=[];
+ const all=Array.from({length:37},(_,i)=>({
+  id:'piece-'+String(i+1).padStart(3,'0'),slug:'loja-um',store_name:'Loja Um',
+  updated_at:'2026-11-21 19:00:00',name:'Camisa',category:'Camisas',color:'Azul',size:'M',
+  price_cents:3500,available:2,photo_url:null
+ }));
+ const db={prepare(sql){
+  let args=[];
+  const stmt={bind(...v){args=v;return stmt;},async all(){
+   seen.push({sql,args});
+   if(sql.includes('FROM variants v JOIN tenants'))return {results:all};
+   return {results:[]};
+  }};return stmt;
+ }};
+ const first=await(await worker.fetch(new Request('https://example.test/v1/marketplace'),{DB:db})).json();
+ assert.equal(first.items.length,36);
+ assert.ok(first.next_cursor);
+ assert.equal(seen[0].args.at(-1),37);
+ const second=await(await worker.fetch(new Request('https://example.test/v1/marketplace?after='+encodeURIComponent(first.next_cursor)),{DB:db})).json();
+ assert.equal(second.items.length,36);
+ const withAfter=seen.find(x=>x.sql.includes('v.updated_at < ?'));
+ assert.ok(withAfter);
+ assert.deepEqual(withAfter.args.slice(0,3),['2026-11-21 19:00:00','2026-11-21 19:00:00','piece-036']);
+});
+test('cursor público malformado é rejeitado sem consulta ao banco',async()=>{
+ const response=await worker.fetch(new Request('https://example.test/v1/marketplace?after=invalid_cursor'),{DB:{}});
+ assert.equal(response.status,400);
+ assert.equal((await response.json()).error,'invalid_cursor');
+});
