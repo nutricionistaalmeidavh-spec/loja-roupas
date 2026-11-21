@@ -34,7 +34,8 @@ async function thumbnail(bytes:Buffer,type:string):Promise<Buffer>{
 function sendPhoto(reply:any,row:{bytes:Buffer;sha256:string},version?:string,ifNoneMatch?:string){
  if(version&&version!==row.sha256)throw new DomainError(409,'PHOTO_CHANGED','Fotografia alterada; recarregue o catálogo');
  const etag='"'+row.sha256+'"';
- reply.header('etag',etag).header('cache-control',version?'private, max-age=86400, immutable':'private, no-store')
+ reply.header('etag',etag).header('cache-control',version?'private, max-age=300, must-revalidate':'private, no-store')
+  .header('vary','Authorization, x-store-id')
   .header('x-content-type-options','nosniff');
  if(ifNoneMatch===etag)return reply.code(304).send();
  return reply.type('image/webp').send(row.bytes);
