@@ -52,12 +52,29 @@ try{
  }
  const origin=new URL(appWindow.url()).origin;
  assert.equal(new URL(origin).hostname,'127.0.0.1');
+ // Test the real installed native recovery IPC, without requiring internet
+ // and without erasing or reinitializing PostgreSQL.
+ const recoveryPromise=instance.waitForEvent('window',{timeout:15000});
+ await appWindow.getByRole('button',{name:/Esqueci minha senha/}).click();
+ const recovery=await recoveryPromise;
+ await recovery.getByRole('heading',{name:'Recuperar acesso ao administrador'}).waitFor();
+ await recovery.locator('input[name=login]').fill('local-admin');
+ await recovery.locator('input[name=password]').fill('Senha-redefinida-CI-2026');
+ await recovery.locator('input[name=confirmation]').fill('Senha-redefinida-CI-2026');
+ await recovery.getByRole('button',{name:'Redefinir senha neste computador'}).click();
+ await recovery.getByText('Senha alterada.',{exact:false}).waitFor({timeout:30000});
+ await recovery.close();
+ const old=await fetch(origin+'/v1/auth/sessions',{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify({login:'local-admin',password:'Senha-Local-CI-2026'})
+ });
+ assert.equal(old.status,401,'Senha antiga deve ser recusada após redefinição');
  await appWindow.getByLabel('Usuário').fill('local-admin');
- await appWindow.getByLabel('Senha').fill('Senha-Local-CI-2026');
+ await appWindow.getByLabel('Senha').fill('Senha-redefinida-CI-2026');
  await appWindow.getByRole('button',{name:'Entrar na loja'}).click();
  await appWindow.getByRole('dialog',{name:'Guia inicial da loja'}).waitFor({timeout:12000});
  await appWindow.getByRole('button',{name:'Reabrir tour'}).waitFor();
- console.info('Windows one-computer: PostgreSQL, API, web, bootstrap and tour operational');
+ console.info('Windows one-computer: PostgreSQL, API, web, offline password recovery and tour operational');
 }finally{
  await instance?.close();
  await rm(userData,{recursive:true,force:true,maxRetries:8,retryDelay:500}).catch(error=>console.warn('Cleanup failed',error.message));
