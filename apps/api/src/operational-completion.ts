@@ -106,7 +106,7 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
           [auth.storeId,line.variant_id,revision,JSON.stringify({variant_id:line.variant_id,revision,purchase_id:id})]);
       }
       await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
-        VALUES($1,$2,'purchase.receive.checked',$3,$4::jsonb)`,
+        VALUES($1,$2,'purchase.receive',$3,$4::jsonb)`,
         [auth.storeId,auth.userId,id,JSON.stringify({received_quantity,accepted_quantity,rejected_quantity,missing_quantity,reason})]);
       return {id,received:true,received_quantity,accepted_quantity,rejected_quantity,missing_quantity};
     });
