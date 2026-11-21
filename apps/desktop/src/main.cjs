@@ -126,6 +126,11 @@ function recoveryAllowed(event){
     !event.sender.getURL().startsWith('file://'))throw new Error('Recuperação disponível somente na janela local segura.');
 }
 function registerRecoveryHandlers(){
+ ipcMain.handle('loja:diagnostics:render-failure',event=>{
+  if(!isMainLocalSender(event))return false;
+  void logInterfaceFailure({kind:'render',code:null});
+  return true;
+ });
  ipcMain.handle('loja:recovery:available',event=>isMainLocalSender(event));
  ipcMain.handle('loja:recovery:open',async event=>{
   if(!isMainLocalSender(event))throw new Error('Recupere a senha no computador principal da loja.');
