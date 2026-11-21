@@ -23,3 +23,7 @@ CREATE TABLE IF NOT EXISTS pickup_orders(
  FOREIGN KEY(tenant_id) REFERENCES tenants(id)
 );
 CREATE INDEX IF NOT EXISTS idx_pickup_pending ON pickup_orders(tenant_id,status,created_at);
+
+-- Opcional: busca paginada no marketplace D1; não é dependência do PDV local.
+CREATE INDEX IF NOT EXISTS idx_variants_marketplace_seek ON variants(updated_at DESC,id ASC) WHERE published=1 AND available>0;
+CREATE INDEX IF NOT EXISTS idx_variants_marketplace_category ON variants(lower(category),updated_at DESC,id ASC) WHERE published=1 AND available>0;
