@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type {Pool, PoolClient} from 'pg';
 import { requirePermission } from './auth.ts';
 import type { AuthContext } from './auth.ts';
+import {holdState} from '@loja/domain/operations';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 const uuid = {type:'string', pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
@@ -20,11 +21,14 @@ async function recordChange(client:PoolClient, auth:AuthContext, holdId:string, 
 export function registerStockHolds(app:FastifyInstance, db:Pool) {
   app.get('/v1/stock/holds', async (request,reply) => {
     if (requirePermission(request,reply,'reservation.create')) return reply;
-    const holds = await db.query(`SELECT h.id,h.quantity,v.sku,h.created_at FROM stock_holds h
+    const holds = await db.query<{id:string;quantity:number;sku:string;created_at:Date;released_at:Date|null;stale:boolean}>(`SELECT h.id,h.quantity,v.sku,h.created_at,h.released_at,
+      h.created_at<=now()-interval '24 hours' AS stale FROM stock_holds h
       JOIN product_variants v ON v.store_id=h.store_id AND v.id=h.variant_id
       WHERE h.store_id=$1 AND h.released_at IS NULL ORDER BY h.created_at,h.id LIMIT 100`,
       [request.authContext!.storeId]);
-    return {holds:holds.rows};
+    return {holds:holds.rows.map(hold=>({id:hold.id,quantity:hold.quantity,sku:hold.sku,
+      created_at:hold.created_at,stale:hold.stale,
+      state:holdState({released_at:hold.released_at?.toISOString()??null})}))};
   });
 
   app.post<{Body:{variant_id:string;quantity:number}}>('/v1/stock/holds', {
