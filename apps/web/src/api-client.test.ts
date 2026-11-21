@@ -133,3 +133,18 @@ test('galeria adicional preserva escopo de loja, idempotência e versão de cada
  assert.equal(calls[3].key,'key-gallery-remove');
  assert.equal(calls[2].url,'/v1/catalog/products/'+productId+'/gallery/'+photoId+'/thumbnail?v='+version);
 });
+
+test('planilha de estoque usa cursor para navegar sem precisar de OFFSET profundo',async()=>{
+ const {listStockSpreadsheet}=await import('./api-client.ts');
+ const fake:typeof fetch=async(input,init)=>{
+  const url=new URL(String(input),'https://local.test');
+  assert.equal(url.pathname,'/v1/stock/spreadsheet');
+  assert.equal(url.searchParams.get('query'),'blusa');
+  assert.equal(url.searchParams.get('offset'),'50000');
+  assert.equal(url.searchParams.get('cursor'),'opaque-cursor');
+  assert.equal((init?.headers as Record<string,string>)['x-store-id'],session.storeId);
+  return Response.json({items:[],total:100000,limit:50,offset:50000,categories:[],next_cursor:null});
+ };
+ const result=await listStockSpreadsheet(session,{query:'blusa',offset:50000,cursor:'opaque-cursor'},fake);
+ assert.equal(result.next_cursor,null);
+});
