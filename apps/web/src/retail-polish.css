@@ -323,3 +323,14 @@ input,select,textarea{accent-color:var(--retail-primary)}
 .photo-upload-preview strong{font-size:13px}
 .photo-upload-preview span,.photo-upload-preview p{font-size:12px;line-height:1.5;color:var(--retail-muted);margin:0;overflow-wrap:anywhere}
 @media(max-width:390px){.photo-upload-preview img{width:72px;height:94px}}
+
+/* Loading reserva a mesma geometria da grade real. */
+.catalog-loading .product-card{pointer-events:none}
+.skeleton-product{gap:10px}
+.skeleton-product .product-visual{background:#eae8e6}
+.skeleton-line{height:13px;width:90%;border-radius:4px;background:#e8e6e3}
+.skeleton-line.short{width:48%;height:18px}
+.skeleton-controls{display:flex;gap:7px;margin-top:auto;padding-bottom:8px}
+.skeleton-controls span{height:34px;width:36px;border-radius:7px;background:#eeece9}
+.skeleton-shimmer{background:linear-gradient(110deg,#eeeae6 10%,#f7f5f2 45%,#eeeae6 80%);background-size:200% 100%;animation:retail-skeleton 1.7s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.skeleton-shimmer{animation:none}}
