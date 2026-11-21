@@ -75,7 +75,7 @@ test('P2: lote atômico, repetição idempotente, conflitos e histórico filtrad
    'VALUES($1,$2,$3,4,3500) RETURNING id::text',[sid,supplier,variants[0].id])).rows[0].id;
   const received=await app.inject({method:'POST',
    url:'/v1/management/purchases/'+purchase+'/receive',
-   headers:{...headers,'idempotency-key':randomUUID()}});
+   headers:{...headers,'idempotency-key':randomUUID()},payload:{received_quantity:4,accepted_quantity:4}});
   assert.equal(received.statusCode,200,received.body);
   const purchaseHistory=await app.inject({method:'GET',
    url:'/v1/stock/spreadsheet/movements?supplier_id='+supplier+'&purchase_id='+purchase+
