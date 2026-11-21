@@ -108,9 +108,11 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByRole('button',{name:'Registrar pedido de compra'}).click();
   const purchase=page.getByRole('listitem').filter({hasText:supplier}).filter({hasText:new RegExp(sku,'i')});
   await purchase.getByRole('button',{name:'Conferir recebimento'}).click();
-  await purchase.getByLabel('Quantidade entregue').fill('1');
-  await purchase.getByLabel('Quantidade aprovada para venda').fill('1');
-  await purchase.getByRole('button',{name:'Confirmar conferência e liberar aprovadas'}).click();
+  const inspection=page.getByRole('dialog',{name:/Conferir recebimento/});
+  await expect(inspection).toBeVisible();
+  await inspection.getByLabel('Quantidade entregue').fill('1');
+  await inspection.getByLabel('Quantidade aprovada para venda').fill('1');
+  await inspection.getByRole('button',{name:'Confirmar conferência e liberar aprovadas'}).click();
   await expect(purchase.getByText(/Conferido: 1 aprovadas/)).toBeVisible();
 
   await storefront.getByLabel('Quantidade de '+name+' Azul M').fill('1');
