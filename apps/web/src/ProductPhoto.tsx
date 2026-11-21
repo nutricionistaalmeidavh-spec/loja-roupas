@@ -13,14 +13,14 @@ export function ProductPhoto({session,product,fallback}:{session:Session;product
   const controller=new AbortController();
   let objectUrl:string|null=null;
   setUrl(null);setLoading(true);
-  void fetchProductPhoto(session,product.id,fetch,controller.signal).then(blob=>{
+  void fetchProductPhoto(session,product.id,fetch,controller.signal,product.photoVersion??undefined).then(blob=>{
    if(controller.signal.aborted)return;
    objectUrl=URL.createObjectURL(blob);
    setUrl(objectUrl);
   }).catch(()=>{if(!controller.signal.aborted)setUrl(null);})
    .finally(()=>{if(!controller.signal.aborted)setLoading(false);});
   return ()=>{controller.abort();if(objectUrl)URL.revokeObjectURL(objectUrl);};
- },[session,product.id,product.hasPhoto]);
+ },[session,product.id,product.hasPhoto,product.photoVersion]);
  if(!url)return <div className={'photo-fallback'+(loading?' is-loading':'')} aria-label={loading?'Carregando fotografia':'Fotografia não disponível'}>
    {fallback??<span className="photo-placeholder">{loading?'Carregando foto…':'Foto indisponível'}</span>}
  </div>;
