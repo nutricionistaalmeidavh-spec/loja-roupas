@@ -17,7 +17,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   expect(product.ok()).toBeTruthy();
   const variant = (await product.json()).variants[0].id;
   const stock = await request.post('/v1/stock/receipts',{headers:headers(),
-    data:{variant_id:variant,reference_id:randomUUID(),quantity:1}});
+    data:{variant_id:variant,reference_id:randomUUID(),quantity:1,note:'Entrada direta auditada para teste'}});
   expect(stock.ok()).toBeTruthy();
 
   await page.goto('/');
