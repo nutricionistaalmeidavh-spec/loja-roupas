@@ -5,7 +5,6 @@ import {ApiError,headers,jsonRequest} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {requestId} from './request-id.ts';
 
- unit_price_cents:number;returned_quantity:number;available_to_return:number};
 type Result={id:string;refunded_cents:number;status:string};
 type Sale=SaleReturnLookup;
 type Selection={quantity:string;condition:'resellable'|'quarantine'};
