@@ -1,4 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
+import {purchaseState} from '@loja/domain/operations';
+import type {PurchaseRecord as Purchase,PurchaseReceiptRequest} from '@loja/domain/operations';
+import {TaskDialog} from './TaskDialog.tsx';
 import type {FormEvent} from 'react';
 import {headers,jsonRequest,listCatalog} from './api-client.ts';
 import type {Session} from './api-client.ts';
@@ -7,7 +10,6 @@ import {receiptText} from './pos-client.ts';
 import {requestId} from './request-id.ts';
 
 type Job={id:string;sale_id:string;sale_number:string;paper_mm:number};
-type Purchase={id:string;supplier:string;sku:string;quantity:number;unit_cost_cents:string;received_at:string|null;promised_on:string|null;accepted_quantity:number|null;received_quantity:number|null;rejected_quantity:number|null;missing_quantity:number|null;quality_finalized:boolean};
 type Pickup={id:string;created_at:string;quoted_total_cents:string};
 type Supplier={id:string;name:string};
 const base='/v1/management/';
@@ -69,8 +71,11 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
       pending.current.delete(signature);
       setNotice(success);setRevision(value=>value+1);
       return true;
-    }catch(error){setError(message(error));return false;}
-    finally{setBusy(false);}
+    }catch(error){
+      if(error instanceof Error&&'status' in error&&typeof error.status==='number'&&error.status>=400&&error.status<500)
+        pending.current.delete(signature);
+      setError(message(error));return false;
+    }finally{setBusy(false);}
   }
 
   async function createPurchase(event:FormEvent<HTMLFormElement>) {
@@ -133,7 +138,7 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
       <ul>{purchases.map(purchase=><li key={purchase.id}>
         {purchase.supplier} · {purchase.sku} · {purchase.quantity} un. · {money(purchase.unit_cost_cents)} por unidade{' '}
         {purchase.promised_on&&<span>Prazo {purchase.promised_on.split('-').reverse().join('/')} · </span>}
-        {purchase.received_at?<div role="status">
+        {purchaseState(purchase)!=='awaiting_receipt'?<div role="status">
           {purchase.quality_finalized
            ? 'Conferido: '+purchase.accepted_quantity+' aprovadas · '+purchase.rejected_quantity+' em quarentena · '+purchase.missing_quantity+' não entregues'
            : 'Recebimento anterior ao controle P0: conferir inventário antes de reclassificar peças'}
@@ -141,39 +146,41 @@ export function OperationalPanels({session,suppliers,onStockChanged}:{
          onClick={()=>{setReceiving(purchase);setReceivedQty('');setAcceptedQty('');setReceiptReason('');}}>
           Conferir recebimento
         </button>}
-        {receiving?.id===purchase.id&&!purchase.received_at&&<form className="editor-block" onSubmit={event=>{
+        
+      </li>)}</ul>
+    </section>
+    {receiving&&purchaseState(receiving)==='awaiting_receipt'&&<TaskDialog title={'Conferir recebimento — '+receiving.sku} busy={busy} onClose={()=>setReceiving(null)}><form className="editor-block" onSubmit={event=>{
           event.preventDefault();
-          const body=JSON.stringify({received_quantity:Number(receivedQty),accepted_quantity:Number(acceptedQty),
-            ...(receiptReason.trim()?{reason:receiptReason.trim()}:{})});
-          void write('purchases/'+purchase.id+'/receive','Conferência concluída: somente peças aprovadas liberadas.',body)
+          const payload:PurchaseReceiptRequest={received_quantity:Number(receivedQty),accepted_quantity:Number(acceptedQty),
+            ...(receiptReason.trim()?{reason:receiptReason.trim()}:{})};
+          const body=JSON.stringify(payload);
+          void write('purchases/'+receiving.id+'/receive','Conferência concluída: somente peças aprovadas liberadas.',body)
             .then(ok=>{if(ok){setReceiving(null);onStockChanged();}});
          }}>
-          <h3>Conferir entrega de {purchase.sku}</h3>
-          <p>Pedido: {purchase.quantity} unidades. Conte e inspecione antes de liberar estoque.</p>
+          <h3>Conferir entrega de {receiving.sku}</h3>
+          <p>Pedido: {receiving.quantity} unidades. Conte e inspecione antes de liberar estoque.</p>
           <label>Quantidade entregue
-            <input type="number" inputMode="numeric" required min={1} max={purchase.quantity}
+            <input type="number" inputMode="numeric" required min={1} max={receiving.quantity}
               value={receivedQty} onChange={e=>setReceivedQty(e.target.value)}/></label>
           <label>Quantidade aprovada para venda
             <input type="number" inputMode="numeric" required min={0}
-              max={receivedQty||purchase.quantity} value={acceptedQty}
+              max={receivedQty||receiving.quantity} value={acceptedQty}
               onChange={e=>setAcceptedQty(e.target.value)}/></label>
           {receivedQty!==''&&acceptedQty!==''&&Number(acceptedQty)<=Number(receivedQty)&&<p role="status">
-            {Number(acceptedQty)} liberadas · {Number(receivedQty)-Number(acceptedQty)} em quarentena · {purchase.quantity-Number(receivedQty)} faltantes
+            {Number(acceptedQty)} liberadas · {Number(receivedQty)-Number(acceptedQty)} em quarentena · {receiving.quantity-Number(receivedQty)} faltantes
           </p>}
           <label>Justificativa (obrigatória se houver divergência)
             <textarea maxLength={250} value={receiptReason} onChange={e=>setReceiptReason(e.target.value)}
               required={receivedQty!==''&&acceptedQty!==''&&
-                (Number(acceptedQty)!==Number(receivedQty)||Number(receivedQty)!==purchase.quantity)}/></label>
+                (Number(acceptedQty)!==Number(receivedQty)||Number(receivedQty)!==receiving.quantity)}/></label>
           <div className="workspace-actions">
             <button type="button" className="light-button" disabled={busy} onClick={()=>setReceiving(null)}>Cancelar</button>
             <button type="submit" className="primary-action" disabled={busy||receivedQty===''||acceptedQty===''||
-              Number(acceptedQty)>Number(receivedQty)||Number(receivedQty)>purchase.quantity}>
+              Number(acceptedQty)>Number(receivedQty)||Number(receivedQty)>receiving.quantity}>
               Confirmar conferência e liberar aprovadas
             </button>
           </div>
-        </form>}
-      </li>)}</ul>
-    </section>
+        </form></TaskDialog>}
     <section>
       <h2>Pedidos para retirada pendentes</h2>
       {!pickups.length&&<p>Nenhum pedido pendente.</p>}

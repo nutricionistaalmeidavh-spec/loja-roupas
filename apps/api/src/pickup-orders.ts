@@ -1,24 +1,26 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, PoolClient } from 'pg';
 import { stableFingerprint } from '@loja/domain/catalog';
+import {pickupState,transition} from '@loja/domain/operations';
 import { requirePermission } from './auth.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 const uuid = {type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const params = {type:'object',required:['id'],properties:{id:uuid}};
 type Line = {variant_id:string;quantity:number};
-type OrderRow = {id:string;sale_id:string|null;quoted_total_cents:string;expired:boolean;cancelled_at:Date|null};
+type OrderRow = {id:string;sale_id:string|null;quoted_total_cents:string;created_at:Date;cancelled_at:Date|null};
 type Queryable = Pick<PoolClient,'query'>;
 
 async function pendingOrder(db:Queryable, storeId:string, id:string, lock=false) {
-  const order = await db.query<OrderRow>(`SELECT id,sale_id,quoted_total_cents,cancelled_at,
-    created_at <= now() - interval '48 hours' AS expired FROM pickup_orders
+  const order = await db.query<OrderRow>(`SELECT id,sale_id,quoted_total_cents,cancelled_at,created_at FROM pickup_orders
     WHERE store_id=$1 AND id=$2 ${lock?'FOR UPDATE':''}`,[storeId,id]);
   const found = order.rows[0];
   if (!found) throw new DomainError(404,'ORDER_NOT_FOUND','Pedido de retirada não encontrado');
-  if (found.sale_id) throw new DomainError(409,'ORDER_SOLD','Pedido de retirada já finalizado');
-  if (found.cancelled_at) throw new DomainError(409,'ORDER_CANCELLED','Pedido de retirada cancelado');
-  if (found.expired) throw new DomainError(409,'ORDER_EXPIRED','Código de retirada expirado');
+  const state=pickupState({sale_id:found.sale_id,cancelled_at:found.cancelled_at?.toISOString()??null,created_at:found.created_at.toISOString()});
+  if(state==='completed')throw new DomainError(409,'ORDER_SOLD','Pedido de retirada já finalizado');
+  if(state==='cancelled')throw new DomainError(409,'ORDER_CANCELLED','Pedido de retirada cancelado');
+  if(state==='expired')throw new DomainError(409,'ORDER_EXPIRED','Código de retirada expirado');
+  if(transition('pickup',state,'complete')!=='completed')throw new DomainError(409,'ORDER_UNAVAILABLE','Pedido indisponível');
   const lines = await db.query<Line>(`SELECT variant_id,quantity FROM pickup_order_lines
     WHERE store_id=$1 AND order_id=$2 ORDER BY variant_id`,[storeId,id]);
   return {id:found.id,quoted_total_cents:found.quoted_total_cents,lines:lines.rows};
@@ -107,14 +109,14 @@ export function registerPickupOrders(app:FastifyInstance, db:Pool) {
   app.get<{Params:{id:string;orderId:string}}>('/v1/storefront/:id/pickup-orders/:orderId/status',{
     schema:{params:{type:'object',required:['id','orderId'],properties:{id:uuid,orderId:uuid}}},
   },async(request,reply)=>{
-    const result=await db.query<{status:string}>(`SELECT CASE
-      WHEN cancelled_at IS NOT NULL THEN 'cancelled'
-      WHEN sale_id IS NOT NULL THEN 'complete'
-      WHEN created_at<=now()-interval '48 hours' THEN 'expired'
-      ELSE 'pending' END AS status
-      FROM pickup_orders WHERE store_id=$1 AND id=$2`,[request.params.id,request.params.orderId]);
+    const result=await db.query<{sale_id:string|null;cancelled_at:Date|null;created_at:Date}>(`
+      SELECT sale_id,cancelled_at,created_at FROM pickup_orders WHERE store_id=$1 AND id=$2`,
+      [request.params.id,request.params.orderId]);
     if(!result.rowCount)throw new DomainError(404,'ORDER_NOT_FOUND','Pedido de retirada não encontrado');
-    return reply.header('Cache-Control','no-store').send(result.rows[0]);
+    const order=result.rows[0];
+    const status=pickupState({sale_id:order.sale_id,cancelled_at:order.cancelled_at?.toISOString()??null,
+      created_at:order.created_at.toISOString()});
+    return reply.header('Cache-Control','no-store').send({status:status==='completed'?'complete':status});
   });
 
   app.get<{Params:{id:string}}>('/v1/pickup-orders/:id', {schema:{params}}, async (request,reply) => {

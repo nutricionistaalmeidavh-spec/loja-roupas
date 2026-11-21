@@ -13,6 +13,7 @@ import { registerStoreOperations } from './store-operations.ts';
 import { registerPickupOrders } from './pickup-orders.ts';
 import { registerOperationalCompletion } from './operational-completion.ts';
 import { registerIntelligence } from './intelligence.ts';
+import { registerOperationsDashboard } from './operations-dashboard.ts';
 import { registerProductFields } from './product-fields.ts';
 import { registerProductImport } from './import-products.ts';
 import { registerStockHolds } from './stock-holds.ts';
@@ -48,6 +49,7 @@ export function buildApp(db: Pool) {
   registerPickupOrders(app, db);
   registerOperationalCompletion(app, db);
   registerIntelligence(app, db);
+  registerOperationsDashboard(app, db);
   registerProductFields(app, db);
   registerStaticUi(app);
   registerMarketplaceBridge(app,db);

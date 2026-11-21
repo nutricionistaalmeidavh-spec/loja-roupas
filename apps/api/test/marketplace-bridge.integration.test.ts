@@ -18,7 +18,9 @@ test('chave de lojista permanece cifrada e resiste a alteração de bytes',async
   const original='a'.repeat(64),encrypted=await sealSyncKey(original,env);
   assert.notEqual(encrypted,original);
   assert.equal(await openSyncKey(encrypted,env),original);
-  await assert.rejects(openSyncKey(encrypted.slice(0,-2)+'00',env));
+  const [iv,tag,ciphertext]=encrypted.split('.');
+  const changed=(ciphertext.slice(0,2)==='00'?'01':'00')+ciphertext.slice(2);
+  await assert.rejects(openSyncKey([iv,tag,changed].join('.'),env));
  }finally{await rm(root,{recursive:true,force:true});}
 });
 

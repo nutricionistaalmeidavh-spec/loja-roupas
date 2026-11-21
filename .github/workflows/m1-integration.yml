@@ -69,6 +69,11 @@ jobs:
       - name: Instalar Chromium open source para Playwright
         timeout-minutes: 6
         run: pnpm --filter @loja/web exec playwright install --with-deps chromium
+      - name: Preparar axe-core OSS somente para QA (fora das dependências do produto)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/loja-axe" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund axe-core@4.10.3
+          test -s "$RUNNER_TEMP/loja-axe/node_modules/axe-core/axe.min.js"
+          echo "LOJA_AXE_CORE_PATH=$RUNNER_TEMP/loja-axe/node_modules/axe-core/axe.min.js" >> "$GITHUB_ENV"
       - name: E2E Web real (login → cadastro → estoque → carrinho)
         env:
           LOJA_E2E_BUILT: '1'

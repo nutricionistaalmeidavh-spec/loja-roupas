@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
+import {saleReturnState,transition} from '@loja/domain/operations';
+import type {ReturnItem,CashReturnRequest} from '@loja/domain/operations';
 import { requirePermission } from './auth.ts';
 import { expectedCash } from './cash.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
@@ -7,7 +9,6 @@ import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from '.
 const uuid={type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const numberParams={type:'object',required:['number'],properties:{number:{type:'string',pattern:'^[1-9][0-9]{0,15}$'}}};
 type SaleInfo={id:string;sale_number:string;status:string;total_cents:string;cash_only:boolean};
-type ReturnItem={sale_line_id:string;quantity:number;condition:'resellable'|'quarantine'};
 type SaleLine={id:string;variant_id:string;quantity:string;unit_price_cents:string;returned_quantity:string};
 const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,
   NOT EXISTS(SELECT 1 FROM sale_payments p WHERE p.store_id=s.store_id AND p.sale_id=s.id AND p.method<>'cash') AS cash_only
@@ -37,7 +38,7 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
    }))};
   });
 
- app.post<{Params:{number:string};Body:{cash_session_id:string;reason:string;items:ReturnItem[]}}>(
+ app.post<{Params:{number:string};Body:CashReturnRequest}>(
   '/v1/management/sales/by-number/:number/cash-return',{
    schema:{params:numberParams,body:{type:'object',additionalProperties:false,
     required:['cash_session_id','reason','items'],properties:{
@@ -122,9 +123,13 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
        JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
        WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id)),0)::text AS returned
       FROM sale_lines l WHERE l.store_id=$1 AND l.sale_id=$2`,[auth.storeId,sale.id]);
-    const complete=totals.rows[0].quantity===totals.rows[0].returned;
+    const next=saleReturnState(Number(totals.rows[0].quantity),Number(totals.rows[0].returned));
+    if(next==='confirmed'||transition('sale_return',sale.status as 'confirmed'|'partially_returned',
+      next==='returned'?'complete':'partial')!==next)
+      throw new DomainError(409,'RETURN_TRANSITION','Transição de devolução inválida');
+    const complete=next==='returned';
     await client.query('UPDATE sales SET status=$3 WHERE store_id=$1 AND id=$2',
-      [auth.storeId,sale.id,complete?'returned':'partially_returned']);
+      [auth.storeId,sale.id,next]);
     await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
       VALUES($1,$2,'sales.return',$3,$4::jsonb)`,
       [auth.storeId,auth.userId,sale.id,JSON.stringify({return_id:returnId,amount_cents:amount,cash_session_id,reason,items})]);

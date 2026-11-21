@@ -4,6 +4,7 @@ import { ApiError, headers, jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { CashReturnForm } from './CashReturnForm.tsx';
 import { OperationalPanels } from './OperationalPanels.tsx';
+import { OperationsActionCenter } from './OperationsActionCenter.tsx';
 import { CommercialIntelligence } from './CommercialIntelligence.tsx';
 import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
@@ -95,6 +96,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
         {item.label}
       </a>)}
     </nav>
+    <OperationsActionCenter session={session} revision={refresh} onNavigate={setSection}/>
     {section==='vendas'&&<section id="gestao-vendas" className="management-section">
       <div className="management-section-head">
         <div><h2>Vendas e devoluções nos últimos 30 dias</h2><p>Informações registradas no servidor da loja.</p></div>
@@ -131,7 +133,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
       <PickupSettings session={session}/>
     </div>}
     {section==='operacoes'&&<div id="gestao-operacoes" className="management-section">
-      <OperationalPanels session={session} suppliers={suppliers} onStockChanged={onReturned}/>
+      <OperationalPanels session={session} suppliers={suppliers} onStockChanged={()=>{setRefresh(n=>n+1);onReturned();}}/>
     </div>}
     {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
@@ -294,7 +296,7 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
   </div>;
 }
 
-type Hold = {id:string; sku:string; quantity:number};
+type Hold = {id:string; sku:string; quantity:number; stale:boolean; state:'active'|'released'};
 export function StockHolds({session,variant,onChanged}:{
   session:Session; variant?:{id:string;sku:string}; onChanged?:()=>void;
 }) {
@@ -346,7 +348,7 @@ export function StockHolds({session,variant,onChanged}:{
         value={quantity} disabled={busy} onChange={event=>setQuantity(event.target.value)}/></label>
       <button className="light-button" disabled={busy}>Reservar</button>
     </form> : <ul>{holds.map(hold => <li key={hold.id}>
-      {hold.sku} · {hold.quantity} un. <button className="light-button" disabled={busy}
+      {hold.sku} · {hold.quantity} un. · {hold.stale&&<strong>Reserva com mais de 24 horas: revisar</strong>}{' '}<button className="light-button" disabled={busy}
         onClick={() => void change(hold.id)}>Liberar reserva</button>
     </li>)}</ul>}
     {status && <p role="status">{status}</p>}
