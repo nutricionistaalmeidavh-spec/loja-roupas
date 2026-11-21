@@ -27,7 +27,22 @@ foreach($folder in @('bin','lib','share')){
  Copy-Item -Recurse -LiteralPath $source -Destination (Join-Path $pgDest $folder)
 }
 
+# Bundle Microsoft's free, officially signed VC++ runtime for machines without it.
+# No installer download, account, or paid service is needed on the customer PC.
+# The user explicitly chooses whether to install the OS prerequisite.
+$prerequisites=Join-Path $runtime 'prerequisites'
+New-Item -ItemType Directory -Force -Path $prerequisites | Out-Null
+$vcRedist=Join-Path $prerequisites 'vc_redist.x64.exe'
+Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vcRedist -MaximumRedirection 6
+$vcSignature=Get-AuthenticodeSignature -LiteralPath $vcRedist
+if($vcSignature.Status -ne 'Valid' -or
+   !$vcSignature.SignerCertificate -or
+   $vcSignature.SignerCertificate.Subject -notmatch 'Microsoft') {
+ throw 'Microsoft VC++ runtime signature invalid; refusing to package'
+}
+if((Get-Item -LiteralPath $vcRedist).Length -lt 1000000){throw 'VC++ redistributable is incomplete'}
 Write-Host 'PostgreSQL portable component verified'
+
 
 # Isolated production API deployment including tsx runtime and workspace packages.
 Push-Location $repo
