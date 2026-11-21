@@ -33,7 +33,10 @@ async function freePort(){
 async function execute(binary,args,options={}){
  return new Promise((resolve,reject)=>{
   const child=spawn(binary,args,{cwd:options.cwd,env:options.env,windowsHide:true,stdio:[options.input===undefined?'ignore':'pipe','pipe','pipe']});
-  if(options.input!==undefined)child.stdin.end(options.input);
+  if(options.input!==undefined){
+   child.stdin.on('error',()=>{/* Child startup errors are reported by exit/error below. */});
+   child.stdin.end(options.input);
+  }
   let stdout='',stderr='';
   child.stdout.on('data',data=>{stdout+=data.toString();stdout=stdout.slice(-20000);});
   child.stderr.on('data',data=>{stderr+=data.toString();stderr=stderr.slice(-20000);});
