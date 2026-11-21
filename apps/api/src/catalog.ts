@@ -91,7 +91,7 @@ export function registerCatalog(app:FastifyInstance,db:Pick<Pool,'query'>){
   if(ids.length>50||ids.some(id=>!uuid.test(id))||new Set(ids).size!==ids.length)
    throw new DomainError(400,'INVALID_VARIANTS','Lista de variantes inválida');
   const data=await db.query<Row>(`SELECT p.id::text AS product_id,p.name,p.category,
-   p.revision::text AS product_revision,(img.product_id IS NOT NULL) AS has_photo,img.sha256::text AS photo_version,img.sha256::text AS photo_version,
+   p.revision::text AS product_revision,(img.product_id IS NOT NULL) AS has_photo,img.sha256::text AS photo_version,
    v.id::text AS variant_id,v.sku,v.barcode,v.color,v.size,v.price_cents::text,
    (coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available,
    coalesce(s.revision,0)::text AS revision,v.revision::text AS variant_revision
