@@ -12,6 +12,7 @@ import {M2StockAdjustment} from './M2Admin.tsx';
 import {TaskDialog} from './TaskDialog.tsx';
 import {SpreadsheetBulkEditor} from './SpreadsheetBulkEditor.tsx';
 import {StockMovementHistory} from './StockMovementHistory.tsx';
+import {DirectReceiptPermissions} from './DirectReceiptPermissions.tsx';
 
 const money=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 type SheetRow=Omit<StockSpreadsheetRow,'barcode'> & {barcode:string;price_edit:string};
@@ -27,7 +28,7 @@ function movementLabel(kind:string){
 }
 function movementSource(source:string){
  return ({
-  manual_receipt:'Entrada manual',spreadsheet_import:'Importação de planilha',
+  manual_receipt:'Entrada manual',direct_receipt:'Entrada direta',direct_receipt_reversal:'Estorno de entrada direta',spreadsheet_import:'Importação de planilha',
   purchase:'Pedido de compra',sale:'Venda confirmada',
   sale_return:'Devolução de venda',manager_adjustment:'Conferência gerencial'
  } as Record<string,string>)[source]??source;
@@ -60,6 +61,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  const [actionLoading,setActionLoading]=useState(false);
  const [bulkOpen,setBulkOpen]=useState(false);
  const [fullHistoryOpen,setFullHistoryOpen]=useState(false);
+ const [permissionsOpen,setPermissionsOpen]=useState(false);
  const [exporting,setExporting]=useState(false);
  const [exportStatus,setExportStatus]=useState('');
  const [historyError,setHistoryError]=useState('');
@@ -284,6 +286,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   {bulkOpen&&<SpreadsheetBulkEditor session={session} rows={rows}
    onClose={()=>setBulkOpen(false)}
    onSaved={()=>{setBulkOpen(false);setNotice('Edição em lote registrada no servidor.');setRefreshKey(n=>n+1);onSaved();}}/>}
+  {permissionsOpen&&<DirectReceiptPermissions session={session} onClose={()=>setPermissionsOpen(false)}/>}
   {fullHistoryOpen&&<StockMovementHistory session={session} onClose={()=>setFullHistoryOpen(false)}/>}
   {action?.kind==='history'&&<StockMovementHistory session={session}
    variantId={action.row.variant_id} sku={action.row.sku}
