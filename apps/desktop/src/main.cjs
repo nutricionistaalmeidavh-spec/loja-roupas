@@ -1,4 +1,4 @@
-const {app,BrowserWindow,dialog,shell,ipcMain}=require('electron');
+const {app,BrowserWindow,dialog,shell,ipcMain,Menu}=require('electron');
 const {readFileSync} =require('node:fs');
 const fs=require('node:fs/promises');
 const path=require('node:path');
@@ -44,6 +44,7 @@ function configuredUrl(){
 function openWindow(url){
  const window=new BrowserWindow({
   width:1440,height:900,minWidth:760,minHeight:560,
+  show:false,backgroundColor:'#f7f6f4',
   webPreferences:{preload:path.join(__dirname,'update-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
  });
@@ -64,7 +65,25 @@ function openWindow(url){
   });
  }
  desktopUpdater.registerWindow(window,url.href);
- void window.loadURL(url.href).catch(error=>dialog.showErrorBox('Conexão com a loja',error.message));
+ // Conservar a janela de preparação até a interface ficar pronta para ser mostrada.
+ const reveal=()=>{
+  if(window.isDestroyed())return;
+  window.show();
+  if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
+  setupWindow=null;
+ };
+ window.once('ready-to-show',reveal);
+ let connectionErrorShown=false;
+ const showConnectionError=()=>{
+  if(connectionErrorShown||window.isDestroyed())return;
+  connectionErrorShown=true;
+  void window.loadFile(path.join(__dirname,'connection-error.html')).catch(error=>
+   dialog.showErrorBox('Conexão com a loja',error.message));
+ };
+ window.webContents.on('did-fail-load',(_event,code,_description,_url,isMainFrame)=>{
+  if(code!==-3&&isMainFrame!==false)showConnectionError();
+ });
+ void window.loadURL(url.href).catch(showConnectionError);
  return window;
 }
 function status(message){
@@ -175,9 +194,8 @@ function registerRecoveryHandlers(){
  });
 }
 function transition(url){
+ // A janela antiga fica visível durante o carregamento, em vez de piscar branco.
  openWindow(url);
- if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
- setupWindow=null;
 }
 async function requireCommercialApproval(){
  if(!commercialEdition)return true;
@@ -264,7 +282,11 @@ async function start(){
  await setupWindow.loadFile(path.join(__dirname,'setup.html'));
  await beginLocal();
 }
-app.whenReady().then(start).catch(error=>{dialog.showErrorBox('Iniciar Loja de Roupas',error.message);app.quit();});
+app.whenReady().then(()=>{
+ // Não exibir o menu de desenvolvimento File/Edit/View na loja instalada.
+ Menu.setApplicationMenu(null);
+ return start();
+}).catch(error=>{dialog.showErrorBox('Iniciar Loja de Roupas',error.message);app.quit();});
 app.on('before-quit',event=>{
  if(!runtime||quitting)return;
  event.preventDefault();quitting=true;

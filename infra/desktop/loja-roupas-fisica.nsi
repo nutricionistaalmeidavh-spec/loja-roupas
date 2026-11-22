@@ -4,10 +4,16 @@ OutFile "../../dist/Loja-de-Roupas-Fisica-Setup-x64.exe"
 InstallDir "$LOCALAPPDATA\Programs\Loja de Roupas Fisica"
 InstallDirRegKey HKCU "Software\Loja de Roupas Fisica" "InstallDir"
 RequestExecutionLevel user
-Page directory
-Page instfiles
-UninstPage uninstConfirm
-UninstPage instfiles
+!include "MUI2.nsh"
+!define MUI_ABORTWARNING
+!define MUI_FINISHPAGE_RUN "$INSTDIR\app\electron.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Iniciar Loja de Roupas Fisica agora"
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "PortugueseBR"
 
 Section "Loja de Roupas Fisica"
   SetShellVarContext current

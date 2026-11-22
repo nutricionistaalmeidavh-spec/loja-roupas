@@ -74,6 +74,27 @@ try{
  await appWindow.getByRole('button',{name:'Entrar na loja'}).click();
  await appWindow.getByRole('dialog',{name:'Guia inicial da loja'}).waitFor({timeout:12000});
  await appWindow.getByRole('button',{name:'Reabrir tour'}).waitFor();
+ // Regressão no binário instalado: Estoque não deve travar ou desmontar o PDV.
+ const skip=appWindow.getByRole('button',{name:'Pular tour'});
+ if(await skip.isVisible())await skip.click();
+ const stockDiagnostics=[];
+ appWindow.on('pageerror',error=>stockDiagnostics.push('PAGEERROR '+error.message));
+ appWindow.on('console',msg=>{if(msg.type()==='error')stockDiagnostics.push('CONSOLE '+msg.text().slice(0,400));});
+ appWindow.on('requestfailed',request=>{if(request.url().includes('/assets/'))stockDiagnostics.push('ASSET_FAILED '+request.url().split('/').pop());});
+ await appWindow.getByRole('button',{name:'Entrada de estoque'}).click();
+ await appWindow.getByRole('heading',{name:'Estoque da loja'}).waitFor({timeout:20000});
+ try{
+  await appWindow.getByRole('heading',{name:'Planilha operacional'}).waitFor({timeout:12000});
+ }catch(error){
+  console.error('STOCK_DIAGNOSTICS_BODY:',(await appWindow.locator('body').innerText().catch(()=>'<body unavailable>')).slice(0,2800));
+  console.error('STOCK_DIAGNOSTICS_EVENTS:',stockDiagnostics.slice(-20));
+  console.error('STOCK_DIAGNOSTICS_RESOURCES:',JSON.stringify(await appWindow.evaluate(()=>performance.getEntriesByType('resource')
+   .filter(entry=>/InventorySpreadsheet|react-data-grid|assets\\/.test(entry.name))
+   .map(entry=>({asset:entry.name.split('/').pop(),duration_ms:Math.round(entry.duration),bytes:entry.transferSize}))).catch(e=>({error:e.message}))));
+  throw error;
+ }
+ await appWindow.getByRole('button',{name:'PDV',exact:true}).click();
+ await appWindow.getByRole('heading',{name:'Nova venda'}).waitFor({timeout:12000});
  console.info('Windows one-computer: PostgreSQL, API, web, offline password recovery and tour operational');
 }finally{
  await instance?.close();

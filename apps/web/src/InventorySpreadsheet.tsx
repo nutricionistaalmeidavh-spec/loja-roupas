@@ -86,13 +86,20 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
    const current=++serial;
    if(!background)setLoading(true);
    try{
-    const page=await listStockSpreadsheet(session,{query:search,category,offset,limit,cursor},fetch,ctrl.signal);
+    // Uma consulta lenta não pode deixar a página ocupada indefinidamente.
+    const deadline=AbortSignal.timeout(10000);
+    const requestSignal=AbortSignal.any([ctrl.signal,deadline]);
+    const page=await listStockSpreadsheet(session,{query:search,category,offset,limit,cursor},fetch,requestSignal);
     if(!active||current!==serial)return;
     if(dirtyRef.current||savingRef.current){setStale(true);return;}
     setRows(page.items.map(toRow));setTotal(page.total);setCategories(page.categories);setNextCursor(page.next_cursor??null);
     setError('');setStale(false);setLastUpdated(new Date().toLocaleTimeString('pt-BR'));
    }catch(err){
-    if(active&&!ctrl.signal.aborted)setError(err instanceof Error?err.message:'Falha ao atualizar a planilha');
+    if(active&&!ctrl.signal.aborted)setError(
+     err instanceof ApiError&&err.code==='NETWORK_ERROR'
+      ?'A consulta de estoque demorou demais ou o servidor não respondeu. Verifique a conexão e tente novamente.'
+      :err instanceof Error?err.message:'Falha ao atualizar a planilha'
+    );
    }finally{
     if(active&&current===serial)setLoading(false);
    }
@@ -247,7 +254,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   </div>
   <p className="muted small">Selecione qualquer SKU para acessar as ações também em telas pequenas.</p>
   {canEdit&&<p className="muted small">Clique duas vezes em uma célula para editar. Salve ou descarte cada linha antes de passar para outro SKU. Saldo e histórico são somente leitura.</p>}
-  {error&&<p role="alert" className="error">{error}</p>}
+  {error&&<div className="error" role="alert">{error} <button type="button" className="light-button" onClick={()=>{setError('');setRefreshKey(n=>n+1);}}>Tentar novamente</button></div>}
   {notice&&<p role="status" className="notice">{notice}</p>}
   {exportStatus&&<p role="status" className="notice">{exportStatus}</p>}
   {stale&&<p role="status" className="notice">Há dados novos no servidor. Conclua a edição atual e atualize a planilha.</p>}
