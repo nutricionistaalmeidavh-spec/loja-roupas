@@ -2,12 +2,13 @@
 
 Sistema para boutique física inicialmente única, com **desktop Electron, Web/PWA e servidor PostgreSQL canônico em rede local**. Core obrigatório **R$ 0, open source (AGPLv3) e self-hosted**. Serviços pagos são opcionais explícitos, nunca dependências silenciosas.
 
-## Situação e validação de novembro/2026
+## Situação e validação em 22/11/2026
 
 - **M0–M3 incorporados à main:** documentação D0–D6, fundação, catálogo/estoque e PDV/caixa transacional.
 - **M4–M8 têm implementações parciais integradas**, mas a homologação em hardware e operação real ainda está pendente. Consulte [status de execução](docs/06-roadmap/status-execucao.md).
 - O pagamento por Pix e cartão é **registrado manualmente após conferência externa**; não há cobrança automática, TEF, PSP ou emissão fiscal integrada.
-- **Ainda não homologado para clientes. Nenhuma release publicada.** CI verde não equivale a instalador, impressão física, segurança de produção nem backup/restauração validados.
+- **Instalador Windows físico v0.2.3 já publicado como pré-release:** [download](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.3). PR #41 incorporada; a edição física mantém banco/instalação separados. O pacote passou pelos testes automatizados de instalação, mas permanece sem homologação de periféricos reais.
+- **P1 em desenvolvimento:** [PR #42](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/42) (draft; não integrado) acrescenta pós-venda, crediário, financeiro, comissões, fidelidade, inventário colaborativo, PIN, backup LAN cifrado e atualizador da edição física. Não está disponível na release v0.2.3.
 
 **Comece pelo [status de execução M0–M8](docs/06-roadmap/status-execucao.md), [roadmap final](docs/06-roadmap/roadmap-final.md) e [status técnico](IMPLEMENTATION_STATUS.md).**
 
@@ -23,13 +24,13 @@ Sistema para boutique física inicialmente única, com **desktop Electron, Web/P
 
 | Marco | Situação | Acompanhamento |
 |---|---|---|
-| M4 — Instalador, impressão, LAN e backup/restore (P0) | Próximo | [#7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
-| M5 — Pós-venda, finanças, compras, CRM e equipes (P1) | Planejado | [#8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
+| M4 — Instalador, impressão, LAN e backup/restore (P0) | Parcial; instalador Windows físico publicado | [#7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
+| M5 — Pós-venda, finanças, compras, CRM e equipes (P1) | Parcial; extensões em PR #42 | [#8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
 | M6 — Provador, online, entrega, presentes e serviços (P2) | Planejado | [#9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
 | M7 — Previsões, coleções, planejamento e personalização (P2) | Planejado | [#10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
 | M8 — QA global e release candidate | Planejado | [#11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
-**Governança:** branch e PR, contrato versionado, testes e documentação. Merge e release requerem autorizações **separadas**. Nenhuma publicação automática.
+**Governança:** branch e PR, migrações versionadas, testes e documentação. A PR #42 permanece em rascunho; não haverá merge nem publicação sem validação e autorização. A release v0.2.3 foi explicitamente autorizada no projeto.
 
 ## Instalação Windows autônoma e primeiro acesso
 
