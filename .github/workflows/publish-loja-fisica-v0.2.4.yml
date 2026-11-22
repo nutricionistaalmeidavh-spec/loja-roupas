@@ -76,6 +76,37 @@ jobs:
           if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
           $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  Loja-de-Roupas-Fisica-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
+      - name: Simular migração de instalador físico v0.2.3 para v0.2.4 sem apagar o perfil
+        shell: pwsh
+        run: |
+          $source='https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/download/loja-fisica-v0.2.3/Loja-de-Roupas-Fisica-Setup-x64.exe'
+          $oldFile=Join-Path $env:RUNNER_TEMP 'Loja-Fisica-0.2.3-original.exe'
+          Invoke-WebRequest -Uri $source -OutFile $oldFile
+          $expected='6e6032c8c6b98a8a21d77f264f8562703414f0e91aaaf4db79dc473c2d3eb100'
+          $actual=(Get-FileHash $oldFile -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($actual -ne $expected){throw 'O instalador físico legado divergiu do checksum aprovado'}
+          $root=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica'
+          $old=Start-Process $oldFile -ArgumentList '/S' -Wait -PassThru
+          if($old.ExitCode -ne 0){throw 'Instalação v0.2.3 não concluída'}
+          $oldVersion=(Get-Content "$root/app/resources/app/package.json" -Raw | ConvertFrom-Json).version
+          if($oldVersion -ne '0.2.3'){throw 'Não instalou edição física legada correta'}
+          $profile=Join-Path $env:APPDATA 'loja-roupas-fisica'
+          New-Item -ItemType Directory -Force -Path $profile | Out-Null
+          $canary=Join-Path $profile 'qa-upgrade-preserve.txt'
+          Set-Content -LiteralPath $canary -Value 'DADOS LOCAIS PRESERVAR' -Encoding UTF8
+          $newInstaller=(Resolve-Path 'dist/Loja-de-Roupas-Fisica-Setup-x64.exe').Path
+          $upgrade=Start-Process $newInstaller -ArgumentList '/S' -Wait -PassThru
+          if($upgrade.ExitCode -ne 0){throw 'Upgrade para v0.2.4 não concluído'}
+          $newVersion=(Get-Content "$root/app/resources/app/package.json" -Raw | ConvertFrom-Json).version
+          if($newVersion -ne '0.2.4'){throw 'Nova versão física incorreta após upgrade'}
+          if(!(Test-Path $canary) -or (Get-Content $canary -Raw).Trim() -ne 'DADOS LOCAIS PRESERVAR'){
+            throw 'Dados do perfil físico foram modificados no upgrade'
+          }
+          node scripts/smoke-single-machine.mjs "$root/app/electron.exe"
+          if($LASTEXITCODE -ne 0){throw 'Smoke após upgrade falhou'}
+          $uninstall=Start-Process "$root/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          if($uninstall.ExitCode -ne 0){throw 'Desinstalação final após upgrade falhou'}
+          if(!(Test-Path $canary)){throw 'Desinstalação apagou dados locais'}
       - name: Arquivar instalador validado para release
         uses: actions/upload-artifact@v4
         with:
