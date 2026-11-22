@@ -160,7 +160,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
     </div>}
-    {section==='financeiro'&&<><ManagementFinance session={session}/><RetailLedger session={session}/></>}
+    {section==='financeiro'&&<><ManagementFinance session={session}/><RetailLedger session={session} cashId={cashId}/></>}
     {section==='clientes'&&<ManagementCustomers session={session}/>}
     {section==='inventario'&&<ManagementInventory session={session} onSaved={()=>{setRefresh(n=>n+1);onReturned();}}/>}
     {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">

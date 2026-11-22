@@ -9,9 +9,9 @@ import {commissionCents,loyaltyPoints} from './retail-rules.ts';
 
 const uuid={type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const numberParams={type:'object',required:['number'],properties:{number:{type:'string',pattern:'^[1-9][0-9]{0,15}$'}}};
-type SaleInfo={id:string;sale_number:string;status:string;total_cents:string;cash_only:boolean};
+type SaleInfo={id:string;sale_number:string;status:string;total_cents:string;cash_only:boolean;customer_id:string|null};
 type SaleLine={id:string;variant_id:string;quantity:string;unit_price_cents:string;returned_quantity:string};
-const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,
+const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,s.customer_id::text,
   NOT EXISTS(SELECT 1 FROM sale_payments p WHERE p.store_id=s.store_id AND p.sale_id=s.id AND p.method<>'cash') AS cash_only
   FROM sales s WHERE s.store_id=$1 AND s.sale_number=$2`;
 const linesQuery=`SELECT l.id,l.variant_id,l.product_name,l.sku,l.color,l.size,l.quantity::text,

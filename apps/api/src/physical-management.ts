@@ -68,6 +68,27 @@ export function registerPhysicalManagement(app:FastifyInstance,db:Pool){
   });
   return reply.code(op.replayed?200:201).send({...op.result,replayed:op.replayed});
  });
+ app.post<{Params:{id:string};Body:{marketing_consent:boolean;loyalty_opt_in:boolean}}>('/v1/management/customers/:id/consents',{
+  schema:{params:{type:'object',additionalProperties:false,required:['id'],properties:{id:{type:'string',pattern:uuid}}},
+   body:{type:'object',additionalProperties:false,required:['marketing_consent','loyalty_opt_in'],
+    properties:{marketing_consent:{type:'boolean'},loyalty_opt_in:{type:'boolean'}}}}
+ },async(req,reply)=>{
+  if(requirePermission(req,reply,'customer.write'))return reply;
+  const auth=req.authContext!,body=req.body;
+  const out=await withIdempotentTransaction(db,auth,'retail.customer.consents:'+req.params.id,
+   requireIdempotencyKey(req.headers['idempotency-key']),body,async client=>{
+   const customer=await client.query<{id:string}>(`SELECT id::text FROM retail_customers
+    WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL FOR UPDATE`,[auth.storeId,req.params.id]);
+   if(!customer.rowCount)throw new DomainError(404,'CUSTOMER_NOT_FOUND','Cliente não encontrado');
+   await client.query(`UPDATE retail_customers SET marketing_consent=$3,loyalty_opt_in=$4
+    WHERE store_id=$1 AND id=$2`,[auth.storeId,req.params.id,body.marketing_consent,body.loyalty_opt_in]);
+   await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
+    VALUES($1,$2,'customer.consents.update',$3,$4::jsonb)`,
+    [auth.storeId,auth.userId,req.params.id,JSON.stringify(body)]);
+   return {id:req.params.id,...body};
+  });
+  return out.result;
+ });
  app.get('/v1/management/customers',async(request,reply)=>{
   if(requirePermission(request,reply,'customer.read'))return reply;
   const q=await db.query(`SELECT id::text,name,phone,email,marketing_consent,loyalty_opt_in,created_at FROM retail_customers

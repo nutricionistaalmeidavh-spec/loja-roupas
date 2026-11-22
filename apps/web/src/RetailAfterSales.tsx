@@ -1,11 +1,11 @@
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import type {FormEvent} from 'react';
 import {ApiError,headers,jsonRequest,scanCatalog} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {mapCatalog} from './catalog-model.ts';
 import {requestId} from './request-id.ts';
 type Line={id:string;sku:string;product_name:string;color:string;size:string;available_to_return:number;unit_price_cents:number};
-type Sale={id:string;sale_number:string;status:string;cash_only:boolean;lines:Line[]};
+type Sale={id:string;sale_number:string;status:string;cash_only:boolean;customer_id:string|null;lines:Line[]};
 const brl=(value:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(value/100);
 export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onUpdated:()=>void;cashId:string|null}){
  const [number,setNumber]=useState(''),[sale,setSale]=useState<Sale|null>(null),[lineId,setLineId]=useState(''),
@@ -16,9 +16,16 @@ export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onU
  [replacement,setReplacement]=useState(''),[replacementQty,setReplacementQty]=useState(1),
  [replacementInfo,setReplacementInfo]=useState<{id:string;sku:string;priceCents:number}|null>(null),
  [paidBy,setPaidBy]=useState<'cash'|'pix_manual'|'card_external'>('cash'),[paymentRef,setPaymentRef]=useState(''),
- [customerId,setCustomerId]=useState(''),[reason,setReason]=useState(''),
+ [customerId,setCustomerId]=useState(''),[customerList,setCustomerList]=useState<Array<{id:string;name:string}>>([]),
+ [reason,setReason]=useState(''),
  [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const pending=useRef<{signature:string;key:string}|null>(null);
+ useEffect(()=>{
+  let active=true;
+  void jsonRequest<{items:Array<{id:string;name:string}>}>('/v1/management/customers',
+   {headers:headers(session)},fetch).then(r=>{if(active)setCustomerList(r.items);}).catch(()=>{});
+  return ()=>{active=false;};
+ },[session]);
  const selected=sale?.lines.find(l=>l.id===lineId),oldValue=Number(selected?.unit_price_cents||0)*qty,
  replacementValue=Number(replacementInfo?.priceCents||0)*replacementQty,
  extra=Math.max(0,replacementValue-oldValue),credit=Math.max(0,oldValue-replacementValue);
@@ -28,7 +35,7 @@ export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onU
    if(!/^[1-9]\d{0,15}$/.test(number))throw Error('Número de venda inválido.');
    const found=await jsonRequest<Sale>('/v1/management/sales/by-number/'+number,
     {headers:headers(session)},fetch);
-   setSale(found);setLineId(found.lines.find(x=>x.available_to_return>0)?.id||'');
+   setSale(found);setLineId(found.lines.find(x=>x.available_to_return>0)?.id||'');setCustomerId(found.customer_id||'');
   }catch(e){setError(e instanceof Error?e.message:'Venda não encontrada');}
   finally{setBusy(false);}
  }
@@ -124,8 +131,11 @@ export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onU
        onChange={e=>setPaymentRef(e.target.value)} required minLength={6}/></label>}
      </>}
     </>}
-    <label>Cliente (UUID, obrigatório se gerar crédito) <input value={customerId}
-     onChange={e=>setCustomerId(e.target.value)} placeholder="ID do cliente"/></label>
+    <label>Cliente (obrigatório se gerar crédito)
+     <select value={customerId} onChange={e=>setCustomerId(e.target.value)}>
+      <option value="">Sem cliente vinculado</option>
+      {customerList.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+     </select></label>
     {!cashId&&<p role="alert">Abra um caixa para confirmar a troca.</p>}
    </>}
    <label>Motivo e conferência <textarea value={reason} onChange={e=>setReason(e.target.value)}

@@ -19,7 +19,7 @@ function cents(value:string){
  if(!Number.isSafeInteger(n)||n<1)throw Error('Valor inválido');
  return n;
 }
-export function RetailLedger({session}:{session:Session}){
+export function RetailLedger({session,cashId}:{session:Session;cashId:string|null}){
  const [accounts,setAccounts]=useState<Account[]>([]),[credit,setCredit]=useState<Credit[]>([]),
  [commissions,setCommissions]=useState<Commission[]>([]),[dre,setDre]=useState<Dre|null>(null),
  [month,setMonth]=useState(date().slice(0,7)),[revision,setRevision]=useState(0),
@@ -65,7 +65,7 @@ export function RetailLedger({session}:{session:Session}){
   try{
    const amount_cents=cents(String(form.get('amount')));
    const method=String(form.get('method')),external_reference=String(form.get('reference')).trim();
-   const cash_session_id=String(form.get('cash_session_id')).trim();
+   const cash_session_id=cashId;
    void write('/v1/management/accounts/'+id+'/settlements',
     {amount_cents,method,...(method==='cash'?{cash_session_id}:{external_reference})},
     'Recebimento ou pagamento registrado.').then(()=>{});
@@ -108,9 +108,10 @@ export function RetailLedger({session}:{session:Session}){
       <input name="amount" aria-label="Valor da baixa" inputMode="decimal" required placeholder="Valor R$"/>
       <select name="method" aria-label="Meio de pagamento">
        <option value="pix_manual">Pix externo conferido</option><option value="card_external">Cartão externo</option>
-       <option value="bank_transfer">Transferência bancária</option><option value="cash">Dinheiro em caixa</option>
+       <option value="bank_transfer">Transferência bancária</option>
+       {cashId&&<option value="cash">Dinheiro no caixa aberto</option>}
       </select><input name="reference" aria-label="Comprovante externo" placeholder="Referência Pix/cartão"/>
-      <input name="cash_session_id" aria-label="ID do caixa, somente dinheiro" placeholder="UUID caixa para dinheiro"/>
+
       <button type="submit" disabled={busy}>Registrar baixa</button>
      </form>:<span>Quitada</span>}</td></tr>;
     })}</tbody></table>
