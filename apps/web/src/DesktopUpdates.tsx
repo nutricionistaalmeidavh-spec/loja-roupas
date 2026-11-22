@@ -12,7 +12,8 @@ type Bridge={
  lastResult():Promise<LastResult>;
  onProgress(callback:(value:Progress)=>void):()=>void;
 };
-declare global{interface Window{lojaUpdates?:Bridge;lojaBackups?:{create():Promise<{cancelled:boolean;bytes?:number;sha256?:string}>}}}
+declare global{interface Window{lojaUpdates?:Bridge;lojaBackups?:{create():Promise<{cancelled:boolean;bytes?:number;sha256?:string}>;
+ verify():Promise<{cancelled:boolean;verified?:boolean;sales?:number;photos?:number;migrations?:number}>}}}
 
 function messageFor(progress:Progress|null){
  if(!progress)return '';
@@ -97,6 +98,10 @@ export function LocalBackupSettings(){
    void bridge.create().then(result=>{if(!result.cancelled)setNotice('Backup concluído e conferido · '+result.bytes+' bytes · SHA-256 '+result.sha256);})
     .catch(e=>setError(e instanceof Error?e.message:'Falha ao criar backup')).finally(()=>setBusy(false));
   }}>{busy?'Criando backup…':'Escolher destino e exportar backup'}</button>
+  <button className="update-secondary" disabled={busy} onClick={()=>{setBusy(true);setNotice('');setError('');
+   void bridge.verify().then(result=>{if(!result.cancelled)setNotice('Restauração testada com sucesso em banco isolado: '+result.sales+' vendas, '+result.photos+' fotos. Nenhum dado atual foi substituído.');})
+    .catch(e=>setError(e instanceof Error?e.message:'Falha ao validar restauração')).finally(()=>setBusy(false));
+  }}>Verificar arquivo e testar restauração</button>
   {notice&&<p role="status">{notice}</p>}{error&&<p role="alert" className="update-error">{error}</p>}
  </section>;
 }

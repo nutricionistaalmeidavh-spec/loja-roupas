@@ -14,6 +14,15 @@ function backupDestinationAllowed(destination,userData){
  if(rel==='postgres-data'||rel.startsWith('postgres-data'+path.sep)||rel==='sync-secrets'||rel.startsWith('sync-secrets'+path.sep))return false;
  return true;
 }
+async function isPgDumpArchive(file){
+ if(typeof file!=='string'||path.extname(file).toLowerCase()!=='.dump')return false;
+ let handle;
+ try{
+  handle=await fs.open(file,'r');
+  const sig=Buffer.alloc(5),result=await handle.read(sig,0,5,0);
+  return result.bytesRead===5&&sig.toString('ascii')==='PGDMP';
+ }catch{return false;}finally{await handle?.close().catch(()=>{});}
+}
 async function writeBackup({destination,userData,executeDump}){
  if(!backupDestinationAllowed(destination,userData))throw Error('Destino de backup inválido ou protegido.');
  if(typeof executeDump!=='function')throw Error('Executador PostgreSQL ausente.');
@@ -31,4 +40,4 @@ async function writeBackup({destination,userData,executeDump}){
   return {file:destination,bytes:stat.size,sha256:hash.digest('hex')};
  }finally{await fs.rm(part,{force:true}).catch(()=>{});}
 }
-module.exports={backupFilename,backupDestinationAllowed,writeBackup};
+module.exports={backupFilename,backupDestinationAllowed,writeBackup,isPgDumpArchive};

@@ -52,11 +52,12 @@ export function registerPhysicalInventory(app:FastifyInstance,db:Pool){
    const existing=await client.query<{expected_on_hand:string}>(`SELECT expected_on_hand::text
     FROM inventory_count_lines WHERE store_id=$1 AND count_id=$2 AND variant_id=$3 FOR UPDATE`,
     [auth.storeId,id,body.variant_id]);
-   const expected=existing.rowCount?Number(existing.rows[0].expected_on_hand):Number(b.rows[0].on_hand);
+   // Recontar um SKU atualiza o snapshot observado; venda concorrente só é reconciliada após nova contagem explícita.
+   const expected=Number(b.rows[0].on_hand);
    reconcileCount({expected,current:Number(b.rows[0].on_hand),reserved:Number(b.rows[0].reserved),counted:body.counted_on_hand});
    await client.query(`INSERT INTO inventory_count_lines(store_id,count_id,variant_id,expected_on_hand,counted_on_hand,counted_by)
     VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(store_id,count_id,variant_id)
-    DO UPDATE SET counted_on_hand=excluded.counted_on_hand,counted_by=excluded.counted_by,updated_at=now()`,[
+    DO UPDATE SET expected_on_hand=excluded.expected_on_hand,counted_on_hand=excluded.counted_on_hand,counted_by=excluded.counted_by,updated_at=now()`,[
     auth.storeId,id,body.variant_id,expected,body.counted_on_hand,auth.userId
    ]);
    return {variant_id:body.variant_id,expected_on_hand:expected,counted_on_hand:body.counted_on_hand};

@@ -106,6 +106,16 @@ function registerPrinterHandlers(){
  });
 }
 function registerBackupHandlers(){
+ ipcMain.handle('loja:backup:verify',async event=>{
+  if(!isMainLocalSender(event)||!runtime)throw new Error('Validação disponível no computador principal.');
+  const window=BrowserWindow.fromWebContents(event.sender);
+  const choice=await dialog.showOpenDialog(window,{
+   title:'Verificar restauração de backup PostgreSQL',
+   properties:['openFile'],filters:[{name:'Backup PostgreSQL',extensions:['dump']}]
+  });
+  if(choice.canceled||!choice.filePaths?.length)return {cancelled:true};
+  return {cancelled:false,...await runtime.verifyBackup(choice.filePaths[0])};
+ });
  ipcMain.handle('loja:backup:create',async event=>{
   if(!isMainLocalSender(event)||!runtime)throw new Error('Backup disponível somente no computador principal da loja.');
   const window=BrowserWindow.fromWebContents(event.sender);
