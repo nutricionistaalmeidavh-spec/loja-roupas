@@ -6,11 +6,10 @@ set -euo pipefail
 archive=$(realpath -- "$1")
 database=$2
 source "$(dirname "${BASH_SOURCE[0]}")/lan-common.sh"
-tmp=$(mktemp -d)
-trap 'rm -rf -- "$tmp"' EXIT
-backup_gpg --output "$tmp/database" --decrypt "$archive"
+# O dump é descriptografado na RAM por pipe; não grava cópia em texto claro no disco.
 lan exec -T postgres createdb -U loja "$database"
-if ! lan exec -T postgres pg_restore -U loja -d "$database" --single-transaction --exit-on-error < "$tmp/database"; then
+if ! backup_gpg --batch --decrypt "$archive" |
+  lan exec -T postgres pg_restore -U loja -d "$database" --single-transaction --exit-on-error; then
   lan exec -T postgres dropdb -U loja "$database"
   exit 1
 fi

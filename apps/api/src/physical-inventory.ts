@@ -13,7 +13,7 @@ export function registerPhysicalInventory(app:FastifyInstance,db:Pool){
    WHERE store_id=$1 AND closed_at IS NULL LIMIT 1`,[store]);
   if(!count.rowCount)return {active:false,lines:[]};
   const lines=await db.query(`SELECT l.variant_id::text,p.name,v.sku,v.color,v.size,
-    l.expected_on_hand::text,l.counted_on_hand::text,l.updated_at
+    l.expected_on_hand::text,l.counted_on_hand::text,l.updated_at,l.counted_by::text,l.approved_by::text,l.approved_at
    FROM inventory_count_lines l JOIN product_variants v ON v.store_id=l.store_id AND v.id=l.variant_id
    JOIN products p ON p.store_id=v.store_id AND p.id=v.product_id
    WHERE l.store_id=$1 AND l.count_id=$2 ORDER BY v.sku,v.id`,[store,count.rows[0].id]);
@@ -57,12 +57,41 @@ export function registerPhysicalInventory(app:FastifyInstance,db:Pool){
    reconcileCount({expected,current:Number(b.rows[0].on_hand),reserved:Number(b.rows[0].reserved),counted:body.counted_on_hand});
    await client.query(`INSERT INTO inventory_count_lines(store_id,count_id,variant_id,expected_on_hand,counted_on_hand,counted_by)
     VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(store_id,count_id,variant_id)
-    DO UPDATE SET expected_on_hand=excluded.expected_on_hand,counted_on_hand=excluded.counted_on_hand,counted_by=excluded.counted_by,updated_at=now()`,[
+    DO UPDATE SET expected_on_hand=excluded.expected_on_hand,counted_on_hand=excluded.counted_on_hand,counted_by=excluded.counted_by,updated_at=now(),approved_by=NULL,approved_at=NULL`,[
     auth.storeId,id,body.variant_id,expected,body.counted_on_hand,auth.userId
    ]);
    return {variant_id:body.variant_id,expected_on_hand:expected,counted_on_hand:body.counted_on_hand};
   });
   return reply.code(out.replayed?200:201).send(out.result);
+ });
+ app.post<{Params:{id:string};Body:{variant_id:string}}>('/v1/management/inventory-counts/:id/approve-line',{
+  schema:{params:idParams,body:{type:'object',additionalProperties:false,required:['variant_id'],
+   properties:{variant_id:{type:'string',pattern:uuid}}}}
+ },async(request,reply)=>{
+  if(requirePermission(request,reply,'stock.adjust'))return reply;
+  const auth=request.authContext!,id=request.params.id;
+  const out=await withIdempotentTransaction(db,auth,'inventory.approve:'+id,
+   requireIdempotencyKey(request.headers['idempotency-key']),request.body,async client=>{
+   const active=await client.query(`SELECT id FROM inventory_count_sessions
+    WHERE store_id=$1 AND id=$2 AND closed_at IS NULL FOR UPDATE`,[auth.storeId,id]);
+   if(!active.rowCount)throw new DomainError(409,'COUNT_CLOSED','Inventário encerrado');
+   const found=await client.query<{expected_on_hand:string}>(`SELECT expected_on_hand::text
+    FROM inventory_count_lines WHERE store_id=$1 AND count_id=$2 AND variant_id=$3 FOR UPDATE`,
+    [auth.storeId,id,request.body.variant_id]);
+   if(!found.rowCount)throw new DomainError(404,'COUNT_LINE_MISSING','SKU não contado');
+   const current=await client.query<{on_hand:string}>(`SELECT on_hand::text FROM stock_balances
+    WHERE store_id=$1 AND variant_id=$2 FOR UPDATE`,[auth.storeId,request.body.variant_id]);
+   if(!current.rowCount||current.rows[0].on_hand!==found.rows[0].expected_on_hand)
+    throw new DomainError(409,'COUNT_STALE','Estoque mudou: recontagem necessária');
+   await client.query(`UPDATE inventory_count_lines SET approved_by=$4,approved_at=now()
+    WHERE store_id=$1 AND count_id=$2 AND variant_id=$3`,
+    [auth.storeId,id,request.body.variant_id,auth.userId]);
+   await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
+    VALUES($1,$2,'inventory.approve',$3,$4::jsonb)`,
+    [auth.storeId,auth.userId,id,JSON.stringify({variant_id:request.body.variant_id})]);
+   return {approved:true,variant_id:request.body.variant_id};
+  });
+  return out.result;
  });
  app.post<{Params:{id:string}}>('/v1/management/inventory-counts/:id/close',{
   schema:{params:idParams}
@@ -73,12 +102,14 @@ export function registerPhysicalInventory(app:FastifyInstance,db:Pool){
    requireIdempotencyKey(request.headers['idempotency-key']),{},async client=>{
    const c=await client.query(`SELECT id FROM inventory_count_sessions WHERE store_id=$1 AND id=$2 AND closed_at IS NULL FOR UPDATE`,[auth.storeId,id]);
    if(!c.rowCount)throw new DomainError(409,'COUNT_CLOSED','Inventário já foi encerrado');
-   const lines=await client.query<{variant_id:string;expected_on_hand:string;counted_on_hand:string}>(`
-    SELECT variant_id::text,expected_on_hand::text,counted_on_hand::text FROM inventory_count_lines
+   const lines=await client.query<{variant_id:string;expected_on_hand:string;counted_on_hand:string;counted_by:string;approved_by:string|null}>(`
+    SELECT variant_id::text,expected_on_hand::text,counted_on_hand::text,counted_by::text,approved_by::text FROM inventory_count_lines
     WHERE store_id=$1 AND count_id=$2 ORDER BY variant_id`,[auth.storeId,id]);
    if(!lines.rowCount)throw new DomainError(422,'COUNT_EMPTY','Registre ao menos uma peça antes de concluir');
    let adjusted=0,missing=0,extra=0;
    for(const line of lines.rows){
+    if(line.counted_by!==auth.userId&&!line.approved_by)
+     throw new DomainError(409,'COUNT_NOT_APPROVED','Contagem de outro operador exige conferência gerencial antes de conciliar');
     const bal=await client.query<{on_hand:string;reserved:string}>(`SELECT on_hand::text,reserved::text FROM stock_balances
      WHERE store_id=$1 AND variant_id=$2 FOR UPDATE`,[auth.storeId,line.variant_id]);
     if(!bal.rowCount)throw new DomainError(409,'COUNT_STALE','SKU sem saldo atual. Reconte.');

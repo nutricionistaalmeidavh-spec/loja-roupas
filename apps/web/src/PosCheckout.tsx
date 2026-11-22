@@ -2,7 +2,7 @@ import { requestId } from './request-id.ts';
 import { useEffect,useMemo,useRef,useState } from 'react';
 import type { FormEvent } from 'react';
 import type { DraftLine } from '@loja/domain';
-import { ApiError } from './api-client.ts';
+import { ApiError,headers,jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { reaisToCents } from './catalog-model.ts';
 import { commitSale,quoteSale } from './pos-client.ts';
@@ -11,7 +11,21 @@ import type { PaymentInput,Sale,SaleQuote } from './pos-client.ts';
 
 const brl=(cents:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
 const editMoney=(cents:number)=>(cents/100).toFixed(2).replace('.',',');
-type Tender={key:string;method:'cash'|'pix_manual'|'card_external';amount:string;confirmed:boolean;reference:string};
+type Tender={key:string;method:PaymentInput['method'];amount:string;confirmed:boolean;reference:string};
+type CheckoutCustomer={id:string;name:string;phone:string|null};
+type CheckoutOperator={id:string;login:string};
+function splitInstallments(amount:number,count:number,first:string){
+ const start=new Date(first+'T00:00:00Z');
+ if(!Number.isFinite(start.getTime())||start.toISOString().slice(0,10)!==first)throw Error('Primeiro vencimento inválido');
+ if(!Number.isInteger(count)||count<1||count>12)throw Error('Quantidade de parcelas inválida');
+ const base=Math.floor(amount/count),rem=amount%count;
+ return Array.from({length:count},(_,i)=>{
+  const y=start.getUTCFullYear(),m=start.getUTCMonth()+i;
+  const last=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  const due=new Date(Date.UTC(y,m,Math.min(start.getUTCDate(),last)));
+  return {amount_cents:base+(i<rem?1:0),due_on:due.toISOString().slice(0,10)};
+ });
+}
 function newTender(method:Tender['method']='cash',amount=''):Tender {
  return {key:requestId(),method,amount,confirmed:false,reference:''};
 }
@@ -22,6 +36,11 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState('');
  const [tenders,setTenders]=useState<Tender[]>([newTender()]);
+ const [customers,setCustomers]=useState<CheckoutCustomer[]>([]),[operators,setOperators]=useState<CheckoutOperator[]>([]);
+ const [customerId,setCustomerId]=useState(''),[sellerId,setSellerId]=useState('');
+ const [creditParts,setCreditParts]=useState(1),[creditDue,setCreditDue]=useState(()=>{
+  const d=new Date();return new Date(Date.UTC(d.getFullYear(),d.getMonth()+1,Math.min(28,d.getDate()))).toISOString().slice(0,10);
+ });
  const [refresh,setRefresh]=useState(0);
  const [busy,setBusy]=useState(false);
  const [pending,setPending]=useState<{key:string;body:string}|null>(null);
@@ -54,6 +73,15 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
  },[]);
 
  useEffect(()=>{
+  const ctrl=new AbortController();
+  void Promise.all([
+   jsonRequest<{items:CheckoutCustomer[]}>('/v1/management/customers',{headers:headers(session),signal:ctrl.signal},fetch),
+   jsonRequest<{items:Array<CheckoutOperator&{pin_ready:boolean}>}>('/v1/auth/operators',{headers:headers(session),signal:ctrl.signal},fetch)
+  ]).then(([c,s])=>{if(!ctrl.signal.aborted){setCustomers(c.items);setOperators(s.items);}})
+   .catch(()=>{if(!ctrl.signal.aborted)setError('Não foi possível listar clientes e vendedores. A venda sem vínculo permanece disponível.');});
+  return ()=>ctrl.abort();
+ },[session]);
+ useEffect(()=>{
   let cancelled=false;
   setLoading(true);setError('');
   void quoteSale(session,pickup?.lines ?? draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity}))).then(result=>{
@@ -80,11 +108,16 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   try {
    payments=tenders.map(t=>{
     const amount_cents=reaisToCents(t.amount);
-    if(!amount_cents||!t.confirmed)throw new Error('Confirme o recebimento e informe o valor de cada pagamento.');
-    if(t.method!=='cash'&&t.reference.trim().length<6)
+    if(!amount_cents||!t.confirmed)throw new Error('Confirme a operação e informe o valor de cada forma de pagamento.');
+    const external=t.method==='pix_manual'||t.method==='card_external';
+    if((t.method==='store_credit'||t.method==='customer_credit')&&!customerId)
+     throw new Error('Selecione um cliente para usar crediário ou crédito da loja.');
+    if(t.method==='store_credit'&&!session.roles.includes('manager'))
+     throw new Error('Crediário requer autorização do gestor.');
+    if(external&&t.reference.trim().length<6)
       throw new Error('Informe a referência externa do Pix/cartão antes de concluir.');
     return {method:t.method,amount_cents,confirmed:true,
-      ...(t.method!=='cash'?{external_reference:t.reference.trim()}:{})};
+      ...(external?{external_reference:t.reference.trim()}:{})};
    });
    const cash=payments.filter(p=>p.method==='cash').reduce((a,b)=>a+b.amount_cents,0);
    const other=payments.filter(p=>p.method!=='cash').reduce((a,b)=>a+b.amount_cents,0);
@@ -95,7 +128,13 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
    variant_id:line.variant_id,quantity:line.quantity,
    expected_price_cents:line.price_cents,expected_price_revision:line.price_revision
   }));
-  const body=JSON.stringify({cashSessionId,lines,payments,pickupOrderId:pickup?.id});
+  const creditAmount=payments.filter(p=>p.method==='store_credit').reduce((n,p)=>n+p.amount_cents,0);
+  let creditInstallments:Array<{amount_cents:number;due_on:string}>|undefined;
+  try{if(creditAmount>0)creditInstallments=splitInstallments(creditAmount,creditParts,creditDue);}
+  catch(e){setError(e instanceof Error?e.message:'Parcelas inválidas');return;}
+  const extras={...(customerId?{customer_id:customerId}:{}),...(sellerId?{seller_id:sellerId}:{}),
+   ...(creditInstallments?{credit_installments:creditInstallments}:{})};
+  const body=JSON.stringify({cashSessionId,lines,payments,pickupOrderId:pickup?.id,...extras});
   if(pending&&pending.body!==body){
    setError('Há uma venda com resultado pendente. Repita exatamente a mesma operação.');return;
   }
@@ -103,7 +142,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   setPending({key,body});
   setBusy(true);
   try{
-   const sold=await commitSale(session,cashSessionId,lines,payments,key,fetch,pickup?.id);
+   const sold=await commitSale(session,cashSessionId,lines,payments,key,fetch,pickup?.id,extras);
    setPending(null);setUncertain(false);onConfirmed(sold);
   }catch(err){
    setError(err instanceof Error?err.message:'Falha ao confirmar venda');
@@ -128,7 +167,21 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
       <div className="total-row"><strong>Total</strong><strong>{brl(quote.total_cents)}</strong></div>
       {!quote.can_commit&&<p role="alert" className="error">Estoque insuficiente. Ajuste os itens antes de continuar.</p>}
     </div>
-    <div className="editor-block"><h3>Pagamentos recebidos</h3>
+    <div className="editor-block"><h3>Cliente e vendedor</h3>
+      <div className="fields-two">
+       <label>Cliente para fidelidade ou crediário
+        <select aria-label="Cliente da venda" value={customerId} onChange={e=>setCustomerId(e.target.value)}>
+         <option value="">Venda sem cliente vinculado</option>
+         {customers.map(c=><option key={c.id} value={c.id}>{c.name}{c.phone?' · '+c.phone:''}</option>)}
+        </select></label>
+       <label>Vendedor responsável
+        <select aria-label="Vendedor da venda" value={sellerId} onChange={e=>setSellerId(e.target.value)}>
+         <option value="">Operador do caixa</option>{operators.map(o=><option key={o.id} value={o.id}>{o.login}</option>)}
+        </select></label>
+      </div>
+      <p className="muted small">Crediário exige cliente e limite previamente autorizado. Crédito da loja será descontado somente após confirmação da venda.</p>
+    </div>
+    <div className="editor-block"><h3>Pagamentos e crédito</h3>
       <p className="muted small">Pix e cartão são lançamentos manuais. Não existe confirmação automática de banco, adquirente ou TEF.</p>
       {tenders.map((t,i)=><fieldset className="tender-row" key={t.key} disabled={busy||uncertain}>
         <legend>Pagamento {i+1}</legend>
@@ -137,19 +190,32 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
           onChange={e=>update(t.key,{method:e.target.value as Tender['method'],confirmed:false,reference:''})}>
            <option value="cash">Dinheiro</option><option value="pix_manual">Pix conferido manualmente</option>
            <option value="card_external">Cartão em maquininha externa</option>
+           {session.roles.includes('manager')&&<option value="store_credit">Crediário (valor a receber)</option>}
+           <option value="customer_credit">Saldo de crédito do cliente</option>
          </select></label>
-         <label>Valor recebido (R$)<input aria-label={'Valor pagamento '+(i+1)} required inputMode="decimal"
+         <label>{t.method==='store_credit'?'Valor financiado (R$)':t.method==='customer_credit'?'Crédito resgatado (R$)':'Valor recebido (R$)'}<input aria-label={'Valor pagamento '+(i+1)} required inputMode="decimal"
           value={t.amount} onChange={e=>update(t.key,{amount:e.target.value})}/></label></div>
-        {t.method!=='cash'&&<label>Referência/comprovante externo
+        {(t.method==='pix_manual'||t.method==='card_external')&&<label>Referência/comprovante externo
          <input required minLength={6} maxLength={128} aria-label={'Referência pagamento '+(i+1)}
           value={t.reference} placeholder="ID da transação confirmada" onChange={e=>update(t.key,{reference:e.target.value})}/>
         </label>}
         <label className="confirm-tender"><input type="checkbox" checked={t.confirmed}
          onChange={e=>update(t.key,{confirmed:e.target.checked})}/>
-         {t.method==='cash'?'Dinheiro recebido e conferido':'Pagamento confirmado fora deste sistema e conferido'}
+         {t.method==='cash'?'Dinheiro recebido e conferido':
+          t.method==='store_credit'?'Gestor autorizou venda a prazo; não houve entrada financeira':
+          t.method==='customer_credit'?'Cliente autorizou usar saldo de crédito da loja':
+          'Pagamento confirmado fora deste sistema e conferido'}
         </label>
         {tenders.length>1&&<button type="button" className="text-btn" onClick={()=>setTenders(x=>x.filter(r=>r.key!==t.key))}>Remover pagamento</button>}
       </fieldset>)}
+      {tenders.some(t=>t.method==='store_credit')&&<fieldset className="tender-row">
+       <legend>Parcelamento próprio da loja</legend>
+       <label>Número de parcelas <select value={creditParts} onChange={e=>setCreditParts(Number(e.target.value))}>
+        {[1,2,3,4,5,6,8,10,12].map(n=><option value={n} key={n}>{n} parcela{n>1?'s':''}</option>)}
+       </select></label>
+       <label>Primeiro vencimento <input type="date" value={creditDue} onChange={e=>setCreditDue(e.target.value)} required/></label>
+       <p>As parcelas constituem contas a receber; não entram no saldo do caixa antes da liquidação.</p>
+      </fieldset>}
       <button type="button" className="light-button" disabled={busy||uncertain||tenders.length>=6}
        onClick={()=>setTenders(x=>[...x,newTender('pix_manual')])}>+ Adicionar pagamento</button>
     </div>
@@ -164,7 +230,8 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
       <button type="button" className="light-button" disabled={busy||uncertain}
         onClick={()=>setRefresh(r=>r+1)}>Atualizar cotação</button>
       <button type="submit" className="primary-action" disabled={!quote.can_commit||busy}>
-        {busy?'Confirmando…':uncertain?'Repetir confirmação sem duplicar':'Confirmar venda e pagamentos'}
+        {busy?'Confirmando…':uncertain?'Repetir confirmação sem duplicar':
+         tenders.some(t=>t.method==='store_credit')?'Confirmar venda e gerar parcelas':'Confirmar venda e pagamentos'}
       </button>
     </div>
    </form>}

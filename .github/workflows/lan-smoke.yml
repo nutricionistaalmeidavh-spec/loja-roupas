@@ -8,6 +8,10 @@ on:
       - 'scripts/**'
       - 'pnpm-*.yaml'
       - '.github/workflows/lan-smoke.yml'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 jobs:
@@ -60,6 +64,24 @@ jobs:
           done
           cmp "$RUNNER_TEMP/loja.txt" "$RUNNER_TEMP/loja_restore_smoke.txt"
           grep -Fx 'qa-admin|cafecafecafecafecafecafecafecafe' "$RUNNER_TEMP/loja_restore_smoke.txt"
+      - name: Validar backup cifrado rotativo em pasta externa
+        run: |
+          bash scripts/test-backup-scripts.sh
+          export LOJA_BACKUP_PASSPHRASE_FILE="$RUNNER_TEMP/loja-backup-passphrase"
+          export LOJA_BACKUP_RETENTION_DAYS=7
+          mkdir -p "$RUNNER_TEMP/loja-rotativa"
+          scripts/backup-lan-rotate.sh "$RUNNER_TEMP/loja-rotativa"
+          count=$(find "$RUNNER_TEMP/loja-rotativa" -maxdepth 1 -name 'loja-*.gpg' -type f | wc -l)
+          test "$count" -eq 1
+          archive=$(find "$RUNNER_TEMP/loja-rotativa" -maxdepth 1 -name 'loja-*.gpg' -type f | head -1)
+          test -s "$archive"
+          # Validar assinatura PGDMP dentro do arquivo GPG sem deixar dump em disco.
+          source scripts/lan-common.sh
+          # Guardar apenas a lista de objetos em memória evita SIGPIPE quando o grep
+          # termina antes de o pg_restore consumir todo o arquivo criptografado.
+          objects=$(backup_gpg --decrypt "$archive" | lan exec -T postgres pg_restore --list -U loja)
+          grep -Fq "TABLE DATA" <<< "$objects"
+          test -z "$(find "$RUNNER_TEMP/loja-rotativa" -maxdepth 1 -type d -name '.loja-backup.*' -print -quit)"
       - name: Verificar perda e recuperação do banco
         run: |
           source scripts/lan-common.sh

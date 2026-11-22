@@ -3,7 +3,7 @@ import { headers,jsonRequest,ApiError } from './api-client.ts';
 export type CashSession = {id:string;terminal_code:string;opening_cents:number;active:boolean;opened_at:string};
 export type CashState = CashSession | {active:false;terminal_code:string};
 export type SaleLineInput = {variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number};
-export type PaymentInput={method:'cash'|'pix_manual'|'card_external';amount_cents:number;confirmed:boolean;external_reference?:string};
+export type PaymentInput={method:'cash'|'pix_manual'|'card_external'|'store_credit'|'customer_credit';amount_cents:number;confirmed:boolean;external_reference?:string};
 export type QuoteLine={variant_id:string;quantity:number;sku:string;product_name:string;price_cents:number;price_revision:number;available:number};
 export type SaleQuote={total_cents:number;can_commit:boolean;lines:QuoteLine[]};
 export type Sale={id:string;sale_number:number;status:string;total_cents:number;tendered_cents:number;
@@ -35,10 +35,12 @@ export function quoteSale(session:Session,lines:Array<{variant_id:string;quantit
  return jsonRequest<SaleQuote>('/v1/sales/quotes',{method:'POST',
   headers:{...headers(session),'content-type':'application/json'},body:JSON.stringify({lines})},fetchImpl);
 }
+export type RetailCheckoutOptions={customer_id?:string;seller_id?:string;
+ credit_installments?:Array<{amount_cents:number;due_on:string}>};
 export function commitSale(session:Session,cash_session_id:string,lines:SaleLineInput[],
- payments:PaymentInput[],key:string,fetchImpl:typeof fetch=fetch,pickupOrderId?:string){
+ payments:PaymentInput[],key:string,fetchImpl:typeof fetch=fetch,pickupOrderId?:string,options:RetailCheckoutOptions={}){
  return jsonRequest<Sale>('/v1/sales',{method:'POST',headers:write(session,key),
-  body:JSON.stringify({cash_session_id,lines,payments,...(pickupOrderId ? {pickup_order_id:pickupOrderId} : {})})},fetchImpl);
+  body:JSON.stringify({cash_session_id,lines,payments,...(pickupOrderId ? {pickup_order_id:pickupOrderId} : {}),...options})},fetchImpl);
 }
 export function saleDetail(session:Session,id:string,fetchImpl:typeof fetch=fetch){
  return jsonRequest<SaleDetail>('/v1/sales/'+encodeURIComponent(id),{

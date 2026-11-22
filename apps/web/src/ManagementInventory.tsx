@@ -3,7 +3,7 @@ import {ApiError,headers,jsonRequest,scanCatalog} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {mapCatalog} from './catalog-model.ts';
 import {requestId} from './request-id.ts';
-type Line={variant_id:string;name:string;sku:string;color:string;size:string;expected_on_hand:string;counted_on_hand:string};
+type Line={variant_id:string;name:string;sku:string;color:string;size:string;expected_on_hand:string;counted_on_hand:string;counted_by:string;approved_by:string|null};
 type Count={active:boolean;id?:string;started_at?:string;lines:Line[]};
 export function ManagementInventory({session,onSaved}:{session:Session;onSaved:()=>void}){
  const [count,setCount]=useState<Count|null>(null),[code,setCode]=useState(''),[quantity,setQuantity]=useState('');
@@ -59,9 +59,13 @@ export function ManagementInventory({session,onSaved}:{session:Session;onSaved:(
      <button className="primary-action" disabled={busy||!code.trim()}>Salvar contagem</button>
     </form>
     <div className="management-table-scroll" role="region" tabIndex={0} aria-label="Itens contados">
-     <table><thead><tr><th>SKU</th><th>Peça</th><th>Saldo observado</th><th>Contado</th></tr></thead>
+     <table><thead><tr><th>SKU</th><th>Peça</th><th>Saldo observado</th><th>Contado</th><th>Conferência</th></tr></thead>
       <tbody>{count.lines.map(l=><tr key={l.variant_id}><td>{l.sku}</td><td>{l.name} · {l.color} · {l.size}</td>
-       <td>{l.expected_on_hand}</td><td>{l.counted_on_hand}</td></tr>)}</tbody></table>
+       <td>{l.expected_on_hand}</td><td>{l.counted_on_hand}</td>
+       <td>{l.approved_by?'Aprovado':'Pendente'}
+       {manager&&!l.approved_by&&<button type="button" disabled={busy}
+        onClick={()=>void operate('/v1/management/inventory-counts/'+count.id+'/approve-line',
+         {variant_id:l.variant_id})}>Aprovar</button>}</td></tr>)}</tbody></table>
     </div>
     {manager&&<button className="primary-action" disabled={busy||!count.lines.length}
      onClick={()=>{if(window.confirm('Conferiu os itens? A conciliação altera o estoque real.'))

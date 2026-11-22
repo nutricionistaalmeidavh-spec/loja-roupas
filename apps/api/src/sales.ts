@@ -4,12 +4,14 @@ import { requirePermission } from './auth.ts';
 import type { AuthContext } from './auth.ts';
 import { validatePickupSale } from './pickup-orders.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
+import {commissionCents,creditInstallments,loyaltyPoints} from './retail-rules.ts';
 
 const uid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
 type Line={variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number};
 type QuoteLine={variant_id:string;quantity:number};
-type Pay={method:'cash'|'pix_manual'|'card_external';amount_cents:number;confirmed:boolean;external_reference?:string};
-type Commit={cash_session_id:string;pickup_order_id?:string;lines:Line[];payments:Pay[]};
+type Pay={method:'cash'|'pix_manual'|'card_external'|'store_credit'|'customer_credit';amount_cents:number;confirmed:boolean;external_reference?:string};
+type Commit={cash_session_id:string;pickup_order_id?:string;customer_id?:string;seller_id?:string;
+ credit_installments?:Array<{due_on:string;amount_cents:number}>;lines:Line[];payments:Pay[]};
 type VariantRow={id:string;price_cents:string;revision:string;sku:string;color:string;size:string;name:string;available:string};
 type SaleRow={id:string;store_id:string;sale_number:string;status:string;total_cents:string;tendered_cents:string;
  change_cents:string;created_at:Date;cash_session_id:string};
@@ -26,10 +28,13 @@ function validatePayments(payments:readonly Pay[],total:number) {
  for(const payment of payments){
   if(!exactInteger(payment.amount_cents,1)||payment.confirmed!==true)
    throw new DomainError(422,'PAYMENT_UNCONFIRMED','Valor e recebimento precisam de confirmação explícita');
-  if(payment.method!=='cash'&&payment.method!=='pix_manual'&&payment.method!=='card_external')
+  if(!['cash','pix_manual','card_external','store_credit','customer_credit'].includes(payment.method))
    throw new DomainError(422,'METHOD_NOT_SUPPORTED','Meio de pagamento não está habilitado');
   if(payment.method==='cash'){cash+=payment.amount_cents;cashCount++;}
-  else{
+  else if(payment.method==='store_credit'||payment.method==='customer_credit'){
+   if(payment.external_reference)throw new DomainError(422,'PAYMENT_REFERENCE','Crédito da loja não aceita referência externa');
+   noncash+=payment.amount_cents;
+  }else{
    if(!payment.external_reference || payment.external_reference.trim().length<6 ||
        payment.external_reference.trim().length>128)
     throw new DomainError(422,'PAYMENT_REFERENCE','Informe comprovante ou referência de confirmação externa');
@@ -102,6 +107,10 @@ export function registerSales(app:FastifyInstance,db:Pool){
  app.post<{Body:Commit}>('/v1/sales',{
   schema:{body:{type:'object',additionalProperties:false,required:['cash_session_id','lines','payments'],properties:{
    cash_session_id:{type:'string',pattern:uid},pickup_order_id:{type:'string',pattern:uid},
+   customer_id:{type:'string',pattern:uid},seller_id:{type:'string',pattern:uid},
+   credit_installments:{type:'array',minItems:1,maxItems:24,items:{
+    type:'object',additionalProperties:false,required:['amount_cents','due_on'],
+    properties:{amount_cents:{type:'integer',minimum:1},due_on:{type:'string',maxLength:10}}}},
    lines:{type:'array',minItems:1,maxItems:100,items:{
     type:'object',additionalProperties:false,required:['variant_id','quantity','expected_price_cents','expected_price_revision'],
     properties:{variant_id:{type:'string',pattern:uid},quantity:{type:'integer',minimum:1,maximum:10000},
@@ -109,7 +118,7 @@ export function registerSales(app:FastifyInstance,db:Pool){
    }},
    payments:{type:'array',minItems:1,maxItems:6,items:{
     type:'object',additionalProperties:false,required:['method','amount_cents','confirmed'],
-    properties:{method:{type:'string',enum:['cash','pix_manual','card_external']},
+    properties:{method:{type:'string',enum:['cash','pix_manual','card_external','store_credit','customer_credit']},
      amount_cents:{type:'integer',minimum:1},confirmed:{type:'boolean'},
      external_reference:{type:'string',maxLength:128}}
    }}
@@ -144,23 +153,80 @@ export function registerSales(app:FastifyInstance,db:Pool){
     total+=subtotal;priced.push({line,row,price,subtotal});
    }
    const {tendered,change}=validatePayments(body.payments,total);
+   const storeCredit=body.payments.filter(p=>p.method==='store_credit').reduce((sum,p)=>sum+p.amount_cents,0);
+   const loyaltyCredit=body.payments.filter(p=>p.method==='customer_credit').reduce((sum,p)=>sum+p.amount_cents,0);
+   if(body.payments.filter(p=>p.method==='store_credit').length>1||
+      body.payments.filter(p=>p.method==='customer_credit').length>1)
+    throw new DomainError(422,'CREDIT_DUPLICATE','Consolide pagamentos em crédito por tipo');
+   if((storeCredit||loyaltyCredit)&&!body.customer_id)
+    throw new DomainError(422,'CUSTOMER_REQUIRED','Identifique o cliente para crédito ou crediário');
+   if(storeCredit&&!auth.roles.includes('manager'))
+    throw new DomainError(403,'CREDIT_APPROVAL','Somente o gestor pode conceder crediário');
+   const installments=storeCredit?creditInstallments(storeCredit,body.credit_installments||[]):[];
+   if(!storeCredit&&body.credit_installments?.length)
+    throw new DomainError(422,'UNEXPECTED_INSTALLMENTS','Parcelas sem venda a crediário');
+   let loyaltyAllowed=false;
+   if(body.customer_id){
+    const customer=await client.query<{loyalty_opt_in:boolean}>(`SELECT loyalty_opt_in
+     FROM retail_customers WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL FOR UPDATE`,
+     [auth.storeId,body.customer_id]);
+    if(!customer.rowCount)throw new DomainError(404,'CUSTOMER_NOT_FOUND','Cliente não encontrado');
+    loyaltyAllowed=customer.rows[0].loyalty_opt_in;
+   }
+   if(storeCredit){
+    const limit=await client.query<{enabled:boolean;credit_limit_cents:string}>(`SELECT enabled,
+     credit_limit_cents::text FROM retail_credit_limits WHERE store_id=$1 AND customer_id=$2 FOR UPDATE`,
+     [auth.storeId,body.customer_id]);
+    if(!limit.rowCount||!limit.rows[0].enabled)
+     throw new DomainError(409,'CREDIT_DISABLED','Crediário não autorizado para este cliente');
+    const owed=await client.query<{outstanding:string}>(`SELECT coalesce(sum(amount_cents-settled_cents),0)::text AS outstanding
+     FROM retail_accounts WHERE store_id=$1 AND customer_id=$2 AND kind='receivable' AND cancelled_at IS NULL`,
+     [auth.storeId,body.customer_id]);
+    if(Number(owed.rows[0].outstanding)+storeCredit>Number(limit.rows[0].credit_limit_cents))
+     throw new DomainError(409,'CREDIT_LIMIT','Limite de crediário insuficiente');
+   }
+   if(loyaltyCredit){
+    const credits=await client.query<{id:string;remaining:string}>(`SELECT id::text,
+     (amount_cents-used_cents)::text AS remaining FROM retail_customer_credits
+     WHERE store_id=$1 AND customer_id=$2 AND used_cents<amount_cents
+     ORDER BY created_at,id FOR UPDATE`,[auth.storeId,body.customer_id]);
+    if(credits.rows.reduce((n,c)=>n+Number(c.remaining),0)<loyaltyCredit)
+     throw new DomainError(409,'CUSTOMER_CREDIT_LOW','Saldo de crédito do cliente insuficiente');
+    let remaining=loyaltyCredit;
+    for(const credit of credits.rows){
+     const used=Math.min(remaining,Number(credit.remaining));
+     if(!used)continue;
+     await client.query(`UPDATE retail_customer_credits SET used_cents=used_cents+$3
+      WHERE store_id=$1 AND id=$2`,[auth.storeId,credit.id,used]);
+     remaining-=used;
+     if(!remaining)break;
+    }
+   }
+   const sellerId=body.seller_id||auth.userId;
+   const seller=await client.query(`SELECT 1 FROM user_store_roles r JOIN users u ON u.id=r.user_id
+    WHERE r.store_id=$1 AND r.user_id=$2 AND u.status='active'`,[auth.storeId,sellerId]);
+   if(!seller.rowCount)throw new DomainError(404,'SELLER_NOT_FOUND','Vendedor não pertence a esta loja');
    const num=await client.query<{last_number:string}>(`INSERT INTO store_counters(store_id,counter_name,last_number)
      VALUES($1,'sale',1) ON CONFLICT(store_id,counter_name) DO UPDATE SET
      last_number=store_counters.last_number+1 RETURNING last_number::text`,[auth.storeId]);
    const number=toMoney(num.rows[0].last_number);
    const created=await client.query<{id:string;created_at:Date}>(`INSERT INTO sales
-    (store_id,sale_number,cash_session_id,cashier_id,total_cents,tendered_cents,change_cents)
-    VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text,created_at`,
-    [auth.storeId,number,body.cash_session_id,auth.userId,total,tendered,change]);
+    (store_id,sale_number,cash_session_id,cashier_id,total_cents,tendered_cents,change_cents,customer_id,seller_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id::text,created_at`,
+    [auth.storeId,number,body.cash_session_id,auth.userId,total,tendered,change,body.customer_id||null,sellerId]);
    const saleId=created.rows[0].id;
    if(body.pickup_order_id)await client.query('UPDATE pickup_orders SET sale_id=$3 WHERE store_id=$1 AND id=$2',
      [auth.storeId,body.pickup_order_id,saleId]);
    for(const x of priced){
+    const lastCost=await client.query<{unit_cost_cents:string}>(`SELECT unit_cost_cents::text
+     FROM purchase_orders WHERE store_id=$1 AND variant_id=$2 AND quality_finalized=true
+     ORDER BY received_at DESC NULLS LAST,id DESC LIMIT 1`,[auth.storeId,x.line.variant_id]);
+    const unitCost=lastCost.rowCount?Number(lastCost.rows[0].unit_cost_cents):null;
     await client.query(`INSERT INTO sale_lines(store_id,sale_id,variant_id,product_name,sku,color,size,
-      quantity,unit_price_cents,line_total_cents)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      quantity,unit_price_cents,line_total_cents,cost_unit_cents)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
      [auth.storeId,saleId,x.line.variant_id,x.row.name,x.row.sku,x.row.color,x.row.size,
-      x.line.quantity,x.price,x.subtotal]);
+      x.line.quantity,x.price,x.subtotal,unitCost]);
     const balance=await client.query<{revision:string}>(`UPDATE stock_balances
       SET on_hand=on_hand-$3,revision=revision+1
       WHERE store_id=$1 AND variant_id=$2 AND on_hand-reserved>=$3 RETURNING revision::text`,
@@ -173,9 +239,30 @@ export function registerSales(app:FastifyInstance,db:Pool){
       [auth.storeId,x.line.variant_id,Number(balance.rows[0].revision),JSON.stringify({sale_id:saleId})]);
    }
    for(const payment of body.payments){
+    const external=payment.method==='pix_manual'||payment.method==='card_external';
     await client.query(`INSERT INTO sale_payments(store_id,sale_id,method,amount_cents,external_reference,confirmed_manually)
-     VALUES($1,$2,$3,$4,$5,true)`,[auth.storeId,saleId,payment.method,payment.amount_cents,
-      payment.method==='cash'?null:payment.external_reference!.trim()]);
+     VALUES($1,$2,$3,$4,$5,$6)`,[auth.storeId,saleId,payment.method,payment.amount_cents,
+      external?payment.external_reference!.trim():null,payment.method!=='store_credit']);
+   }
+   for(const part of installments){
+    await client.query(`INSERT INTO retail_accounts
+     (store_id,kind,customer_id,source_type,source_id,description,amount_cents,due_on,created_by)
+     VALUES($1,'receivable',$2,'sale_credit',$3,$4,$5,$6,$7)`,
+     [auth.storeId,body.customer_id,saleId,'Crediário da venda '+number,part.amount_cents,part.due_on,auth.userId]);
+   }
+   if(loyaltyAllowed&&body.customer_id&&loyaltyPoints(total)>0){
+    await client.query(`INSERT INTO retail_loyalty_events
+     (store_id,customer_id,sale_id,points,kind,note,actor_id)
+     VALUES($1,$2,$3,$4,'earn','Pontos da compra presencial',$5)`,
+     [auth.storeId,body.customer_id,saleId,loyaltyPoints(total),auth.userId]);
+   }
+   const rate=await client.query<{rate_bps:number}>(`SELECT rate_bps FROM retail_commission_rules
+     WHERE store_id=$1 AND seller_id=$2`,[auth.storeId,sellerId]);
+   if(rate.rows[0]?.rate_bps>0){
+    await client.query(`INSERT INTO retail_commission_entries
+     (store_id,sale_id,seller_id,base_cents,rate_bps,amount_cents)
+     VALUES($1,$2,$3,$4,$5,$6)`,
+     [auth.storeId,saleId,sellerId,total,rate.rows[0].rate_bps,commissionCents(total,rate.rows[0].rate_bps)]);
    }
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
      VALUES($1,$2,'sales.confirm',$3,$4::jsonb)`,
@@ -184,7 +271,8 @@ export function registerSales(app:FastifyInstance,db:Pool){
      VALUES($1,'sales.sale.confirmed.v1',$2,1,$3::jsonb)`,
     [auth.storeId,saleId,JSON.stringify({sale_number:number,total_cents:total})]);
    return {id:saleId,sale_number:number,status:'confirmed',total_cents:total,tendered_cents:tendered,
-    change_cents:change,created_at:created.rows[0].created_at,cash_session_id:body.cash_session_id};
+    credit_due_cents:storeCredit,change_cents:change,created_at:created.rows[0].created_at,
+    cash_session_id:body.cash_session_id};
   });
   return reply.code(201).send(out.result);
  });
@@ -208,7 +296,11 @@ export function registerSales(app:FastifyInstance,db:Pool){
     'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
     ...sale.lines.map(l=>l.quantity+' × '+l.product_name+' ('+l.color+'/'+l.size+') '+money(l.line_total_cents)),
     '--------------------------------','TOTAL '+money(sale.total_cents),
-    ...sale.payments.map(p=>p.method+' '+money(p.amount_cents)),
+    ...sale.payments.map(p=>p.method==='store_credit'
+      ?'CREDIÁRIO A RECEBER '+money(p.amount_cents)
+      :p.method==='customer_credit'
+       ?'CRÉDITO DO CLIENTE '+money(p.amount_cents)
+       :p.method+' '+money(p.amount_cents)),
     'TROCO '+money(sale.change_cents),
     'ID: '+sale.id,
   ].join('\n');

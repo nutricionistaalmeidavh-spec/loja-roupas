@@ -5,19 +5,23 @@ import type {ReturnItem,CashReturnRequest} from '@loja/domain/operations';
 import { requirePermission } from './auth.ts';
 import { expectedCash } from './cash.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
+import {commissionCents,loyaltyPoints} from './retail-rules.ts';
 
 const uuid={type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const numberParams={type:'object',required:['number'],properties:{number:{type:'string',pattern:'^[1-9][0-9]{0,15}$'}}};
-type SaleInfo={id:string;sale_number:string;status:string;total_cents:string;cash_only:boolean};
+type SaleInfo={id:string;sale_number:string;status:string;total_cents:string;cash_only:boolean;customer_id:string|null};
 type SaleLine={id:string;variant_id:string;quantity:string;unit_price_cents:string;returned_quantity:string};
-const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,
+const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,s.customer_id::text,
   NOT EXISTS(SELECT 1 FROM sale_payments p WHERE p.store_id=s.store_id AND p.sale_id=s.id AND p.method<>'cash') AS cash_only
   FROM sales s WHERE s.store_id=$1 AND s.sale_number=$2`;
 const linesQuery=`SELECT l.id,l.variant_id,l.product_name,l.sku,l.color,l.size,l.quantity::text,
  l.unit_price_cents::text,
- coalesce((SELECT sum(rl.quantity) FROM cash_return_lines rl
+ (coalesce((SELECT sum(rl.quantity) FROM cash_return_lines rl
     JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
-    WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id),0)::text AS returned_quantity
+    WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id),0)
+   +coalesce((SELECT sum(x.quantity) FROM retail_after_sale_lines x
+    JOIN retail_after_sales after ON after.id=x.operation_id AND after.store_id=x.store_id
+    WHERE x.store_id=l.store_id AND x.sale_line_id=l.id AND after.sale_id=l.sale_id),0))::text AS returned_quantity
  FROM sale_lines l WHERE l.store_id=$1 AND l.sale_id=$2 ORDER BY l.id`;
 
 export function registerCashReturns(app:FastifyInstance,db:Pool){
@@ -92,6 +96,24 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
     const created=await client.query<{id:string}>(`INSERT INTO cash_sale_returns(store_id,sale_id,cash_session_id,actor_id,amount_cents,reason)
       VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[auth.storeId,sale.id,cash_session_id,auth.userId,amount,reason]);
     const returnId=created.rows[0].id;
+    const associated=await client.query<{customer_id:string|null}>(`SELECT customer_id::text
+      FROM sales WHERE store_id=$1 AND id=$2`,[auth.storeId,sale.id]);
+    const cid=associated.rows[0]?.customer_id;
+    if(cid&&loyaltyPoints(amount)>0){
+     const earned=await client.query(`SELECT 1 FROM retail_loyalty_events WHERE store_id=$1 AND sale_id=$2
+      AND kind='earn'`,[auth.storeId,sale.id]);
+     if(earned.rowCount)await client.query(`INSERT INTO retail_loyalty_events
+      (store_id,customer_id,sale_id,points,kind,note,actor_id)
+      VALUES($1,$2,$3,$4,'reverse','Devolução em dinheiro',$5)`,
+      [auth.storeId,cid,sale.id,-loyaltyPoints(amount),auth.userId]);
+    }
+    const commission=await client.query<{seller_id:string;rate_bps:number}>(`SELECT seller_id::text,rate_bps
+      FROM retail_commission_entries WHERE store_id=$1 AND sale_id=$2 FOR UPDATE`,
+      [auth.storeId,sale.id]);
+    if(commission.rowCount)await client.query(`INSERT INTO retail_commission_reversals
+     (store_id,sale_id,operation_id,seller_id,amount_cents) VALUES($1,$2,$3,$4,$5)`,
+     [auth.storeId,sale.id,returnId,commission.rows[0].seller_id,
+      commissionCents(amount,commission.rows[0].rate_bps)]);
     for(const item of items){
       const line=available.get(item.sale_line_id)!;
       await client.query(`INSERT INTO cash_return_lines(store_id,return_id,sale_line_id,quantity,disposition,unit_amount_cents)
@@ -121,7 +143,10 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
       coalesce(sum(l.quantity),0)::text AS quantity,
       coalesce(sum((SELECT coalesce(sum(rl.quantity),0) FROM cash_return_lines rl
        JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
-       WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id)),0)::text AS returned
+       WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id)
+      +(SELECT coalesce(sum(x.quantity),0) FROM retail_after_sale_lines x
+        JOIN retail_after_sales after ON after.id=x.operation_id AND after.store_id=x.store_id
+        WHERE x.store_id=l.store_id AND x.sale_line_id=l.id AND after.sale_id=l.sale_id)),0)::text AS returned
       FROM sale_lines l WHERE l.store_id=$1 AND l.sale_id=$2`,[auth.storeId,sale.id]);
     const next=saleReturnState(Number(totals.rows[0].quantity),Number(totals.rows[0].returned));
     if(next==='confirmed'||transition('sale_return',sale.status as 'confirmed'|'partially_returned',

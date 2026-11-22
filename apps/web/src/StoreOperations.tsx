@@ -18,6 +18,8 @@ import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
 import {ManagementFinance} from './ManagementFinance.tsx';
 import {ManagementCustomers} from './ManagementCustomers.tsx';
 import {ManagementInventory} from './ManagementInventory.tsx';
+import {RetailLedger} from './RetailLedger.tsx';
+import {RetailAfterSales} from './RetailAfterSales.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -148,6 +150,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
         <div><h2>Pós-venda</h2><p>Trocas, devoluções, reservas e pedidos para retirada.</p></div>
         <button className="primary-action" onClick={()=>setReturnOpen(true)}>Nova devolução</button>
       </div>
+      <RetailAfterSales session={session} cashId={cashId} onUpdated={()=>{setRefresh(n=>n+1);onReturned();}}/>
       <StockHolds session={session}/>
       {!physical&&<PickupSettings session={session}/>}
     </div>}
@@ -157,7 +160,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
     </div>}
-    {section==='financeiro'&&<ManagementFinance session={session}/>}
+    {section==='financeiro'&&<><ManagementFinance session={session}/><RetailLedger session={session} cashId={cashId}/></>}
     {section==='clientes'&&<ManagementCustomers session={session}/>}
     {section==='inventario'&&<ManagementInventory session={session} onSaved={()=>{setRefresh(n=>n+1);onReturned();}}/>}
     {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">

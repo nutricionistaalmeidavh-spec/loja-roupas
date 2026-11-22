@@ -26,6 +26,9 @@ import { registerMarketplaceBridge } from './marketplace-bridge.ts';
 import {editionFromEnv,blockedInPhysicalEdition} from './physical-edition.ts';
 import {registerPhysicalManagement} from './physical-management.ts';
 import {registerPhysicalInventory} from './physical-inventory.ts';
+import {registerRetailLedger} from './retail-ledger.ts';
+import {registerRetailAfterSales} from './retail-after-sales.ts';
+import {registerOperatorPin} from './operator-pin.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -68,6 +71,9 @@ export function buildApp(db: Pool) {
   registerMarketplaceBridge(app,db);
   registerPhysicalManagement(app,db);
   registerPhysicalInventory(app,db);
+  registerRetailLedger(app,db);
+  registerRetailAfterSales(app,db);
+  registerOperatorPin(app,db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

@@ -1,6 +1,6 @@
 # Estado da implementação — Loja de Roupas
 
-**Snapshot:** 18/11/2026. M0–M3 incorporados à `main` via PRs #1–#6 com autorização do proprietário; **sem release**. Rastreio detalhado em [status M0–M8](docs/06-roadmap/status-execucao.md).
+**Snapshot:** 22/11/2026. M0–M3 integrados; M4/M5 parcialmente integrados; a edição física v0.2.3 foi publicada como pré-release após PR #41. Rastreio detalhado em [status M0–M8](docs/06-roadmap/status-execucao.md).
 
 | Marco | Implementado no repositório | Limites |
 |---|---|---|
@@ -52,3 +52,6 @@ Abrir http://127.0.0.1:5173 no computador de desenvolvimento. O Vite proxy atend
 ## M4–M6 em desenvolvimento
 
 [Instalação LAN, impressão, backup, gestão e vitrine](docs/07-implementacao/m4-m6-operacao-gestao-vitrine.md) descreve o escopo entregue e os gates pendentes de cada marco.
+
+## Atualização pós-PR #41
+O instalador Windows físico v0.2.3 está [publicado com checksum](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.3), sem homologação de hardware real. Recursos P1 estendidos e scripts LAN de backup cifrado estão em [PR #42](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/42) **draft, ainda não integrado**, com atualização física em canal exclusivo, sem OSV-Scanner nem serviço pago no core.

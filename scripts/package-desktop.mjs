@@ -32,7 +32,7 @@ await cp(new URL('../apps/desktop/src/setup-preload.cjs',import.meta.url),path.j
 await cp(new URL('../apps/desktop/src/setup.html',import.meta.url),path.join(application,'setup.html'));
 const packageInfo=JSON.parse(await readFile(new URL('../apps/desktop/package.json',import.meta.url),'utf8'));
 const physicalVersion=process.env.LOJA_PHYSICAL_EDITION==='true'
- ? (process.env.LOJA_PHYSICAL_VERSION||'0.2.3') : packageInfo.version;
+ ? (process.env.LOJA_PHYSICAL_VERSION||'0.2.4') : packageInfo.version;
 if(!/^\d+\.\d+\.\d+$/.test(physicalVersion))throw Error('Versão desktop inválida');
 await writeFile(path.join(application,'package.json'),JSON.stringify({
   name:'loja-roupas-desktop', productName:process.env.LOJA_PHYSICAL_EDITION==='true'?'Loja de Roupas Fisica':'Loja de Roupas',
