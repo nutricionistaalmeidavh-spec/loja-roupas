@@ -17,6 +17,7 @@ await mkdir(application,{recursive:true});
 await cp(new URL('../apps/desktop/src/main.cjs',import.meta.url),path.join(application,'main.cjs'));
 await cp(new URL('../apps/desktop/src/local-runtime.cjs',import.meta.url),path.join(application,'local-runtime.cjs'));
 await cp(new URL('../apps/desktop/src/local-backup.cjs',import.meta.url),path.join(application,'local-backup.cjs'));
+await cp(new URL('../apps/desktop/src/native-print.cjs',import.meta.url),path.join(application,'native-print.cjs'));
 await cp(new URL('../apps/desktop/src/updates.cjs',import.meta.url),path.join(application,'updates.cjs'));
 await cp(new URL('../apps/desktop/src/desktop-updater.cjs',import.meta.url),path.join(application,'desktop-updater.cjs'));
 await cp(new URL('../apps/desktop/src/update-preload.cjs',import.meta.url),path.join(application,'update-preload.cjs'));

@@ -7,6 +7,7 @@ const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
 const {createDesktopUpdater}=require('./desktop-updater.cjs');
 const {backupFilename}=require('./local-backup.cjs');
+const {validatePrinterSelection}=require('./native-print.cjs');
 
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
@@ -86,6 +87,23 @@ function recoveryAllowed(event){
  if(!recoveryWindow||recoveryWindow.isDestroyed()||
     event.sender!==recoveryWindow.webContents||
     !event.sender.getURL().startsWith('file://'))throw new Error('Recuperação disponível somente na janela local segura.');
+}
+function registerPrinterHandlers(){
+ ipcMain.handle('loja:printers:list',async event=>{
+  if(!isMainLocalSender(event))throw new Error('Impressoras disponíveis apenas no computador principal.');
+  const devices=await event.sender.getPrintersAsync();
+  return devices.map(item=>({name:item.name,displayName:item.displayName||item.name,isDefault:Boolean(item.isDefault)}));
+ });
+ ipcMain.handle('loja:printers:print',async(event,request)=>{
+  if(!isMainLocalSender(event))throw new Error('Impressão não autorizada fora da loja local.');
+  const devices=await event.sender.getPrintersAsync();
+  const chosen=validatePrinterSelection(request,devices.map(p=>p.name));
+  return new Promise((resolve,reject)=>{
+   event.sender.print({silent:true,deviceName:chosen.deviceName,printBackground:true},(success,reason)=>{
+    if(success)resolve({submitted:true});else reject(new Error(reason||'Falha ao enviar impressão ao Windows.'));
+   });
+  });
+ });
 }
 function registerBackupHandlers(){
  ipcMain.handle('loja:backup:create',async event=>{
@@ -210,6 +228,7 @@ async function start(){
  registerSetupHandlers();
  registerRecoveryHandlers();
  registerBackupHandlers();
+ registerPrinterHandlers();
  setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,
   webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
