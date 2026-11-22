@@ -101,6 +101,33 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
    cash_session_id:cashId,reason:'Troca por numeração G',payment:{method:'cash',confirmed:true}});
   check(201,exchange);
   assert.equal(exchange.json().extra_due_cents,5000);
+  const consent=await request('POST','/v1/management/customers/'+customerId+'/consents',
+   {marketing_consent:true,loyalty_opt_in:false});check(200,consent);
+  const clientAfterConsent=await request('GET','/v1/management/customers');check(200,clientAfterConsent);
+  const changed=clientAfterConsent.json().items.find((c:{id:string})=>c.id===customerId);
+  assert.equal(changed.loyalty_opt_in,false);
+  const secondUser=(await db.query<{id:string}>(`INSERT INTO users(login,password_hash)
+   VALUES($1,$2) RETURNING id::text`,['p1-stocker-'+randomUUID(),await hashPassword(managerPassword)])).rows[0].id;
+  await db.query("INSERT INTO user_store_roles(user_id,store_id,role_code) VALUES($1,$2,'stocker')",
+   [secondUser,store]);
+  const stocker=issueSession();
+  await db.query(`INSERT INTO auth_sessions(user_id,token_hash,expires_at)
+   VALUES($1,$2,now()+interval '8 hours')`,[secondUser,stocker.tokenHash]);
+  const stockerPost=async(url:string,body?:object)=>await app.inject({method:'POST',url,
+   headers:{authorization:'Bearer '+stocker.token,'x-store-id':store,'idempotency-key':randomUUID()},
+   ...(body?{payload:body}:{})});
+  const count=await request('POST','/v1/management/inventory-counts');check(201,count);
+  const countId=count.json().id as string;
+  const stock=await db.query<{on_hand:number}>(`SELECT on_hand FROM stock_balances
+   WHERE store_id=$1 AND variant_id=$2`,[store,oldV.id]);
+  const counted=await stockerPost('/v1/management/inventory-counts/'+countId+'/lines',
+   {variant_id:oldV.id,counted_on_hand:stock.rows[0].on_hand});check(201,counted);
+  const premature=await request('POST','/v1/management/inventory-counts/'+countId+'/close');
+  check(409,premature);
+  const approved=await request('POST','/v1/management/inventory-counts/'+countId+'/approve-line',
+   {variant_id:oldV.id});check(200,approved);
+  const closed=await request('POST','/v1/management/inventory-counts/'+countId+'/close');
+  check(200,closed);assert.equal(closed.json().closed,true);
   const report=await request('GET','/v1/management/dre?month=2026-11');check(200,report);
   assert.equal(report.json().complete,false);
   assert.ok(Number.isInteger(report.json().operating_result_cents));
