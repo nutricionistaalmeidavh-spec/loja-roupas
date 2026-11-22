@@ -15,7 +15,7 @@ const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,
   FROM sales s WHERE s.store_id=$1 AND s.sale_number=$2`;
 const linesQuery=`SELECT l.id,l.variant_id,l.product_name,l.sku,l.color,l.size,l.quantity::text,
  l.unit_price_cents::text,
- coalesce((SELECT sum(rl.quantity) FROM cash_return_lines rl
+ (coalesce((SELECT sum(rl.quantity) FROM cash_return_lines rl
     JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
     WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id),0)
    +coalesce((SELECT sum(x.quantity) FROM retail_after_sale_lines x
