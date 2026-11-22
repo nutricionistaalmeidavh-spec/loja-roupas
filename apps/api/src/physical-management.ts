@@ -19,6 +19,10 @@ function validCustomer(body:{name:string;phone?:string|null;email?:string|null;m
  return {name,phone,email,marketing_consent:body.marketing_consent===true};
 }
 export function registerPhysicalManagement(app:FastifyInstance,db:Pool){
+ app.get('/v1/management/backup/authorization',async(request,reply)=>{
+  if(requirePermission(request,reply,'system.backup'))return reply;
+  return {allowed:true};
+ });
  app.get<{Querystring:{month:string}}>('/v1/management/operational-result',{
   schema:{querystring:{type:'object',additionalProperties:false,required:['month'],properties:{month:{type:'string',maxLength:7}}}}
  },async(request,reply)=>{

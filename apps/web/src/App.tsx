@@ -428,7 +428,7 @@ export function App() {
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside data-tour="cart" className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
       {page==='gestao'&&manager&&<div data-tour="management"><StoreOperations session={session} cashId={cashId} onReturned={refreshed}/></div>}
-      {page==='configuracoes'&&<><UpdateSettings/><LocalBackupSettings/></>}
+      {page==='configuracoes'&&<><UpdateSettings/>{manager&&<LocalBackupSettings session={session}/>}</>}
       {page==='produtos'&&manager&&<div data-tour="products"><ProductsWorkspace session={session} onSaved={refreshed}/></div>}
       {page==='caixa'&&canCash&&<div data-tour="cash"><CashPanel session={session} onChanged={cashUpdated}/></div>}
       {page==='estoque'&&canReceive&&<div className="products-workspace" data-tour="stock">

@@ -105,9 +105,23 @@ function registerPrinterHandlers(){
   });
  });
 }
+async function verifyManagerForBackup(event,authorization){
+ if(!isMainLocalSender(event)||!runtime)throw new Error('Backup disponível somente no computador principal.');
+ const token=authorization?.token,storeId=authorization?.storeId;
+ if(typeof token!=='string'||!/^[A-Za-z0-9_-]{32,128}$/.test(token)||
+    typeof storeId!=='string'||!/^[a-fA-F0-9-]{36}$/.test(storeId))
+   throw new Error('Entre com uma conta de gestor antes de realizar backup.');
+ let reply;
+ try{
+  reply=await fetch(runtime.url+'/v1/management/backup/authorization',{
+   headers:{authorization:'Bearer '+token,'x-store-id':storeId},signal:AbortSignal.timeout(4000)
+  });
+ }catch{throw new Error('Não foi possível validar a sessão do gestor.');}
+ if(!reply.ok)throw new Error('Somente gestores autenticados podem realizar backups.');
+}
 function registerBackupHandlers(){
- ipcMain.handle('loja:backup:verify',async event=>{
-  if(!isMainLocalSender(event)||!runtime)throw new Error('Validação disponível no computador principal.');
+ ipcMain.handle('loja:backup:verify',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
   const window=BrowserWindow.fromWebContents(event.sender);
   const choice=await dialog.showOpenDialog(window,{
    title:'Verificar restauração de backup PostgreSQL',
@@ -116,8 +130,8 @@ function registerBackupHandlers(){
   if(choice.canceled||!choice.filePaths?.length)return {cancelled:true};
   return {cancelled:false,...await runtime.verifyBackup(choice.filePaths[0])};
  });
- ipcMain.handle('loja:backup:create',async event=>{
-  if(!isMainLocalSender(event)||!runtime)throw new Error('Backup disponível somente no computador principal da loja.');
+ ipcMain.handle('loja:backup:create',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
   const window=BrowserWindow.fromWebContents(event.sender);
   const choice=await dialog.showSaveDialog(window,{
    title:'Exportar backup completo da loja',defaultPath:backupFilename(),

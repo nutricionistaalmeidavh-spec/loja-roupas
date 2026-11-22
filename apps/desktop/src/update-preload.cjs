@@ -6,8 +6,8 @@ contextBridge.exposeInMainWorld('lojaPrinter',{
  print:(request)=>ipcRenderer.invoke('loja:printers:print',request)
 });
 contextBridge.exposeInMainWorld('lojaBackups',{
- create:()=>ipcRenderer.invoke('loja:backup:create'),
- verify:()=>ipcRenderer.invoke('loja:backup:verify')
+ create:auth=>ipcRenderer.invoke('loja:backup:create',auth),
+ verify:auth=>ipcRenderer.invoke('loja:backup:verify',auth)
 });
 contextBridge.exposeInMainWorld('lojaUpdates',{
  info:()=>ipcRenderer.invoke('loja:updates:info'),
