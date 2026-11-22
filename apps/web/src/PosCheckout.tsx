@@ -217,7 +217,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
        <p>As parcelas constituem contas a receber; não entram no saldo do caixa antes da liquidação.</p>
       </fieldset>}
       <button type="button" className="light-button" disabled={busy||uncertain||tenders.length>=6}
-       onClick={()=>setTenders(x=>[...x,newTender('pix_manual')])}>+ Adicionar forma de pagamento</button>
+       onClick={()=>setTenders(x=>[...x,newTender('pix_manual')])}>+ Adicionar pagamento</button>
     </div>
     <div className="checkout-totals">
       <div className="total-row"><span>Total da venda</span><strong>{brl(quote.total_cents)}</strong></div>

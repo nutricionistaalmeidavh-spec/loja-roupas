@@ -88,7 +88,7 @@ export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onU
   <p>A operação atualiza estoque e auditoria na mesma transação. Estornos externos exigem confirmação humana; não são enviados automaticamente ao banco.</p>
   {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status">{notice}</p>}
   <form className="management-form" onSubmit={e=>void findSale(e)}>
-   <label>Número da venda <input value={number} onChange={e=>setNumber(e.target.value)}
+   <label>Localizar venda para troca ou estorno <input value={number} onChange={e=>setNumber(e.target.value)}
     inputMode="numeric" required placeholder="Ex.: 123"/></label>
    <button disabled={busy}>Consultar venda</button>
   </form>

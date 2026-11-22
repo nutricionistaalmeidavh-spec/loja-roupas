@@ -108,10 +108,11 @@ jobs:
           @'
           ## Loja de Roupas Física v0.2.4 — Windows 64 bits
 
-Esta versão introduz o **atualizador próprio da edição física**, com oferta de atualização ao iniciar quando houver nova pré-release válida, solicitação de confirmação antes de baixar, validação SHA256, backup e snapshot de rollback. Usuários com **v0.2.3 precisam instalar esta versão manualmente uma vez**, porque aquela versão mantém o atualizador desabilitado.
-
-Também inclui os módulos P1 de pós-venda (trocas e estornos externos manuais), crediário, contas/DRE, comissões, fidelidade, PIN e inventário multioperador.
-
+          
+          Esta versão introduz o **atualizador próprio da edição física**, com oferta de atualização ao iniciar quando houver nova pré-release válida, solicitação de confirmação antes de baixar, validação SHA256, backup e snapshot de rollback. Usuários com **v0.2.3 precisam instalar esta versão manualmente uma vez**, porque aquela versão mantém o atualizador desabilitado.
+          
+          Também inclui os módulos P1 de pós-venda (trocas e estornos externos manuais), crediário, contas/DRE, comissões, fidelidade, PIN e inventário multioperador.
+          
 
           Instalador para comércio **presencial**, com caixa, estoque, cadastro de produtos, inventário, despesas, clientes e comprovantes não fiscais.
 
