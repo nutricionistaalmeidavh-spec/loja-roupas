@@ -38,3 +38,15 @@ test('Estoque mostra erro útil quando sua API não responde, sem bloquear PDV',
  await page.getByRole('button',{name:'PDV',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Nova venda'})).toBeVisible();
 });
+
+test('Chromium antigo sem Map/WeakMap.getOrInsertComputed carrega Estoque sem travar',async({page})=>{
+ await page.addInitScript(()=>{
+  for(const prototype of [Map.prototype,WeakMap.prototype]){
+   Object.defineProperty(prototype,'getOrInsertComputed',{value:undefined,writable:true,configurable:true});
+  }
+ });
+ await login(page);
+ await page.getByRole('button',{name:'Entrada de estoque'}).click();
+ await expect(page.getByRole('heading',{name:'Planilha operacional'})).toBeVisible({timeout:15000});
+ await expect(page.getByRole('alert').filter({hasText:'Não foi possível abrir o estoque'})).toHaveCount(0);
+});
