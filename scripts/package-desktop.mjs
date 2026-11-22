@@ -30,9 +30,10 @@ await cp(new URL('../apps/desktop/src/recovery-preload.cjs',import.meta.url),pat
 await cp(new URL('../apps/desktop/src/recovery.html',import.meta.url),path.join(application,'recovery.html'));
 await cp(new URL('../apps/desktop/src/setup-preload.cjs',import.meta.url),path.join(application,'setup-preload.cjs'));
 await cp(new URL('../apps/desktop/src/setup.html',import.meta.url),path.join(application,'setup.html'));
+await cp(new URL('../apps/desktop/src/connection-error.html',import.meta.url),path.join(application,'connection-error.html'));
 const packageInfo=JSON.parse(await readFile(new URL('../apps/desktop/package.json',import.meta.url),'utf8'));
 const physicalVersion=process.env.LOJA_PHYSICAL_EDITION==='true'
- ? (process.env.LOJA_PHYSICAL_VERSION||'0.2.4') : packageInfo.version;
+ ? (process.env.LOJA_PHYSICAL_VERSION||'0.2.5') : packageInfo.version;
 if(!/^\d+\.\d+\.\d+$/.test(physicalVersion))throw Error('Versão desktop inválida');
 await writeFile(path.join(application,'package.json'),JSON.stringify({
   name:'loja-roupas-desktop', productName:process.env.LOJA_PHYSICAL_EDITION==='true'?'Loja de Roupas Fisica':'Loja de Roupas',
