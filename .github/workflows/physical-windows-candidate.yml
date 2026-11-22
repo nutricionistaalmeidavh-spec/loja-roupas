@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 55
     env:
       LOJA_PHYSICAL_EDITION: 'true'
-      LOJA_PHYSICAL_VERSION: '0.2.3'
+      LOJA_PHYSICAL_VERSION: '0.2.4'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,7 +51,7 @@ jobs:
           if(!(Test-Path $marker)){throw 'Marcador da edição física ausente'}
           $edition=Get-Content $marker -Raw | ConvertFrom-Json
           $version=(Get-Content 'dist/desktop-win32-x64/resources/app/package.json' -Raw | ConvertFrom-Json).version
-          if($version -ne '0.2.3'){throw 'Versão física incorreta'}
+          if($version -ne '0.2.4'){throw 'Versão física incorreta'}
           if($edition.edition -ne 'physical'){throw 'Marcador da edição física inválido'}
           pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
           if($LASTEXITCODE -ne 0){throw 'Empacotamento da API/Postgres falhou'}
@@ -73,7 +73,7 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Smoke primeiro uso falhou'}
           $installed="$install/app/resources/app/physical-edition.json"
           if(!(Test-Path $installed)){throw 'Edição incorreta instalada'}
-          if((Get-Content "$install/app/resources/app/package.json" -Raw | ConvertFrom-Json).version -ne '0.2.3'){throw 'Versão física instalada incorreta'}
+          if((Get-Content "$install/app/resources/app/package.json" -Raw | ConvertFrom-Json).version -ne '0.2.4'){throw 'Versão física instalada incorreta'}
           $process=Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
           if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
           $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
