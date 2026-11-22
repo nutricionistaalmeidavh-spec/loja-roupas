@@ -17,7 +17,10 @@ const linesQuery=`SELECT l.id,l.variant_id,l.product_name,l.sku,l.color,l.size,l
  l.unit_price_cents::text,
  coalesce((SELECT sum(rl.quantity) FROM cash_return_lines rl
     JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
-    WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id),0)::text AS returned_quantity
+    WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id),0)
+   +coalesce((SELECT sum(x.quantity) FROM retail_after_sale_lines x
+    JOIN retail_after_sales after ON after.id=x.operation_id AND after.store_id=x.store_id
+    WHERE x.store_id=l.store_id AND x.sale_line_id=l.id AND after.sale_id=l.sale_id),0))::text AS returned_quantity
  FROM sale_lines l WHERE l.store_id=$1 AND l.sale_id=$2 ORDER BY l.id`;
 
 export function registerCashReturns(app:FastifyInstance,db:Pool){
@@ -121,7 +124,10 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
       coalesce(sum(l.quantity),0)::text AS quantity,
       coalesce(sum((SELECT coalesce(sum(rl.quantity),0) FROM cash_return_lines rl
        JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
-       WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id)),0)::text AS returned
+       WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id)
+      +(SELECT coalesce(sum(x.quantity),0) FROM retail_after_sale_lines x
+        JOIN retail_after_sales after ON after.id=x.operation_id AND after.store_id=x.store_id
+        WHERE x.store_id=l.store_id AND x.sale_line_id=l.id AND after.sale_id=l.sale_id)),0)::text AS returned
       FROM sale_lines l WHERE l.store_id=$1 AND l.sale_id=$2`,[auth.storeId,sale.id]);
     const next=saleReturnState(Number(totals.rows[0].quantity),Number(totals.rows[0].returned));
     if(next==='confirmed'||transition('sale_return',sale.status as 'confirmed'|'partially_returned',
