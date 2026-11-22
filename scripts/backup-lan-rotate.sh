@@ -26,7 +26,7 @@ find "$root" -maxdepth 1 -type f -name 'loja-????????T??????Z-*.gpg' -mtime "+$r
  done
 if [[ -n ${LOJA_RESTIC_REPOSITORY:-} ]]; then
  command -v restic >/dev/null || { echo 'Repositório restic solicitado, mas restic não está instalado' >&2; exit 1; }
- [[ -r ${RESTIC_PASSWORD_FILE:-/dev/null} ]] || { echo 'RESTIC_PASSWORD_FILE protegido é obrigatório' >&2; exit 1; }
+ [[ -n ${RESTIC_PASSWORD_FILE:-} && -r "$RESTIC_PASSWORD_FILE" ]] || { echo 'RESTIC_PASSWORD_FILE protegido é obrigatório' >&2; exit 1; }
  # Repositório remoto ou local configurado explicitamente; nenhuma cloud obrigatória.
  restic -r "$LOJA_RESTIC_REPOSITORY" backup -- "$destination"
 fi

@@ -14,7 +14,7 @@ export async function expectedCash(db:Pick<PoolClient,'query'>,storeId:string,id
   WHERE s.store_id=$1 AND s.cash_session_id=$2 AND sp.method='cash') AS cash_in,
  (SELECT COALESCE(SUM(s.change_cents),0)::text FROM sales s
   WHERE s.store_id=$1 AND s.cash_session_id=$2) AS change_total`,[storeId,id]);
- const m=await db.query<{movement_total:string}>(`SELECT COALESCE(SUM(CASE WHEN kind='supply' THEN amount_cents ELSE -amount_cents END),0)::text AS movement_total
+ const m=await db.query<{movement_total:string}>(`SELECT COALESCE(SUM(CASE WHEN kind IN ('supply','credit_collection','exchange_collection') THEN amount_cents ELSE -amount_cents END),0)::text AS movement_total
  FROM cash_movements WHERE store_id=$1 AND cash_session_id=$2`,[storeId,id]);
  const result=opening+Number(p.rows[0].cash_in)-Number(p.rows[0].change_total)+Number(m.rows[0].movement_total);
  if(!Number.isSafeInteger(result)||result<0)throw new DomainError(409,'CASH_INVALID','Valor esperado do caixa inválido');

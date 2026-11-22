@@ -2,11 +2,12 @@
 ALTER TABLE sales ADD COLUMN customer_id uuid;
 ALTER TABLE sales ADD COLUMN seller_id uuid REFERENCES users(id);
 ALTER TABLE sales ADD CONSTRAINT sales_customer_store_fk FOREIGN KEY(customer_id,store_id) REFERENCES retail_customers(id,store_id);
+ALTER TABLE retail_customers ADD COLUMN loyalty_opt_in boolean NOT NULL DEFAULT false;
 ALTER TABLE sale_lines ADD COLUMN cost_unit_cents bigint CHECK(cost_unit_cents>=0);
 ALTER TABLE sale_payments DROP CONSTRAINT sale_payments_method_check;
 ALTER TABLE sale_payments ADD CONSTRAINT sale_payments_method_check CHECK(method IN ('cash','pix_manual','card_external','store_credit','exchange_credit'));
 ALTER TABLE cash_movements DROP CONSTRAINT cash_movements_kind_check;
-ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_kind_check CHECK(kind IN ('supply','withdrawal','refund','credit_collection','exchange_collection'));
+ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_kind_check CHECK(kind IN ('supply','withdrawal','refund','credit_collection','exchange_collection','account_payment'));
 
 CREATE TABLE retail_accounts (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -32,7 +33,7 @@ CREATE TABLE retail_account_settlements (
  UNIQUE(store_id,id),FOREIGN KEY(account_id,store_id) REFERENCES retail_accounts(id,store_id),
  FOREIGN KEY(cash_session_id,store_id) REFERENCES cash_sessions(id,store_id),
  CHECK ((method='cash' AND cash_session_id IS NOT NULL AND external_reference IS NULL)
-  OR (method<>'cash' AND cash_session_id IS NULL AND length(trim(external_reference))>=6))
+  OR (method<>'cash' AND cash_session_id IS NULL AND external_reference IS NOT NULL AND length(trim(external_reference))>=6))
 );
 CREATE UNIQUE INDEX retail_account_external_ref ON retail_account_settlements(store_id,method,external_reference)
  WHERE method<>'cash';
