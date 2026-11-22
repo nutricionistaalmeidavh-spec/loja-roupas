@@ -77,7 +77,7 @@ jobs:
           # termina antes de o pg_restore consumir todo o arquivo criptografado.
           objects=$(backup_gpg --decrypt "$archive" | lan exec -T postgres pg_restore --list -U loja)
           grep -Fq "TABLE DATA" <<< "$objects"
-          test -z "$(find "$RUNNER_TEMP/loja-rotativa" -maxdepth 1 -name '.loja-backup.*' -print -quit)"
+          test -z "$(find "$RUNNER_TEMP/loja-rotativa" -maxdepth 1 -type d -name '.loja-backup.*' -print -quit)"
       - name: Verificar perda e recuperação do banco
         run: |
           source scripts/lan-common.sh
