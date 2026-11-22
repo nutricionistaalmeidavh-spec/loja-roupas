@@ -23,7 +23,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await page.getByRole('button',{name:'Fechar Novo produto'}).click();
 
   await page.getByRole('button', {name:'Entrada de estoque'}).click();
-  await page.getByRole('button',{name:'Entrada direta'}).click();
+  await page.getByRole('button',{name:'Entrada direta',exact:true}).click();
   const select = page.getByLabel('Variante (SKU)');
   const option = select.locator('option', {hasText:sku});
   await expect(option).toBeAttached();
@@ -31,6 +31,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   expect(variantId).toBeTruthy();
   await select.selectOption(variantId!);
   await page.getByLabel('Quantidade recebida').fill('3');
+  await page.getByLabel('Justificativa obrigatória').fill('Entrada inicial validada e autorizada pelo gestor');
   await page.getByRole('button', {name:'Confirmar entrada direta'}).click();
   await expect(page.getByRole('status').filter({hasText:'Novo saldo em mãos: 3'})).toBeVisible();
   await page.getByRole('button',{name:'Fechar Receber estoque'}).click();

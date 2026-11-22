@@ -24,7 +24,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await expect(page.getByText(/Produto cadastrado:/)).toBeVisible();
  await page.getByRole('button',{name:'Fechar Novo produto'}).click();
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
- await page.getByRole('button',{name:'Entrada direta'}).click();
+ await page.getByRole('button',{name:'Entrada direta',exact:true}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const option=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(option).toBeAttached();

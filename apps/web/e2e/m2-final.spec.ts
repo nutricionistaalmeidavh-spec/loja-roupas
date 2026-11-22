@@ -39,7 +39,7 @@ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({labe
    return errors.length?'API ERROR: '+errors.join(' | '):'waiting';
  },{timeout:10000}).toBe('ok');
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
- await page.getByRole('button',{name:'Entrada direta'}).click();
+ await page.getByRole('button',{name:'Entrada direta',exact:true}).click();
  await page.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const item=page.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(item).toBeAttached();

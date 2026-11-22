@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS variants(
  FOREIGN KEY(tenant_id) REFERENCES tenants(id)
 );
 CREATE INDEX IF NOT EXISTS idx_variants_public ON variants(tenant_id,published,name,id);
+-- P2: planos de busca por cursor na vitrine individual e no marketplace opcional.
+CREATE INDEX IF NOT EXISTS idx_variants_store_seek ON variants(tenant_id,id)
+ WHERE published=1;
+CREATE INDEX IF NOT EXISTS idx_variants_marketplace_seek ON variants(updated_at DESC,id ASC)
+ WHERE published=1 AND available>0;
 CREATE TABLE IF NOT EXISTS pickup_orders(
  tenant_id TEXT NOT NULL, id TEXT NOT NULL, request_id TEXT NOT NULL,
  customer_name TEXT NOT NULL, customer_phone TEXT NOT NULL DEFAULT '',

@@ -156,16 +156,23 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
     [request.authContext!.storeId,request.query.variant_id,request.query.limit??50]);
    return {items:rows.rows.map(r=>({...r,qty_delta:Number(r.qty_delta)}))};
  });
- app.get<{Params:{id:string}}>('/v1/catalog/products/:id/thumbnail',{schema:{params:uuidParams}},async(request,reply)=>{
+ app.get<{Params:{id:string};Querystring:{v?:string}}>('/v1/catalog/products/:id/thumbnail',{
+  schema:{params:uuidParams,querystring:{type:'object',additionalProperties:false,properties:{v:{type:'string',maxLength:64}}}}
+ },async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.read'))return reply;
-  const row=await db.query<{bytes:Buffer;mime:string}>(`SELECT
+  const row=await db.query<{bytes:Buffer;mime:string;sha256:string}>(`SELECT
    COALESCE(thumb_bytes,image_bytes) AS bytes,
-   CASE WHEN thumb_bytes IS NOT NULL THEN thumb_type ELSE content_type END AS mime
-   FROM product_photos WHERE product_id=$1 AND store_id=$2`,
+   CASE WHEN thumb_bytes IS NOT NULL THEN thumb_type ELSE content_type END AS mime,
+   sha256 FROM product_photos WHERE product_id=$1 AND store_id=$2`,
    [request.params.id,request.authContext!.storeId]);
   if(!row.rowCount)throw new DomainError(404,'NO_IMAGE','Produto sem fotografia');
-  return reply.header('cache-control','private,no-store').header('x-content-type-options','nosniff')
-   .type(row.rows[0].mime).send(row.rows[0].bytes);
+  const etag='"'+row.rows[0].sha256+'"';
+  reply.header('etag',etag).header('vary','Authorization, X-Store-Id')
+   .header('cache-control',request.query.v===row.rows[0].sha256?
+    'private, max-age=31536000, immutable':'private, no-cache')
+   .header('x-content-type-options','nosniff');
+  if(request.headers['if-none-match']===etag)return reply.code(304).send();
+  return reply.type(row.rows[0].mime).send(row.rows[0].bytes);
  });
  app.post<{Params:{id:string};Body:{sku:string;color:string;size:string;price_cents:number;barcode?:string|null;expected_product_revision:number}}>(
  '/v1/catalog/products/:id/variants',{

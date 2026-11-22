@@ -55,6 +55,9 @@ export function listCatalog(session: Session, query = '', fetchImpl: typeof fetc
     (category ? '&category=' + encodeURIComponent(category) : '');
   return jsonRequest<CatalogPage>(path, {method:'GET',headers:headers(session),signal}, fetchImpl);
 }
+export function getCatalogProduct(session:Session,id:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal):Promise<{item:CatalogPage['items'][number]}>{
+ return jsonRequest('/v1/catalog/products/'+encodeURIComponent(id),{method:'GET',headers:headers(session),signal},fetchImpl);
+}
 export function listCategories(session:Session,fetchImpl:typeof fetch=fetch,signal?:AbortSignal):Promise<{categories:string[]}>{
  return jsonRequest('/v1/catalog/categories',{method:'GET',headers:headers(session),signal},fetchImpl);
 }
@@ -111,12 +114,43 @@ export async function uploadPhoto(session:Session,productId:string,file:Blob,key
   method:'PUT',headers:{...headers(session,key),'content-type':file.type},body:file
  },fetchImpl);
 }
-export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal) {
+export async function fetchProductPhoto(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal,version?:string|null) {
  let response:Response;
- try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail',{
-  headers:headers(session),cache:'no-store',signal
+ try {response=await fetchImpl('/v1/catalog/products/'+encodeURIComponent(productId)+'/thumbnail'+
+  (version?'?v='+encodeURIComponent(version):''),{
+  headers:headers(session),cache:version?'default':'no-store',signal
  });} catch {throw new ApiError(0,'NETWORK_ERROR','Imagem indisponível no servidor LAN');}
  if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a fotografia');
+ return response.blob();
+}
+
+export type ProductGalleryItem={id:string;position:number;sha256:string;variant_id:string|null;primary:boolean};
+export function listProductGallery(session:Session,productId:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal){
+ return jsonRequest<{items:ProductGalleryItem[]}>('/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery',
+  {method:'GET',headers:headers(session),signal},fetchImpl);
+}
+export function uploadGalleryPhoto(session:Session,productId:string,file:Blob,key:string,
+ variantId?:string|null,fetchImpl:typeof fetch=fetch){
+ const path='/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery'+
+  (variantId?'?variant_id='+encodeURIComponent(variantId):'');
+ return jsonRequest<{id:string;position:number;sha256:string;variant_id:string|null}>(path,{
+  method:'POST',headers:{...headers(session,key),'content-type':file.type},body:file
+ },fetchImpl);
+}
+export function deleteGalleryPhoto(session:Session,productId:string,photoId:string,key:string,
+ fetchImpl:typeof fetch=fetch){
+ return jsonRequest<{deleted:boolean;id:string}>(
+  '/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery/'+encodeURIComponent(photoId),
+  {method:'DELETE',headers:headers(session,key)},fetchImpl);
+}
+export async function fetchGalleryThumbnail(session:Session,productId:string,photoId:string,
+ version:string,fetchImpl:typeof fetch=fetch,signal?:AbortSignal){
+ const path='/v1/catalog/products/'+encodeURIComponent(productId)+'/gallery/'+encodeURIComponent(photoId)+
+  '/thumbnail?v='+encodeURIComponent(version);
+ let response:Response;
+ try{response=await fetchImpl(path,{headers:headers(session),cache:'default',signal});}
+ catch{throw new ApiError(0,'NETWORK_ERROR','Miniatura indisponível no servidor local');}
+ if(!response.ok)throw new ApiError(response.status,'IMAGE_UNAVAILABLE','Não foi possível carregar a miniatura');
  return response.blob();
 }
 
@@ -142,7 +176,7 @@ export type StockSpreadsheetRow={
  entries:number;sold:number;returns:number;adjustments:number;last_movement_at:string|null;
 };
 export type StockSpreadsheetPage={
- items:StockSpreadsheetRow[];total:number;offset:number;limit:number;categories:string[];
+ items:StockSpreadsheetRow[];total:number;offset:number;limit:number;categories:string[];next_cursor?:string|null;
 };
 export type SpreadsheetRowPatch={
  name:string;category:string;sku:string;color:string;size:string;
@@ -150,13 +184,14 @@ export type SpreadsheetRowPatch={
  expected_product_revision:number;expected_variant_revision:number;
 };
 export function listStockSpreadsheet(
- session:Session,options:{query?:string;category?:string;limit?:number;offset?:number}={},
+ session:Session,options:{query?:string;category?:string;limit?:number;offset?:number;cursor?:string|null}={},
  fetchImpl:typeof fetch=fetch,signal?:AbortSignal
 ):Promise<StockSpreadsheetPage>{
  const params=new URLSearchParams({
   query:options.query??'',category:options.category??'',
   limit:String(options.limit??50),offset:String(options.offset??0)
  });
+ if(options.cursor)params.set('cursor',options.cursor);
  return jsonRequest<StockSpreadsheetPage>('/v1/stock/spreadsheet?'+params.toString(),{
   method:'GET',headers:headers(session),signal
  },fetchImpl);

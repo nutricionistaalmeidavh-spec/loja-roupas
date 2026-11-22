@@ -19,8 +19,8 @@ test('categoria é carregada do servidor e carrinho volta após recarregar',asyn
  await expect(create.getByRole('status').filter({hasText:'Produto cadastrado'})).toBeVisible();
  await create.getByRole('button',{name:'Fechar Novo produto'}).click();
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
- await page.getByRole('button',{name:'Entrada direta'}).click();
- const receiver=page.getByRole('dialog',{name:'Entrada direta'});
+ await page.getByRole('button',{name:'Entrada direta',exact:true}).click();
+ const receiver=page.getByRole('dialog',{name:'Receber estoque'});
  await receiver.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const option=receiver.getByLabel('Variante (SKU)').locator('option',{hasText:sku});
  await expect(option).toBeAttached();

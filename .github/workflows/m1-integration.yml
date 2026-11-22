@@ -66,6 +66,8 @@ jobs:
         run: pnpm --filter @loja/api bootstrap
       - name: Testes API/RBAC/catálogo
         run: pnpm --filter @loja/api test
+      - name: Testar paginação da vitrine opcional (Node nativo)
+        run: node --test cloudflare/loja-roupas-vitrine/test/marketplace.test.mjs
       - name: Instalar Chromium open source para Playwright
         timeout-minutes: 6
         run: pnpm --filter @loja/web exec playwright install --with-deps chromium
