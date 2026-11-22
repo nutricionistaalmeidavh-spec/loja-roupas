@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { buildApp } from './app.ts';
 import { readConfig } from './config.ts';
 import { startMarketplacePolling } from './marketplace-sync.ts';
+import {editionFromEnv} from './physical-edition.ts';
 
 const config = readConfig();
 const pool = new Pool({ connectionString: config.databaseUrl, max: 10, connectionTimeoutMillis: 3500 });
@@ -13,7 +14,8 @@ process.once('SIGINT', () => { void shutdown(); });
 process.once('SIGTERM', () => { void shutdown(); });
 try {
   await app.listen({ host: config.host, port: config.port });
-  stopSync=startMarketplacePolling(pool,message=>app.log.warn(message));
+  if(editionFromEnv()!=='physical')
+    stopSync=startMarketplacePolling(pool,message=>app.log.warn(message));
 } catch (error) {
   app.log.error(error);
   await pool.end();

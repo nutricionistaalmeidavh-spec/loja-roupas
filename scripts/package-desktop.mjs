@@ -16,11 +16,14 @@ const application = path.join(resources,'app');
 await mkdir(application,{recursive:true});
 await cp(new URL('../apps/desktop/src/main.cjs',import.meta.url),path.join(application,'main.cjs'));
 await cp(new URL('../apps/desktop/src/local-runtime.cjs',import.meta.url),path.join(application,'local-runtime.cjs'));
+await cp(new URL('../apps/desktop/src/local-backup.cjs',import.meta.url),path.join(application,'local-backup.cjs'));
 await cp(new URL('../apps/desktop/src/updates.cjs',import.meta.url),path.join(application,'updates.cjs'));
 await cp(new URL('../apps/desktop/src/desktop-updater.cjs',import.meta.url),path.join(application,'desktop-updater.cjs'));
 await cp(new URL('../apps/desktop/src/update-preload.cjs',import.meta.url),path.join(application,'update-preload.cjs'));
 await cp(new URL('../apps/desktop/src/update-helper.ps1',import.meta.url),path.join(application,'update-helper.ps1'));
 await cp(new URL('../apps/desktop/src/commercial-license.cjs',import.meta.url),path.join(application,'commercial-license.cjs'));
+if(process.env.LOJA_PHYSICAL_EDITION==='true')
+ await writeFile(path.join(application,'physical-edition.json'),JSON.stringify({edition:'physical'}));
 if(process.env.LOJA_COMMERCIAL_EDITION==='true')await writeFile(path.join(application,'commercial-edition.json'),JSON.stringify({required:true,product:'LOJA_ROUPAS'}));
 await cp(new URL('../apps/desktop/src/recovery-preload.cjs',import.meta.url),path.join(application,'recovery-preload.cjs'));
 await cp(new URL('../apps/desktop/src/recovery.html',import.meta.url),path.join(application,'recovery.html'));

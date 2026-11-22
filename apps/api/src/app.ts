@@ -23,10 +23,18 @@ import { registerStockSpreadsheet } from './stock-spreadsheet.ts';
 import { registerStockSpreadsheetP2 } from './stock-spreadsheet-p2.ts';
 import { registerStaticUi } from './static-ui.ts';
 import { registerMarketplaceBridge } from './marketplace-bridge.ts';
+import {editionFromEnv,blockedInPhysicalEdition} from './physical-edition.ts';
+import {registerPhysicalManagement} from './physical-management.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
   registerAuth(app, db);
+  const edition=editionFromEnv();
+  app.addHook('onRequest',async(request,reply)=>{
+    if(edition==='physical'&&blockedInPhysicalEdition(request.url))
+      return reply.code(404).send({code:'PHYSICAL_EDITION',message:'Canal online indisponível nesta edição.'});
+  });
+  app.get('/v1/edition',async()=>({edition,online:edition!=='physical'}));
   app.get('/v1/health', async () => ({ status: 'alive', version: '0.1.0' }));
   app.get('/v1/ready', async (_request, reply) => {
     try {
@@ -57,6 +65,7 @@ export function buildApp(db: Pool) {
   registerProductFields(app, db);
   registerStaticUi(app);
   registerMarketplaceBridge(app,db);
+  registerPhysicalManagement(app,db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

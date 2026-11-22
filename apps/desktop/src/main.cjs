@@ -6,9 +6,11 @@ const {launchLocalRuntime}=require('./local-runtime.cjs');
 const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
 const {createDesktopUpdater}=require('./desktop-updater.cjs');
+const {backupFilename}=require('./local-backup.cjs');
 
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
+const physicalEdition=existsSync(path.join(__dirname,'physical-edition.json'));
 let commercialLicense=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();
@@ -85,6 +87,19 @@ function recoveryAllowed(event){
     event.sender!==recoveryWindow.webContents||
     !event.sender.getURL().startsWith('file://'))throw new Error('Recuperação disponível somente na janela local segura.');
 }
+function registerBackupHandlers(){
+ ipcMain.handle('loja:backup:create',async event=>{
+  if(!isMainLocalSender(event)||!runtime)throw new Error('Backup disponível somente no computador principal da loja.');
+  const window=BrowserWindow.fromWebContents(event.sender);
+  const choice=await dialog.showSaveDialog(window,{
+   title:'Exportar backup completo da loja',defaultPath:backupFilename(),
+   filters:[{name:'Backup PostgreSQL',extensions:['dump']}],properties:['createDirectory','showOverwriteConfirmation']
+  });
+  if(choice.canceled||!choice.filePath)return {cancelled:true};
+  const saved=await runtime.backup(choice.filePath);
+  return {cancelled:false,bytes:saved.bytes,sha256:saved.sha256};
+ });
+}
 function registerRecoveryHandlers(){
  ipcMain.handle('loja:recovery:available',event=>isMainLocalSender(event));
  ipcMain.handle('loja:recovery:open',async event=>{
@@ -136,7 +151,7 @@ async function startLocal(){
  status(setupState.status);
  try{
   runtime=await launchLocalRuntime({resources:process.resourcesPath,
-   userData:app.getPath('userData'),exe:process.execPath,progress:status});
+   userData:app.getPath('userData'),exe:process.execPath,physicalEdition,progress:status});
   if(!runtime.firstRun){transition(validateOrigin(runtime.url));return;}
   setupState={status:'Banco e API prontos. Cadastre o administrador.',ready:true,error:''};
   status(setupState.status);
@@ -194,6 +209,7 @@ async function start(){
  if(process.platform!=='win32'){openWindow(validateOrigin('http://127.0.0.1:'+(process.defaultApp?'5173':'8080')));return;}
  registerSetupHandlers();
  registerRecoveryHandlers();
+ registerBackupHandlers();
  setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,
   webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});

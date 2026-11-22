@@ -9,7 +9,7 @@ import { mapCatalog } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { FirstRunTour } from './FirstRunTour.tsx';
-import { UpdateSettings } from './DesktopUpdates.tsx';
+import { UpdateSettings,LocalBackupSettings } from './DesktopUpdates.tsx';
 import { colorSwatch } from './visual-colors.ts';
 import { ReceiveStockForm } from './Management.tsx';
 import { ProductsWorkspace } from './ProductsWorkspace.tsx';
@@ -81,6 +81,15 @@ export function App() {
   const [scanBusy,setScanBusy] = useState(false);
   const [stockLoading,setStockLoading] = useState(false);
   const [directAccess,setDirectAccess]=useState(false);
+  const [physicalEdition,setPhysicalEdition]=useState(true);
+  useEffect(()=>{
+   if(!session){setPhysicalEdition(true);return;}
+   let alive=true;
+   void jsonRequest<{edition:'full'|'physical'}>('/v1/edition',{headers:headers(session)},fetch)
+    .then(r=>{if(alive)setPhysicalEdition(r.edition==='physical');})
+    .catch(()=>{if(alive)setPhysicalEdition(true);});
+   return ()=>{alive=false;};
+  },[session]);
   useEffect(()=>{
     if(!session){setDirectAccess(false);return;}
     let active=true;
@@ -365,7 +374,7 @@ export function App() {
           {savedDrafts.map(item=><button key={item.id} className="light-button"
             onClick={()=>void resumeCurrent(item)}>Retomar venda · {item.lines.length} itens</button>)}
         </section>}
-        {cashId&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
+        {cashId&&!physicalEdition&&<PickupLookup session={session} onLoaded={order=>{setPickup(order);setCheckoutOpen(true);}}/>}
         <div className="search-row" data-tour="search"><label htmlFor="search" className="sr-only">Buscar nome, SKU ou código</label>
           <input id="search" value={search} autoComplete="off" onChange={e=>setSearch(e.target.value)} onKeyDown={keySearch} placeholder="Pesquisar produto, SKU ou código…"/>
           {search&&<button type="button" className="search-clear" aria-label="Limpar busca" onClick={()=>setSearch('')}><UiIcon name="x" size={16}/></button>}
@@ -419,7 +428,7 @@ export function App() {
         <p className="muted small">Catálogo real e fotografias privadas no servidor local. Atualize a busca para localizar SKU de outras páginas.</p>
       </section><aside data-tour="cart" className="cart-panel" aria-label="Carrinho da venda">{cart}</aside></div>}
       {page==='gestao'&&manager&&<div data-tour="management"><StoreOperations session={session} cashId={cashId} onReturned={refreshed}/></div>}
-      {page==='configuracoes'&&<UpdateSettings/>}
+      {page==='configuracoes'&&<><UpdateSettings/><LocalBackupSettings/></>}
       {page==='produtos'&&manager&&<div data-tour="products"><ProductsWorkspace session={session} onSaved={refreshed}/></div>}
       {page==='caixa'&&canCash&&<div data-tour="cash"><CashPanel session={session} onChanged={cashUpdated}/></div>}
       {page==='estoque'&&canReceive&&<div className="products-workspace" data-tour="stock">

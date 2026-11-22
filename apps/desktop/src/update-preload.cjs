@@ -1,6 +1,9 @@
 'use strict';
 const {contextBridge,ipcRenderer}=require('electron');
 // Narrow read/action bridge. No filesystem, arbitrary URLs, or shell access.
+contextBridge.exposeInMainWorld('lojaBackups',{
+ create:()=>ipcRenderer.invoke('loja:backup:create')
+});
 contextBridge.exposeInMainWorld('lojaUpdates',{
  info:()=>ipcRenderer.invoke('loja:updates:info'),
  check:()=>ipcRenderer.invoke('loja:updates:check'),

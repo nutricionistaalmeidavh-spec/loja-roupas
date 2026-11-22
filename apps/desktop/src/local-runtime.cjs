@@ -5,6 +5,7 @@ const {existsSync} = require('node:fs');
 const fs = require('node:fs/promises');
 const net = require('node:net');
 const path = require('node:path');
+const {writeBackup}=require('./local-backup.cjs');
 
 const expectedBinaries=resources=>['initdb.exe','pg_ctl.exe','psql.exe','createdb.exe','postgres.exe','pg_dump.exe'].map(name=>path.join(resources,'runtime','postgres','bin',name));
 function makeDatabaseUrl(password,port){
@@ -62,7 +63,7 @@ async function ready(url,child){
  }
  throw new Error('API local indisponível. Confira o antivírus e as portas locais.');
 }
-async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
+async function launchLocalRuntime({resources,userData,exe,physicalEdition=false,progress=()=>{}}){
  if(process.platform!=='win32')throw new Error('Instalação local autônoma disponível atualmente para Windows x64.');
  const binaries=expectedBinaries(resources);
  for(const binary of binaries)if(!existsSync(binary))throw new Error('Instalador incompleto: falta '+path.basename(binary));
@@ -91,7 +92,8 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
  let apiChild=null,startedPostgres=false;
  const databaseUrl=makeDatabaseUrl(config.password,config.pgPort);
  const appEnv={...env,DATABASE_URL:databaseUrl,HOST:'127.0.0.1',PORT:String(config.apiPort),
-  LOJA_WEB_DIST:webRoot,LOJA_SYNC_SECRET_DIR:path.join(userData,'sync-secrets'),ELECTRON_RUN_AS_NODE:'1'};
+  LOJA_WEB_DIST:webRoot,LOJA_SYNC_SECRET_DIR:path.join(userData,'sync-secrets'),
+  LOJA_EDITION:physicalEdition?'physical':'full',ELECTRON_RUN_AS_NODE:'1'};
  const node=async(entry,extra={},input)=>execute(exe,['--import','tsx',path.join(apiRoot,'src',entry)],{cwd:apiRoot,env:{...appEnv,...extra},input});
  const stop=async()=>{
   if(apiChild){apiChild.kill();apiChild=null;}
@@ -155,6 +157,10 @@ async function launchLocalRuntime({resources,userData,exe,progress=()=>{}}){
   }
   return {
    url,firstRun:!hasUsers,stop,
+   async backup(destination){
+    return writeBackup({destination,userData,executeDump:file=>
+      execute(bin('pg_dump'),['--format=custom','--no-owner','--file',file,'--dbname','loja'],{env})});
+   },
    async resetAdminPassword(input){
     const login=String(input?.login??'').trim().toLowerCase();
     const password=input?.password;

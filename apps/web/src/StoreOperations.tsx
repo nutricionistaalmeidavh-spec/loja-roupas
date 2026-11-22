@@ -11,6 +11,8 @@ import { requestId } from './request-id.ts';
 import { TaskDialog } from './TaskDialog.tsx';
 import {SalesBars,RetailEmpty} from './RetailUI.tsx';
 import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
+import {ManagementFinance} from './ManagementFinance.tsx';
+import {ManagementCustomers} from './ManagementCustomers.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -21,7 +23,7 @@ type Item = {id:string; name:string; color:string; size:string; price_cents:stri
 
 export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
   const [refresh,setRefresh] = useState(0);
-  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'>('vendas');
+  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'>('vendas');
   const [supplierOpen,setSupplierOpen] = useState(false);
   const [returnOpen,setReturnOpen] = useState(false);
   const [returnLocked,setReturnLocked] = useState(false);
@@ -34,6 +36,15 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
   const [ready, setReady] = useState(false);
   const pending = useRef<{body:string; key:string} | null>(null);
   const storefront = '/vitrine/' + session.storeId;
+  const [physical,setPhysical]=useState(true);
+  useEffect(()=>{
+   let mounted=true;
+   void jsonRequest<{edition:'full'|'physical'}>('/v1/edition',{headers:headers(session)},fetch)
+    .then(data=>{if(mounted)setPhysical(data.edition==='physical');})
+    .catch(()=>{});
+   return ()=>{mounted=false;};
+  },[session]);
+  useEffect(()=>{if(physical&&section==='vitrine')setSection('vendas');},[physical,section]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -85,7 +96,9 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {key:'posvenda',label:'Pós-venda'},
     {key:'operacoes',label:'Operações'},
     {key:'inteligencia',label:'Inteligência'},
-    {key:'vitrine',label:'Vitrine'},
+    {key:'financeiro',label:'Despesas'},
+    {key:'clientes',label:'Clientes'},
+    ...(!physical?[{key:'vitrine' as const,label:'Vitrine'}]:[]),
   ] as const;
   return <div className="operation-panel">
     <nav className="management-jump" aria-label="Atalhos da gestão">
@@ -130,7 +143,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
         <button className="primary-action" onClick={()=>setReturnOpen(true)}>Nova devolução</button>
       </div>
       <StockHolds session={session}/>
-      <PickupSettings session={session}/>
+      {!physical&&<PickupSettings session={session}/>}
     </div>}
     {section==='operacoes'&&<div id="gestao-operacoes" className="management-section">
       <OperationalPanels session={session} suppliers={suppliers} onStockChanged={()=>{setRefresh(n=>n+1);onReturned();}}/>
@@ -138,7 +151,9 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
     </div>}
-    {section==='vitrine'&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
+    {section==='financeiro'&&<ManagementFinance session={session}/>}
+    {section==='clientes'&&<ManagementCustomers session={session}/>}
+    {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
       <MarketplaceSyncPanel session={session}/>
