@@ -157,96 +157,19 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
    return {items:rows.rows.map(r=>({...r,qty_delta:Number(r.qty_delta)}))};
  });
  app.get<{Params:{id:string};Querystring:{v?:string}}>('/v1/catalog/products/:id/thumbnail',{
-  schema:{params:uuidParams,querystring:{type:'object',additionalProperties:false,properties:{
-    v:{type:'string',pattern:'^[a-f0-9]{64}
- app.post<{Params:{id:string};Body:{sku:string;color:string;size:string;price_cents:number;barcode?:string|null;expected_product_revision:number}}>(
- '/v1/catalog/products/:id/variants',{
-  schema:{params:uuidParams,body:{type:'object',additionalProperties:false,
-   required:['sku','color','size','price_cents','expected_product_revision'],properties:{
-    sku:{type:'string',minLength:1,maxLength:64},color:{type:'string',minLength:1,maxLength:100},
-    size:{type:'string',minLength:1,maxLength:32},price_cents:{type:'integer',minimum:0},
-    barcode:{type:['string','null'],maxLength:128},expected_product_revision:{type:'integer',minimum:1}
-   }}}
- },async(request,reply)=>{
-  if(requirePermission(request,reply,'catalog.write'))return reply;
-  const auth=request.authContext!,body=request.body;
-  const sku=body.sku.trim().toUpperCase(),color=body.color.trim(),size=body.size.trim();
-  if(!/^[A-Z0-9_-]{1,64}$/.test(sku)||!color||!size)
-   throw new DomainError(422,'INVALID_VARIANT','SKU, cor ou tamanho inválidos');
-  const input={sku,color,size,price_cents:body.price_cents,
-   barcode:body.barcode?.trim()||null,expected_product_revision:body.expected_product_revision};
-  const key=requireIdempotencyKey(request.headers['idempotency-key']);
-  const out=await withIdempotentTransaction(db,auth,'catalog.variant.add:'+request.params.id,key,input,async client=>{
-   const product=await client.query<{revision:string}>(`UPDATE products SET revision=revision+1
-     WHERE id=$1 AND store_id=$2 AND revision=$3 RETURNING revision::text`,
-     [request.params.id,auth.storeId,input.expected_product_revision]);
-   if(!product.rowCount)throw new DomainError(409,'REVISION_CONFLICT','Produto alterado por outro operador');
-   const variant=await client.query<{id:string}>(`INSERT INTO product_variants
-    (store_id,product_id,sku,barcode,color,size,price_cents)
-    VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,
-    [auth.storeId,request.params.id,sku,input.barcode,color,size,input.price_cents]);
-   await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
-    VALUES($1,$2,'catalog.variant.add',$3,$4::jsonb)`,
-    [auth.storeId,auth.userId,variant.rows[0].id,JSON.stringify({product_id:request.params.id,sku})]);
-   await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
-    VALUES($1,'catalog.variant.created.v1',$2,1,$3::jsonb)`,
-    [auth.storeId,variant.rows[0].id,JSON.stringify({product_id:request.params.id})]);
-   return {id:variant.rows[0].id,product_id:request.params.id,revision:1,...input};
-  });
-  return reply.code(201).send(out.result);
- });
- app.patch<{Params:{id:string};Body:{sku:string;color:string;size:string;barcode?:string|null;expected_revision:number}}>(
- '/v1/catalog/variants/:id/attributes',{
-  schema:{params:uuidParams,body:{type:'object',additionalProperties:false,
-   required:['sku','color','size','expected_revision'],properties:{
-    sku:{type:'string',minLength:1,maxLength:64},color:{type:'string',minLength:1,maxLength:100},
-    size:{type:'string',minLength:1,maxLength:32},barcode:{type:['string','null'],maxLength:128},
-    expected_revision:{type:'integer',minimum:1}
-   }}}
- },async(request,reply)=>{
-  if(requirePermission(request,reply,'catalog.write'))return reply;
-  const auth=request.authContext!,raw=request.body;
-  const normalized={sku:raw.sku.trim().toUpperCase(),color:raw.color.trim(),size:raw.size.trim(),
-   barcode:raw.barcode?.trim()||null,expected_revision:raw.expected_revision};
-  if(!/^[A-Z0-9_-]{1,64}$/.test(normalized.sku)||!normalized.color||!normalized.size)
-   throw new DomainError(422,'INVALID_VARIANT','SKU, cor ou tamanho inválidos');
-  const key=requireIdempotencyKey(request.headers['idempotency-key']);
-  const out=await withIdempotentTransaction(db,auth,'catalog.variant.attributes:'+request.params.id,key,normalized,async client=>{
-   const changed=await client.query<{revision:string}>(`UPDATE product_variants SET
-    sku=$3,color=$4,size=$5,barcode=$6,revision=revision+1
-    WHERE id=$1 AND store_id=$2 AND revision=$7 RETURNING revision::text`,
-    [request.params.id,auth.storeId,normalized.sku,normalized.color,normalized.size,
-     normalized.barcode,normalized.expected_revision]);
-   if(!changed.rowCount)throw new DomainError(409,'REVISION_CONFLICT','Variante alterada por outro operador');
-   const rev=Number(changed.rows[0].revision);
-   await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
-    VALUES($1,$2,'catalog.variant.attributes',$3,$4::jsonb)`,
-    [auth.storeId,auth.userId,request.params.id,JSON.stringify({revision:rev,sku:normalized.sku})]);
-   await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
-    VALUES($1,'catalog.variant.updated.v1',$2,$3,$4::jsonb)`,
-    [auth.storeId,request.params.id,rev,JSON.stringify({revision:rev})]);
-   return {id:request.params.id,revision:rev,...normalized};
-  });
-  return out.result;
- });
-
-}
-}
-  }}}
+  schema:{params:uuidParams,querystring:{type:'object',additionalProperties:false,properties:{v:{type:'string',maxLength:64}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.read'))return reply;
   const row=await db.query<{bytes:Buffer;mime:string;sha256:string}>(`SELECT
    COALESCE(thumb_bytes,image_bytes) AS bytes,
    CASE WHEN thumb_bytes IS NOT NULL THEN thumb_type ELSE content_type END AS mime,
-   sha256
-   FROM product_photos WHERE product_id=$1 AND store_id=$2`,
+   sha256 FROM product_photos WHERE product_id=$1 AND store_id=$2`,
    [request.params.id,request.authContext!.storeId]);
   if(!row.rowCount)throw new DomainError(404,'NO_IMAGE','Produto sem fotografia');
   const etag='"'+row.rows[0].sha256+'"';
-  reply.header('etag',etag)
-   .header('vary','Authorization, X-Store-Id')
+  reply.header('etag',etag).header('vary','Authorization, X-Store-Id')
    .header('cache-control',request.query.v===row.rows[0].sha256?
-     'private, max-age=31536000, immutable':'private, no-cache')
+    'private, max-age=31536000, immutable':'private, no-cache')
    .header('x-content-type-options','nosniff');
   if(request.headers['if-none-match']===etag)return reply.code(304).send();
   return reply.type(row.rows[0].mime).send(row.rows[0].bytes);
