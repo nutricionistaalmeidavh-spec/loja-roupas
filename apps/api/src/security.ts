@@ -9,7 +9,7 @@ const deriveKey = (password: string, salt: Buffer): Promise<Buffer> => new Promi
 });
 const roleCapabilities: Readonly<Record<string, readonly string[]>> = {
   manager: ['*'],
-  cashier: ['catalog.read','stock.read','sale.commit','sale.read','cash.manage','payments.record'],
+  cashier: ['catalog.read','stock.read','sale.commit','sale.read','cash.manage','payments.record','customer.read'],
   seller: ['catalog.read','stock.read','customer.read','reservation.create'],
   stocker: ['catalog.read','stock.read','stock.receive','stock.count'],
   buyer: ['catalog.read','stock.read','purchase.read','purchase.write'],
