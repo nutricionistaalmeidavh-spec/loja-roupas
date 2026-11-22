@@ -20,6 +20,7 @@ import { M2StockAdjustment } from './M2Admin.tsx';
 import { PickupLookup } from './PickupOrders.tsx';
 import type { PickupOrder } from './PickupOrders.tsx';
 import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
+import {OperatorSwitch} from './OperatorSwitch.tsx';
 import { CashPanel } from './CashPanel.tsx';
 import { CheckoutDrawer } from './PosCheckout.tsx';
 import { currentCash, receiptText, suspendSale, suspendedSales, resumeSale } from './pos-client.ts';
@@ -354,6 +355,7 @@ export function App() {
         <div className="header-actions">
           <span className={catalogError?'demo-status disconnected':'demo-status'}>
             {catalogError?'Servidor indisponível':cashId?'Caixa aberto · Conectado':'Catálogo conectado · Sem caixa'}</span>
+          {session&&<OperatorSwitch session={session} onSwitch={authenticated}/>}
           <button className="help-tour" type="button" aria-label="Reabrir tour" onClick={()=>setTourReplay(n=>n+1)}>Ajuda · Tour</button>
           <button className="mobile-logout" onClick={logout}>Sair</button>
         </div>

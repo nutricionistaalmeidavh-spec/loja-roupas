@@ -32,8 +32,7 @@ export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onU
   }catch(e){setError(e instanceof Error?e.message:'Venda não encontrada');}
   finally{setBusy(false);}
  }
- async function lookupReplacement(event:FormEvent){
-  event.preventDefault();setBusy(true);setError('');setReplacementInfo(null);
+ async function lookupReplacement(){setBusy(true);setError('');setReplacementInfo(null);
   try{
    const result=mapCatalog(await scanCatalog(session,replacement.trim()));
    const matches=result.flatMap(p=>p.variants).filter(v=>
@@ -108,10 +107,10 @@ export function RetailAfterSales({session,onUpdated,cashId}:{session:Session;onU
     <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>
      Estorno confirmado no banco ou na maquininha fora do sistema</label>
    </>:<>
-    <form className="management-form" onSubmit={e=>void lookupReplacement(e)}>
+    <div className="management-form">
      <label>SKU/código da peça nova <input value={replacement} onChange={e=>{setReplacement(e.target.value);setReplacementInfo(null);}} required/></label>
-     <button disabled={busy}>Buscar reposição</button>
-    </form>
+     <button type="button" disabled={busy} onClick={()=>void lookupReplacement()}>Buscar reposição</button>
+    </div>
     {replacementInfo&&<>
      <p>Peça nova: <strong>{replacementInfo.sku} · {brl(replacementInfo.priceCents)}</strong></p>
      <label>Quantidade nova <input type="number" min={1} max={10000}

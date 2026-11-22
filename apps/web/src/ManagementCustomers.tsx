@@ -3,7 +3,7 @@ import type {FormEvent} from 'react';
 import {ApiError,headers,jsonRequest} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {requestId} from './request-id.ts';
-type Customer={id:string;name:string;phone:string|null;email:string|null;marketing_consent:boolean};
+type Customer={id:string;name:string;phone:string|null;email:string|null;marketing_consent:boolean;loyalty_opt_in:boolean};
 export function ManagementCustomers({session}:{session:Session}){
  const [items,setItems]=useState<Customer[]>([]),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
@@ -19,7 +19,7 @@ export function ManagementCustomers({session}:{session:Session}){
   event.preventDefault();if(busy)return;
   const form=event.currentTarget;const data=new FormData(form);
   const body=JSON.stringify({name:String(data.get('name')).trim(),phone:String(data.get('phone')).trim()||null,
-   email:String(data.get('email')).trim()||null,marketing_consent:data.get('consent')==='on'});
+   email:String(data.get('email')).trim()||null,marketing_consent:data.get('consent')==='on',loyalty_opt_in:data.get('loyalty')==='on'});
   const key=pending.current?.body===body?pending.current.key:requestId();pending.current={key,body};
   setBusy(true);setError('');setNotice('');
   try{
@@ -45,14 +45,16 @@ export function ManagementCustomers({session}:{session:Session}){
    <label>Telefone (opcional)<input name="phone" type="tel" maxLength={24}/></label>
    <label>E-mail (opcional)<input name="email" type="email" maxLength={254}/></label>
    <label><input name="consent" type="checkbox"/> Cliente autorizou comunicações comerciais</label>
+   <label><input name="loyalty" type="checkbox"/> Cliente aderiu voluntariamente aos pontos de fidelidade</label>
    <button className="primary-action" disabled={busy}>Cadastrar cliente</button>
   </form>
   {notice&&<p role="status">{notice}</p>}{error&&<p className="error" role="alert">{error}</p>}
   <h3>Clientes cadastrados (até 100)</h3>
   <div className="management-table-scroll" role="region" aria-label="Cadastro de clientes" tabIndex={0}>
-   <table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Consentimento</th><th>Ação</th></tr></thead>
+   <table><thead><tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Marketing</th><th>Pontos</th><th>Ação</th></tr></thead>
    <tbody>{items.map(item=><tr key={item.id}><td>{item.name}</td><td>{item.phone||'—'}</td>
     <td>{item.email||'—'}</td><td>{item.marketing_consent?'Sim':'Não'}</td>
+    <td>{item.loyalty_opt_in?'Opt-in ativo':'Não aderiu'}</td>
     <td><button type="button" className="light-button" disabled={busy} onClick={()=>void anonymize(item)}>Anonimizar</button></td>
    </tr>)}</tbody></table>
   </div>
