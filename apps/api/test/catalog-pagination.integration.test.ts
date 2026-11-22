@@ -31,9 +31,9 @@ test('P0-P2 PostgreSQL: cursor catálogo e planilha, busca exata e limites por l
   const catalogIds:string[]=[];
   let cursor:string|null=null;
   for(let i=0;i<3;i++){
-   const path='/v1/catalog/products?limit=1&query='+encodeURIComponent('Paginação '+prefix)+
+   const path:string='/v1/catalog/products?limit=1&query='+encodeURIComponent('Paginação '+prefix)+
     (cursor?'&cursor='+encodeURIComponent(cursor):'');
-   const r=await app.inject({url:path,headers});
+   const r: Awaited<ReturnType<typeof app.inject>>=await app.inject({url:path,headers});
    assert.equal(r.statusCode,200,r.body);
    assert.equal(r.json().items.length,1);
    catalogIds.push(r.json().items[0].id);
@@ -49,9 +49,9 @@ test('P0-P2 PostgreSQL: cursor catálogo e planilha, busca exata e limites por l
   const sheetIds:string[]=[];
   let sheetCursor:string|null=null;
   for(let i=0;i<3;i++){
-   const path='/v1/stock/spreadsheet?limit=1&query='+encodeURIComponent(prefix)+
+   const path:string='/v1/stock/spreadsheet?limit=1&query='+encodeURIComponent(prefix)+
     (sheetCursor?'&cursor='+encodeURIComponent(sheetCursor):'');
-   const r=await app.inject({url:path,headers});
+   const r: Awaited<ReturnType<typeof app.inject>>=await app.inject({url:path,headers});
    assert.equal(r.statusCode,200,r.body);
    assert.equal(r.json().items.length,1);
    sheetIds.push(r.json().items[0].variant_id);
