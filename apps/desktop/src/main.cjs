@@ -12,6 +12,11 @@ const {validatePrinterSelection}=require('./native-print.cjs');
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
 const physicalEdition=existsSync(path.join(__dirname,'physical-edition.json'));
+if(physicalEdition&&!process.argv.some(arg=>arg.startsWith('--user-data-dir='))){
+ const physicalData=path.join(app.getPath('appData'),'loja-roupas-fisica');
+ require('node:fs').mkdirSync(physicalData,{recursive:true});
+ app.setPath('userData',physicalData);
+}
 let commercialLicense=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();

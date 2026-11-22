@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 55
     env:
       LOJA_PHYSICAL_EDITION: 'true'
+      LOJA_PHYSICAL_VERSION: '0.2.3'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,6 +46,8 @@ jobs:
           $marker='dist/desktop-win32-x64/resources/app/physical-edition.json'
           if(!(Test-Path $marker)){throw 'Marcador da edição física ausente'}
           $edition=Get-Content $marker -Raw | ConvertFrom-Json
+          $version=(Get-Content 'dist/desktop-win32-x64/resources/app/package.json' -Raw | ConvertFrom-Json).version
+          if($version -ne '0.2.3'){throw 'Versão física incorreta'}
           if($edition.edition -ne 'physical'){throw 'Marcador da edição física inválido'}
           pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
           if($LASTEXITCODE -ne 0){throw 'Empacotamento da API/Postgres falhou'}
@@ -56,26 +59,27 @@ jobs:
             choco install nsis --yes --no-progress
             if($LASTEXITCODE -ne 0){throw 'NSIS indisponível'}
           }
-          & $compiler /V2 infra/desktop/loja-roupas.nsi
+          & $compiler /V2 infra/desktop/loja-roupas-fisica.nsi
           if($LASTEXITCODE -ne 0){throw 'NSIS falhou'}
-          $installer=(Resolve-Path 'dist/Loja-de-Roupas-Setup-x64.exe').Path
-          $install=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas'
+          $installer=(Resolve-Path 'dist/Loja-de-Roupas-Fisica-Setup-x64.exe').Path
+          $install=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica'
           $process=Start-Process $installer -ArgumentList '/S' -Wait -PassThru
           if($process.ExitCode -ne 0){throw 'Instalação falhou'}
           node scripts/smoke-single-machine.mjs "$install/app/electron.exe"
           if($LASTEXITCODE -ne 0){throw 'Smoke primeiro uso falhou'}
           $installed="$install/app/resources/app/physical-edition.json"
           if(!(Test-Path $installed)){throw 'Edição incorreta instalada'}
+          if((Get-Content "$install/app/resources/app/package.json" -Raw | ConvertFrom-Json).version -ne '0.2.3'){throw 'Versão física instalada incorreta'}
           $process=Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
           if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
           $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  Loja-de-Roupas-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
+          "$hash  Loja-de-Roupas-Fisica-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
       - name: Arquivar somente candidata sem publicar release
         uses: actions/upload-artifact@v4
         with:
           name: loja-fisica-windows-candidata
           path: |
-            dist/Loja-de-Roupas-Setup-x64.exe
+            dist/Loja-de-Roupas-Fisica-Setup-x64.exe
             dist/SHA256SUMS
           retention-days: 7
           if-no-files-found: error
