@@ -19,7 +19,7 @@ test('pacote Electron inclui página de recuperação em falha de conexão',()=>
  const packageScript=fs.readFileSync(path.resolve(__dirname,'../../../scripts/package-desktop.mjs'),'utf8');
  const main=fs.readFileSync(path.resolve(__dirname,'../src/main.cjs'),'utf8');
  const fallback=fs.readFileSync(path.resolve(__dirname,'../src/connection-error.html'),'utf8');
- assert.match(packageScript,/connection-error\\.html/);
+ assert.match(packageScript,/connection-error\.html/);
  assert.match(main,/did-fail-load/);
  assert.match(main,/ready-to-show/);
  assert.match(fallback,/não pôde ser aberta/);
