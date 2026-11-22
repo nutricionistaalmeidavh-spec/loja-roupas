@@ -74,6 +74,14 @@ try{
  await appWindow.getByRole('button',{name:'Entrar na loja'}).click();
  await appWindow.getByRole('dialog',{name:'Guia inicial da loja'}).waitFor({timeout:12000});
  await appWindow.getByRole('button',{name:'Reabrir tour'}).waitFor();
+ // Regressão no binário instalado: Estoque não deve travar ou desmontar o PDV.
+ const skip=appWindow.getByRole('button',{name:'Pular tour'});
+ if(await skip.isVisible())await skip.click();
+ await appWindow.getByRole('button',{name:'Entrada de estoque'}).click();
+ await appWindow.getByRole('heading',{name:'Estoque da loja'}).waitFor({timeout:20000});
+ await appWindow.getByRole('heading',{name:'Planilha operacional'}).waitFor({timeout:20000});
+ await appWindow.getByRole('button',{name:'PDV',exact:true}).click();
+ await appWindow.getByRole('heading',{name:'Nova venda'}).waitFor({timeout:12000});
  console.info('Windows one-computer: PostgreSQL, API, web, offline password recovery and tour operational');
 }finally{
  await instance?.close();
