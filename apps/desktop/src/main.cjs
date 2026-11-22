@@ -15,7 +15,7 @@ const physicalEdition=existsSync(path.join(__dirname,'physical-edition.json'));
 let commercialLicense=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();
-const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog});
+const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition});
 if(!single)app.quit();
 app.on('second-instance',()=>{
  const win=BrowserWindow.getAllWindows()[0];
