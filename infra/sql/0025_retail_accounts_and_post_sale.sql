@@ -5,7 +5,7 @@ ALTER TABLE sales ADD CONSTRAINT sales_customer_store_fk FOREIGN KEY(customer_id
 ALTER TABLE retail_customers ADD COLUMN loyalty_opt_in boolean NOT NULL DEFAULT false;
 ALTER TABLE sale_lines ADD COLUMN cost_unit_cents bigint CHECK(cost_unit_cents>=0);
 ALTER TABLE sale_payments DROP CONSTRAINT sale_payments_method_check;
-ALTER TABLE sale_payments ADD CONSTRAINT sale_payments_method_check CHECK(method IN ('cash','pix_manual','card_external','store_credit','exchange_credit'));
+ALTER TABLE sale_payments ADD CONSTRAINT sale_payments_method_check CHECK(method IN ('cash','pix_manual','card_external','store_credit','customer_credit','exchange_credit'));
 ALTER TABLE cash_movements DROP CONSTRAINT cash_movements_kind_check;
 ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_kind_check CHECK(kind IN ('supply','withdrawal','refund','credit_collection','exchange_collection','account_payment'));
 
