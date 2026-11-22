@@ -1,3 +1,4 @@
+import './map-compat.ts';
 import { InterfaceRecovery } from './InterfaceRecovery.tsx';
 import { createRoot } from 'react-dom/client';
 import { Storefront } from './StoreOperations.tsx';
