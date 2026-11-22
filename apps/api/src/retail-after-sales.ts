@@ -5,7 +5,7 @@ import type {AuthContext} from './auth.ts';
 import {DomainError,requireIdempotencyKey,withIdempotentTransaction} from './transactions.ts';
 import {exchangeBalance,commissionCents,loyaltyPoints} from './retail-rules.ts';
 import {expectedCash} from './cash.ts';
-const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}-[0-9a-fA-F]{12}$';
+const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$';
 type ReturnBody={sale_number:number;sale_line_id:string;quantity:number;condition:'resellable'|'quarantine';
  reason:string;method:'pix_manual'|'card_external';external_reference:string;confirmed:boolean};
 type ExchangeBody={sale_number:number;sale_line_id:string;quantity:number;condition:'resellable'|'quarantine';

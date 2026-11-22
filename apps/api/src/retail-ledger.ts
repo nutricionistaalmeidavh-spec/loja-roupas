@@ -4,7 +4,7 @@ import {requirePermission} from './auth.ts';
 import {DomainError,requireIdempotencyKey,withIdempotentTransaction} from './transactions.ts';
 import {commissionCents,creditInstallments,dreTotals,loyaltyPoints,settlementAllowed,validDate} from './retail-rules.ts';
 import {expectedCash} from './cash.ts';
-const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}-[0-9a-fA-F]{12}$';
+const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$';
 const params={type:'object',required:['id'],properties:{id:{type:'string',pattern:uuid}}};
 const money={type:'integer',minimum:1,maximum:999999999999};
 const key=(h:unknown)=>requireIdempotencyKey(h);

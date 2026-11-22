@@ -4,7 +4,7 @@ import type {Pool} from 'pg';
 import {requirePermission} from './auth.ts';
 import {DomainError} from './transactions.ts';
 import {hashSessionToken,issueSession,verifyPassword} from './security.ts';
-const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}-[0-9a-fA-F]{12}$';
+const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$';
 const derive=(pin:string,salt:Buffer)=>new Promise<Buffer>((resolve,reject)=>
  scrypt(pin,salt,32,{N:16384,r:8,p:1,maxmem:64*1024*1024},(err,key)=>err?reject(err):resolve(key)));
 export async function hashOperatorPin(pin:string){

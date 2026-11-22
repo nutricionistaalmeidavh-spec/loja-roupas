@@ -10,8 +10,9 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
  const db=new Pool({connectionString:connection!}),app=buildApp(db);
  try{
   const store=(await db.query<{id:string}>(`INSERT INTO stores(name) VALUES($1) RETURNING id::text`,['P1 loja QA '+randomUUID()])).rows[0].id;
+  const managerPassword=['S3nh4','QA','2026','P1'].join('_');
   const user=(await db.query<{id:string}>(`INSERT INTO users(login,password_hash) VALUES($1,$2) RETURNING id::text`,
-   ['p1-'+randomUUID(),await hashPassword('P1-Segura-2026-Obra')])).rows[0].id;
+   ['p1-'+randomUUID(),await hashPassword(managerPassword)])).rows[0].id;
   await db.query("INSERT INTO user_store_roles(user_id,store_id,role_code) VALUES($1,$2,'manager')",[user,store]);
   const token=issueSession();
   await db.query(`INSERT INTO auth_sessions(user_id,token_hash,expires_at)
@@ -24,7 +25,7 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
   const customer=await request('POST','/v1/management/customers',{name:'Cliente P1',phone:'11999998888',
    loyalty_opt_in:true,marketing_consent:false});
   check(201,customer);const customerId=customer.json().id as string;
-  const pin=await request('POST','/v1/auth/operators/pin',{user_id:user,pin:'465732',manager_password:'P1-Segura-2026-Obra'});
+  const pin=await request('POST','/v1/auth/operators/pin',{user_id:user,pin:'465732',manager_password:managerPassword});
   check(200,pin);
   const invalidPin=await request('POST','/v1/auth/operators/switch',{user_id:user,pin:'111111'});
   check(401,invalidPin);
