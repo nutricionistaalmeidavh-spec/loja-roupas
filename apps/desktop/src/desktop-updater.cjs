@@ -5,7 +5,7 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const {checkForUpdate,downloadVerified,backupBeforeUpdate,sha256}=require('./updates.cjs');
 
-function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
+function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=false}){
  let available=null,busy=false,lastProgress={phase:'idle'};
  const installedRoot=path.dirname(path.dirname(process.execPath));
  const installSupported=process.platform==='win32'&&
@@ -34,6 +34,8 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
   catch{throw new Error('Origem não autorizada para atualizações');}
  }
  async function check(){
+  if(physicalEdition)return {supported:false,currentVersion:app.getVersion(),available:null,
+   message:'Atualizações da edição física exigem um pacote específico homologado. O atualizador da edição completa não é compatível.'};
   if(!installSupported)return {supported:false,currentVersion:app.getVersion(),available:null,
    message:'Atualizador disponível no instalador Windows. No navegador e na edição portátil, consulte o administrador.'};
   try{
@@ -53,6 +55,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
   }catch{return null;}
  }
  async function install(event){
+  if(physicalEdition)throw new Error('Atualização da edição física bloqueada até existir um pacote próprio homologado.');
   if(!installSupported)throw new Error('Instalador de atualizações indisponível neste ambiente');
   if(busy)throw new Error('Atualização já em andamento');
   // The trusted native confirmation is independent of any renderer: web content
@@ -101,7 +104,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog}){
    throw error;
   }finally{busy=false;}
  }
- ipcMain.handle('loja:updates:info',event=>{allowed(event);return {supported:installSupported,currentVersion:app.getVersion()};});
+ ipcMain.handle('loja:updates:info',event=>{allowed(event);return {supported:installSupported&&!physicalEdition,currentVersion:app.getVersion()};});
  ipcMain.handle('loja:updates:check',async event=>{allowed(event);return check();});
  ipcMain.handle('loja:updates:last-result',async event=>{allowed(event);return lastResult();});
  ipcMain.handle('loja:updates:install',async event=>{allowed(event);return install(event);});

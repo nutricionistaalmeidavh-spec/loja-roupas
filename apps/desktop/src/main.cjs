@@ -6,13 +6,21 @@ const {launchLocalRuntime}=require('./local-runtime.cjs');
 const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
 const {createDesktopUpdater}=require('./desktop-updater.cjs');
+const {backupFilename}=require('./local-backup.cjs');
+const {validatePrinterSelection}=require('./native-print.cjs');
 
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
+const physicalEdition=existsSync(path.join(__dirname,'physical-edition.json'));
+if(physicalEdition&&!process.argv.some(arg=>arg.startsWith('--user-data-dir='))){
+ const physicalData=path.join(app.getPath('appData'),'loja-roupas-fisica');
+ require('node:fs').mkdirSync(physicalData,{recursive:true});
+ app.setPath('userData',physicalData);
+}
 let commercialLicense=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();
-const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog});
+const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition});
 if(!single)app.quit();
 app.on('second-instance',()=>{
  const win=BrowserWindow.getAllWindows()[0];
@@ -85,6 +93,60 @@ function recoveryAllowed(event){
     event.sender!==recoveryWindow.webContents||
     !event.sender.getURL().startsWith('file://'))throw new Error('Recuperação disponível somente na janela local segura.');
 }
+function registerPrinterHandlers(){
+ ipcMain.handle('loja:printers:list',async event=>{
+  if(!isMainLocalSender(event))throw new Error('Impressoras disponíveis apenas no computador principal.');
+  const devices=await event.sender.getPrintersAsync();
+  return devices.map(item=>({name:item.name,displayName:item.displayName||item.name,isDefault:Boolean(item.isDefault)}));
+ });
+ ipcMain.handle('loja:printers:print',async(event,request)=>{
+  if(!isMainLocalSender(event))throw new Error('Impressão não autorizada fora da loja local.');
+  const devices=await event.sender.getPrintersAsync();
+  const chosen=validatePrinterSelection(request,devices.map(p=>p.name));
+  return new Promise((resolve,reject)=>{
+   event.sender.print({silent:true,deviceName:chosen.deviceName,printBackground:true},(success,reason)=>{
+    if(success)resolve({submitted:true});else reject(new Error(reason||'Falha ao enviar impressão ao Windows.'));
+   });
+  });
+ });
+}
+async function verifyManagerForBackup(event,authorization){
+ if(!isMainLocalSender(event)||!runtime)throw new Error('Backup disponível somente no computador principal.');
+ const token=authorization?.token,storeId=authorization?.storeId;
+ if(typeof token!=='string'||!/^[A-Za-z0-9_-]{32,128}$/.test(token)||
+    typeof storeId!=='string'||!/^[a-fA-F0-9-]{36}$/.test(storeId))
+   throw new Error('Entre com uma conta de gestor antes de realizar backup.');
+ let reply;
+ try{
+  reply=await fetch(runtime.url+'/v1/management/backup/authorization',{
+   headers:{authorization:'Bearer '+token,'x-store-id':storeId},signal:AbortSignal.timeout(4000)
+  });
+ }catch{throw new Error('Não foi possível validar a sessão do gestor.');}
+ if(!reply.ok)throw new Error('Somente gestores autenticados podem realizar backups.');
+}
+function registerBackupHandlers(){
+ ipcMain.handle('loja:backup:verify',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
+  const window=BrowserWindow.fromWebContents(event.sender);
+  const choice=await dialog.showOpenDialog(window,{
+   title:'Verificar restauração de backup PostgreSQL',
+   properties:['openFile'],filters:[{name:'Backup PostgreSQL',extensions:['dump']}]
+  });
+  if(choice.canceled||!choice.filePaths?.length)return {cancelled:true};
+  return {cancelled:false,...await runtime.verifyBackup(choice.filePaths[0])};
+ });
+ ipcMain.handle('loja:backup:create',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
+  const window=BrowserWindow.fromWebContents(event.sender);
+  const choice=await dialog.showSaveDialog(window,{
+   title:'Exportar backup completo da loja',defaultPath:backupFilename(),
+   filters:[{name:'Backup PostgreSQL',extensions:['dump']}],properties:['createDirectory','showOverwriteConfirmation']
+  });
+  if(choice.canceled||!choice.filePath)return {cancelled:true};
+  const saved=await runtime.backup(choice.filePath);
+  return {cancelled:false,bytes:saved.bytes,sha256:saved.sha256};
+ });
+}
 function registerRecoveryHandlers(){
  ipcMain.handle('loja:recovery:available',event=>isMainLocalSender(event));
  ipcMain.handle('loja:recovery:open',async event=>{
@@ -136,7 +198,7 @@ async function startLocal(){
  status(setupState.status);
  try{
   runtime=await launchLocalRuntime({resources:process.resourcesPath,
-   userData:app.getPath('userData'),exe:process.execPath,progress:status});
+   userData:app.getPath('userData'),exe:process.execPath,physicalEdition,progress:status});
   if(!runtime.firstRun){transition(validateOrigin(runtime.url));return;}
   setupState={status:'Banco e API prontos. Cadastre o administrador.',ready:true,error:''};
   status(setupState.status);
@@ -194,6 +256,8 @@ async function start(){
  if(process.platform!=='win32'){openWindow(validateOrigin('http://127.0.0.1:'+(process.defaultApp?'5173':'8080')));return;}
  registerSetupHandlers();
  registerRecoveryHandlers();
+ registerBackupHandlers();
+ registerPrinterHandlers();
  setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,
   webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});

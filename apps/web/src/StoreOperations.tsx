@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+declare global{interface Window{lojaPrinter?:{
+ list():Promise<Array<{name:string;displayName:string;isDefault:boolean}>>;
+ print(request:{deviceName:string;paperMm:58|80}):Promise<{submitted:boolean}>;
+}}}
 import type { FormEvent } from 'react';
 import { ApiError, headers, jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
@@ -11,6 +15,9 @@ import { requestId } from './request-id.ts';
 import { TaskDialog } from './TaskDialog.tsx';
 import {SalesBars,RetailEmpty} from './RetailUI.tsx';
 import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
+import {ManagementFinance} from './ManagementFinance.tsx';
+import {ManagementCustomers} from './ManagementCustomers.tsx';
+import {ManagementInventory} from './ManagementInventory.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -21,7 +28,7 @@ type Item = {id:string; name:string; color:string; size:string; price_cents:stri
 
 export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
   const [refresh,setRefresh] = useState(0);
-  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'>('vendas');
+  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'|'inventario'>('vendas');
   const [supplierOpen,setSupplierOpen] = useState(false);
   const [returnOpen,setReturnOpen] = useState(false);
   const [returnLocked,setReturnLocked] = useState(false);
@@ -34,6 +41,15 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
   const [ready, setReady] = useState(false);
   const pending = useRef<{body:string; key:string} | null>(null);
   const storefront = '/vitrine/' + session.storeId;
+  const [physical,setPhysical]=useState(true);
+  useEffect(()=>{
+   let mounted=true;
+   void jsonRequest<{edition:'full'|'physical'}>('/v1/edition',{headers:headers(session)},fetch)
+    .then(data=>{if(mounted)setPhysical(data.edition==='physical');})
+    .catch(()=>{});
+   return ()=>{mounted=false;};
+  },[session]);
+  useEffect(()=>{if(physical&&section==='vitrine')setSection('vendas');},[physical,section]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -85,7 +101,10 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {key:'posvenda',label:'Pós-venda'},
     {key:'operacoes',label:'Operações'},
     {key:'inteligencia',label:'Inteligência'},
-    {key:'vitrine',label:'Vitrine'},
+    {key:'financeiro',label:'Despesas'},
+    {key:'clientes',label:'Clientes'},
+    {key:'inventario',label:'Inventário'},
+    ...(!physical?[{key:'vitrine' as const,label:'Vitrine'}]:[]),
   ] as const;
   return <div className="operation-panel">
     <nav className="management-jump" aria-label="Atalhos da gestão">
@@ -130,7 +149,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
         <button className="primary-action" onClick={()=>setReturnOpen(true)}>Nova devolução</button>
       </div>
       <StockHolds session={session}/>
-      <PickupSettings session={session}/>
+      {!physical&&<PickupSettings session={session}/>}
     </div>}
     {section==='operacoes'&&<div id="gestao-operacoes" className="management-section">
       <OperationalPanels session={session} suppliers={suppliers} onStockChanged={()=>{setRefresh(n=>n+1);onReturned();}}/>
@@ -138,7 +157,10 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
     </div>}
-    {section==='vitrine'&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
+    {section==='financeiro'&&<ManagementFinance session={session}/>}
+    {section==='clientes'&&<ManagementCustomers session={session}/>}
+    {section==='inventario'&&<ManagementInventory session={session} onSaved={()=>{setRefresh(n=>n+1);onReturned();}}/>}
+    {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
       <MarketplaceSyncPanel session={session}/>
@@ -264,6 +286,13 @@ export function Storefront({storeId}:{storeId:string}) {
 
 export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready:boolean}) {
   const [paper,setPaper] = useState<58|80>(80);
+  const [printer,setPrinter]=useState('');
+  const [devices,setDevices]=useState<Array<{name:string;displayName:string;isDefault:boolean}>>([]);
+  useEffect(()=>{
+   let alive=true;
+   void window.lojaPrinter?.list().then(found=>{if(alive)setDevices(found);}).catch(()=>{});
+   return ()=>{alive=false;};
+  },[]);
   const [error,setError] = useState('');
   const [busy,setBusy] = useState(false);
   const pending = useRef<{paper:58|80;key:string} | null>(null);
@@ -280,7 +309,10 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
       }, fetch);
       pending.current = null;
       document.documentElement.dataset.receiptPaper = String(paper);
-      try { window.print(); } finally { delete document.documentElement.dataset.receiptPaper; }
+      try {
+        if(printer&&window.lojaPrinter)await window.lojaPrinter.print({deviceName:printer,paperMm:paper});
+        else window.print();
+      } finally { delete document.documentElement.dataset.receiptPaper; }
     } catch (error) {
       setError(message(error));
     } finally {
@@ -291,6 +323,11 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
     <label>Papel <select value={paper} disabled={busy} onChange={event => setPaper(event.target.value==='58'?58:80)}>
       <option value={58}>58 mm</option><option value={80}>80 mm</option>
     </select></label>
+    {window.lojaPrinter&&<label>Impressora
+      <select aria-label="Impressora do comprovante" value={printer} disabled={busy} onChange={event=>setPrinter(event.target.value)}>
+       <option value="">Escolher na janela do Windows</option>
+       {devices.map(device=><option key={device.name} value={device.name}>{device.displayName}{device.isDefault?' (padrão)':''}</option>)}
+      </select></label>}
     <button className="light-button" disabled={!ready || busy} onClick={() => void print()}>Imprimir comprovante não fiscal</button>
     {error && <p role="alert" className="error">{error}</p>}
   </div>;

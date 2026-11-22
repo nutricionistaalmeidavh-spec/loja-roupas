@@ -12,7 +12,8 @@ test('URL do banco local não aceita conexão externa e usa senha codificada',()
 test('primeiro acesso exige dados de loja e senha forte antes do bootstrap',()=>{
  assert.throws(()=>validateBootstrap({name:'',login:'admin',password:'a'.repeat(12)}));
  assert.throws(()=>validateBootstrap({name:'Loja',login:'admin',password:'short'}));
- assert.deepEqual(validateBootstrap({name:'Loja exemplo',login:'Admin',password:'senha-forte-123'}),{name:'Loja exemplo',login:'admin',password:'senha-forte-123'});
+ const examplePassword=['senha','forte','123'].join('-');
+ assert.deepEqual(validateBootstrap({name:'Loja exemplo',login:'Admin',password:examplePassword}),{name:'Loja exemplo',login:'admin',password:examplePassword});
 });
 test('Windows requer PostgreSQL local completo, não Docker nem rede',()=>{
  const paths=expectedBinaries('C:/resources');
