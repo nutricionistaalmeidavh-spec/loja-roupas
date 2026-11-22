@@ -23,7 +23,7 @@ test('gestor faz login, cadastra peça e recebe estoque real sem habilitar pagam
   await page.getByRole('button',{name:'Fechar Novo produto'}).click();
 
   await page.getByRole('button', {name:'Entrada de estoque'}).click();
-  await page.getByRole('button',{name:'Entrada direta'}).click();
+  await page.getByRole('button',{name:'Entrada direta',exact:true}).click();
   const select = page.getByLabel('Variante (SKU)');
   const option = select.locator('option', {hasText:sku});
   await expect(option).toBeAttached();
