@@ -19,3 +19,19 @@ test('janela Electron é removida sem ler webContents após destruição',()=>{
  destroyed=true;
  assert.doesNotThrow(()=>onClosed());
 });
+
+test('edição física nunca usa atualizador da edição completa',async()=>{
+ const handlers=new Map();
+ const app={getVersion:()=> '0.2.2',getPath:()=>'/tmp/loja-qa'};
+ const ipcMain={handle:(key,fn)=>handlers.set(key,fn)};
+ const updater=createDesktopUpdater({app,ipcMain,BrowserWindow:{},dialog:{},physicalEdition:true});
+ const content={getURL:()=> 'http://127.0.0.1:8090/',isDestroyed:()=>false,send:()=>{}};
+ updater.registerWindow({webContents:content,once(){}},'http://127.0.0.1:8090/');
+ const event={sender:content};
+ const info=await handlers.get('loja:updates:info')(event);
+ assert.equal(info.supported,false);
+ const check=await handlers.get('loja:updates:check')(event);
+ assert.equal(check.available,null);
+ assert.match(check.message,/edição física/i);
+ await assert.rejects(handlers.get('loja:updates:install')(event),/edição física/i);
+});
