@@ -17,8 +17,9 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
   await db.query(`INSERT INTO auth_sessions(user_id,token_hash,expires_at)
    VALUES($1,$2,now()+interval '8 hours')`,[user,token.tokenHash]);
   const base={authorization:'Bearer '+token.token,'x-store-id':store};
-  const request=(method:'POST'|'GET',url:string,payload?:unknown,k?:string)=>
-   app.inject({method,url,headers:{...base,...(method==='POST'?{'idempotency-key':k||randomUUID()}: {})},payload});
+  const request=async(method:'POST'|'GET',url:string,payload?:unknown,k?:string)=>
+   await app.inject({method,url,headers:{...base,...(method==='POST'?{'idempotency-key':k||randomUUID()}: {})},
+    ...(payload===undefined?{}:{payload:payload as object})});
   const check=(code:number,res:{statusCode:number;body:string})=>assert.equal(res.statusCode,code,res.body);
   const customer=await request('POST','/v1/management/customers',{name:'Cliente P1',phone:'11999998888',
    loyalty_opt_in:true,marketing_consent:false});
