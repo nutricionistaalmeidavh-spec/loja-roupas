@@ -34,12 +34,10 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
   catch{throw new Error('Origem não autorizada para atualizações');}
  }
  async function check(){
-  if(physicalEdition)return {supported:false,currentVersion:app.getVersion(),available:null,
-   message:'Atualizações da edição física exigem um pacote específico homologado. O atualizador da edição completa não é compatível.'};
   if(!installSupported)return {supported:false,currentVersion:app.getVersion(),available:null,
    message:'Atualizador disponível no instalador Windows. No navegador e na edição portátil, consulte o administrador.'};
   try{
-   available=await checkForUpdate({currentVersion:app.getVersion()});
+   available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition});
    return {supported:true,currentVersion:app.getVersion(),available};
   }catch(error){
    available=null;
@@ -55,7 +53,6 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
   }catch{return null;}
  }
  async function install(event){
-  if(physicalEdition)throw new Error('Atualização da edição física bloqueada até existir um pacote próprio homologado.');
   if(!installSupported)throw new Error('Instalador de atualizações indisponível neste ambiente');
   if(busy)throw new Error('Atualização já em andamento');
   // The trusted native confirmation is independent of any renderer: web content
@@ -71,7 +68,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
   busy=true;
   try{
    // Revalidate release at the actual moment of user consent.
-   available=await checkForUpdate({currentVersion:app.getVersion()});
+   available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition});
    if(!available)throw new Error('Não há nova versão estável disponível com checksum SHA256');
    const userData=app.getPath('userData');
    const dir=path.join(userData,'updates');
@@ -104,7 +101,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
    throw error;
   }finally{busy=false;}
  }
- ipcMain.handle('loja:updates:info',event=>{allowed(event);return {supported:installSupported&&!physicalEdition,currentVersion:app.getVersion()};});
+ ipcMain.handle('loja:updates:info',event=>{allowed(event);return {supported:installSupported,currentVersion:app.getVersion()};});
  ipcMain.handle('loja:updates:check',async event=>{allowed(event);return check();});
  ipcMain.handle('loja:updates:last-result',async event=>{allowed(event);return lastResult();});
  ipcMain.handle('loja:updates:install',async event=>{allowed(event);return install(event);});

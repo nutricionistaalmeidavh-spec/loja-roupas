@@ -10,6 +10,8 @@ const path=require('node:path');
 
 const API='https://api.github.com/repos/nutricionistaalmeidavh-spec/loja-roupas/releases/latest';
 const ASSET='Loja-de-Roupas-Setup-x64.exe';
+const PHYSICAL_ASSET='Loja-de-Roupas-Fisica-Setup-x64.exe';
+const PHYSICAL_API='https://api.github.com/repos/nutricionistaalmeidavh-spec/loja-roupas/releases?per_page=40';
 const MAX_INSTALLER=1_500_000_000;
 const MAX_NOTES=4000;
 
@@ -28,34 +30,51 @@ function safeAssetUrl(url,tag,name){
  if(url!==expected)throw new Error('URL de atualização não pertence ao repositório oficial');
  return url;
 }
-function selectRelease(release,currentVersion){
- if(!release||release.draft||release.prerelease||!/^v?\d+\.\d+\.\d+$/.test(String(release.tag_name||'')))return null;
- if(compareVersions(release.tag_name,currentVersion)<=0)return null;
- const exe=release.assets?.find(a=>a.name===ASSET);
+function selectRelease(release,currentVersion,{physicalEdition=false}={}){
+ const tag=String(release?.tag_name||'');
+ if(!release||release.draft)return null;
+ if(physicalEdition){
+  if(!release.prerelease||!/^loja-fisica-v\d+\.\d+\.\d+$/.test(tag))return null;
+ }else if(release.prerelease||!/^v?\d+\.\d+\.\d+$/.test(tag))return null;
+ const version=physicalEdition?tag.slice('loja-fisica-v'.length):tag.replace(/^v/,'');
+ if(compareVersions(version,currentVersion)<=0)return null;
+ const assetName=physicalEdition?PHYSICAL_ASSET:ASSET;
+ const exe=release.assets?.find(a=>a.name===assetName);
  const checksums=release.assets?.find(a=>a.name==='SHA256SUMS');
  if(!exe||!checksums)return null;
  if(!Number.isSafeInteger(exe.size)||exe.size<=0||exe.size>MAX_INSTALLER)return null;
  if(!Number.isSafeInteger(checksums.size)||checksums.size<=0||checksums.size>256*1024)return null;
  return {
-  version:release.tag_name.replace(/^v/,''),notes:String(release.body||'').slice(0,MAX_NOTES),
+  version,assetName,notes:String(release.body||'').slice(0,MAX_NOTES),
   size:exe.size,
-  assetUrl:safeAssetUrl(exe.browser_download_url,release.tag_name,ASSET),
+  assetUrl:safeAssetUrl(exe.browser_download_url,release.tag_name,assetName),
   checksumUrl:safeAssetUrl(checksums.browser_download_url,release.tag_name,'SHA256SUMS')
  };
 }
-async function checkForUpdate({currentVersion,fetchImpl=fetch}){
- const response=await fetchImpl(API,{signal:AbortSignal.timeout(8000),headers:{
+function selectPhysicalRelease(releases,currentVersion){
+ if(!Array.isArray(releases))throw new Error('Lista de releases físicas inválida');
+ const candidates=[];
+ for(const release of releases){
+  const item=selectRelease(release,currentVersion,{physicalEdition:true});
+  if(item)candidates.push(item);
+ }
+ candidates.sort((a,b)=>compareVersions(b.version,a.version));
+ return candidates[0]||null;
+}
+async function checkForUpdate({currentVersion,fetchImpl=fetch,physicalEdition=false}){
+ const response=await fetchImpl(physicalEdition?PHYSICAL_API:API,{signal:AbortSignal.timeout(8000),headers:{
   Accept:'application/vnd.github+json','User-Agent':'Loja-de-Roupas-Desktop-Updater'
  }});
  if(response.status===404)return null; // Sem release oficial, sem atualização.
  if(!response.ok)throw new Error('GitHub indisponível (HTTP '+response.status+')');
  const release=await response.json();
- return selectRelease(release,currentVersion);
+ return physicalEdition?selectPhysicalRelease(release,currentVersion):selectRelease(release,currentVersion);
 }
-function parseSha256(manifest){
+function parseSha256(manifest,assetName=ASSET){
+ if(assetName!==ASSET&&assetName!==PHYSICAL_ASSET)throw new Error('Instalador desconhecido');
  if(typeof manifest!=='string'||manifest.length>256*1024)throw new Error('Manifesto SHA256 inválido');
  const records=manifest.split(/\r?\n/).map(l=>l.match(/^([a-fA-F0-9]{64}) [ *](.+)$/))
-  .filter(Boolean).filter(m=>m[2]===ASSET);
+  .filter(Boolean).filter(m=>m[2]===assetName);
  if(records.length!==1)throw new Error('Checksum SHA256 ausente ou duplicado');
  return records[0][1].toLowerCase();
 }
@@ -64,17 +83,19 @@ async function checkedResponse(response,label){
  if(!response.body)throw new Error(label+': resposta sem dados');
  return response;
 }
-async function getManifest(url,fetchImpl){
+async function getManifest(url,fetchImpl,assetName=ASSET){
  const response=await checkedResponse(await fetchImpl(url,{signal:AbortSignal.timeout(20000)}),'Manifesto SHA256');
  const length=Number(response.headers.get('content-length')||0);
  if(length>256*1024)throw new Error('Manifesto SHA256 excessivo');
  let text='',bytes=0;
  for await(const part of response.body){bytes+=part.length;if(bytes>256*1024)throw new Error('Manifesto SHA256 excessivo');text+=Buffer.from(part).toString('utf8');}
- return parseSha256(text);
+ return parseSha256(text,assetName);
 }
 async function downloadVerified({release,directory,fetchImpl=fetch,onProgress=()=>{}}){
- const expected=await getManifest(release.checksumUrl,fetchImpl);
- const target=path.join(directory,'Loja-de-Roupas-Setup-x64-'+release.version+'.exe');
+ const assetName=release.assetName||ASSET;
+ if(assetName!==ASSET&&assetName!==PHYSICAL_ASSET)throw new Error('Instalador desconhecido');
+ const expected=await getManifest(release.checksumUrl,fetchImpl,assetName);
+ const target=path.join(directory,assetName.replace(/\.exe$/,'')+'-'+release.version+'.exe');
  const temp=target+'.'+randomBytes(6).toString('hex')+'.part';
  await fs.mkdir(directory,{recursive:true,mode:0o700});
  let handle,bytes=0;
@@ -147,4 +168,4 @@ async function backupBeforeUpdate({resources,userData,onProgress=()=>{},runDump=
   return {file:final,sha256:digest};
  }catch(error){await fs.rm(temp,{force:true}).catch(()=>{});throw error;}
 }
-module.exports={compareVersions,selectRelease,checkForUpdate,parseSha256,downloadVerified,backupBeforeUpdate,sha256,API,ASSET};
+module.exports={compareVersions,selectRelease,selectPhysicalRelease,checkForUpdate,parseSha256,downloadVerified,backupBeforeUpdate,sha256,API,ASSET,PHYSICAL_API,PHYSICAL_ASSET};
