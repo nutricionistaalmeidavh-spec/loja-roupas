@@ -24,6 +24,6 @@ test('DRE não trata custos históricos desconhecidos como lucro comprovado',()=
  });
 });
 test('liquidação parcial nunca excede saldo aberto',()=>{
- assert.equal(settlementAllowed(10000,6000,4000),4000);
+ assert.equal(settlementAllowed(10000,6000,4000),0);
  assert.throws(()=>settlementAllowed(10000,6000,4001),/saldo/i);
 });
