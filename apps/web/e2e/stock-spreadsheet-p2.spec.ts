@@ -22,6 +22,7 @@ test('P2: copiar/colar Excel, desfazer, lote atômico, exportar filtro e histór
   mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
  });
  await expect(importer.getByText('Nenhum dado será gravado até a confirmação.')).toBeVisible();
+ await importer.getByLabel('Justificativa para entrada direta de estoque (obrigatória)').fill('Carga inicial de estoque confirmada pelo gestor');
  await importer.getByRole('button',{name:'Confirmar importação'}).click();
  await expect(importer.getByRole('status').filter({hasText:'Importação concluída'})).toContainText('2 variantes');
  await importer.getByRole('button',{name:'Fechar Importar produtos por planilha'}).click();
