@@ -121,7 +121,7 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
   const stock=await db.query<{on_hand:number}>(`SELECT on_hand FROM stock_balances
    WHERE store_id=$1 AND variant_id=$2`,[store,oldV.id]);
   const counted=await stockerPost('/v1/management/inventory-counts/'+countId+'/lines',
-   {variant_id:oldV.id,counted_on_hand:stock.rows[0].on_hand});check(201,counted);
+   {variant_id:oldV.id,counted_on_hand:Number(stock.rows[0].on_hand)});check(201,counted);
   const premature=await request('POST','/v1/management/inventory-counts/'+countId+'/close');
   check(409,premature);
   const approved=await request('POST','/v1/management/inventory-counts/'+countId+'/approve-line',
