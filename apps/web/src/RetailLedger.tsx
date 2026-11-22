@@ -54,7 +54,10 @@ export function RetailLedger({session}:{session:Session}){
   try{
    const kind=String(form.get('kind'));const description=String(form.get('description')).trim();
    const amount_cents=cents(String(form.get('amount'))),due_on=String(form.get('due_on'));
-   void write('/v1/management/accounts',{kind,description,amount_cents,due_on},'Conta lançada com sucesso.').then(()=>{});
+   const category=String(form.get('category')).trim();
+   void write('/v1/management/accounts',{kind,description,amount_cents,due_on,
+    ...(kind==='payable'?{category:category||'Despesas operacionais',recognized_on:due_on}:{})},
+    kind==='payable'?'Conta a pagar e despesa de competência registradas.':'Conta a receber criada.');
   }catch(e){setError(e instanceof Error?e.message:'Valor inválido');}
  }
  function settle(event:FormEvent<HTMLFormElement>,id:string){
@@ -85,9 +88,12 @@ export function RetailLedger({session}:{session:Session}){
    <div><span>Resultado gerencial estimado</span><strong>{brl(dre.operating_result_cents)}</strong></div>
   </div><p role="status">{dre.complete?'Custos das vendas registrados.':'DRE incompleta: '+dre.unknown_cost_lines+' linhas de venda sem custo registrado.'} {dre.note}</p></>}
   <h3>Contas a pagar e a receber</h3>
+  <p>Contas a pagar também geram despesa na competência informada (padrão: vencimento), uma única vez. Não duplique manualmente a mesma despesa no painel anterior.</p>
   <form className="management-form" onSubmit={createAccount}>
    <label>Tipo <select name="kind"><option value="payable">A pagar</option><option value="receivable">A receber</option></select></label>
    <label>Descrição <input name="description" required minLength={3} maxLength={240}/></label>
+   <label>Categoria da despesa (somente contas a pagar)
+    <input name="category" maxLength={80} placeholder="Aluguel, Tributos, Frete…"/></label>
    <label>Valor (R$) <input name="amount" inputMode="decimal" required placeholder="150,00"/></label>
    <label>Vencimento <input name="due_on" type="date" defaultValue={date()} required/></label>
    <button className="primary-action" disabled={busy}>Criar conta</button>

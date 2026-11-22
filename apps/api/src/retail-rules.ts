@@ -43,7 +43,11 @@ export function settlementAllowed(principal:number,settled:number,payment:number
 }
 export function dreTotals(input:{gross_cents:number;returns_cents:number;cost_cents:number;
  expenses_cents:number;commissions_cents:number;tax_cents:number;unknown_cost_lines:number}){
- Object.entries(input).forEach(([k,v])=>cents(v,k));
+ Object.entries(input).forEach(([k,v])=>{
+  if(k==='cost_cents'||k==='commissions_cents'){
+   if(!Number.isSafeInteger(v)||Math.abs(v)>999999999999)throw new DomainError(422,'INVALID_AMOUNT',k+' fora do limite');
+  }else cents(v,k);
+ });
  const net_revenue_cents=input.gross_cents-input.returns_cents;
  const gross_profit_cents=net_revenue_cents-input.cost_cents;
  const operating_result_cents=gross_profit_cents-input.expenses_cents-input.commissions_cents-input.tax_cents;

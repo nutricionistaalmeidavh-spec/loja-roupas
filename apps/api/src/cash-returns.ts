@@ -5,6 +5,7 @@ import type {ReturnItem,CashReturnRequest} from '@loja/domain/operations';
 import { requirePermission } from './auth.ts';
 import { expectedCash } from './cash.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
+import {commissionCents,loyaltyPoints} from './retail-rules.ts';
 
 const uuid={type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const numberParams={type:'object',required:['number'],properties:{number:{type:'string',pattern:'^[1-9][0-9]{0,15}$'}}};
@@ -95,6 +96,24 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
     const created=await client.query<{id:string}>(`INSERT INTO cash_sale_returns(store_id,sale_id,cash_session_id,actor_id,amount_cents,reason)
       VALUES($1,$2,$3,$4,$5,$6) RETURNING id`,[auth.storeId,sale.id,cash_session_id,auth.userId,amount,reason]);
     const returnId=created.rows[0].id;
+    const associated=await client.query<{customer_id:string|null}>(`SELECT customer_id::text
+      FROM sales WHERE store_id=$1 AND id=$2`,[auth.storeId,sale.id]);
+    const cid=associated.rows[0]?.customer_id;
+    if(cid&&loyaltyPoints(amount)>0){
+     const earned=await client.query(`SELECT 1 FROM retail_loyalty_events WHERE store_id=$1 AND sale_id=$2
+      AND kind='earn'`,[auth.storeId,sale.id]);
+     if(earned.rowCount)await client.query(`INSERT INTO retail_loyalty_events
+      (store_id,customer_id,sale_id,points,kind,note,actor_id)
+      VALUES($1,$2,$3,$4,'reverse','Devolução em dinheiro',$5)`,
+      [auth.storeId,cid,sale.id,-loyaltyPoints(amount),auth.userId]);
+    }
+    const commission=await client.query<{seller_id:string;rate_bps:number}>(`SELECT seller_id::text,rate_bps
+      FROM retail_commission_entries WHERE store_id=$1 AND sale_id=$2 FOR UPDATE`,
+      [auth.storeId,sale.id]);
+    if(commission.rowCount)await client.query(`INSERT INTO retail_commission_reversals
+     (store_id,sale_id,operation_id,seller_id,amount_cents) VALUES($1,$2,$3,$4,$5)`,
+     [auth.storeId,sale.id,returnId,commission.rows[0].seller_id,
+      commissionCents(amount,commission.rows[0].rate_bps)]);
     for(const item of items){
       const line=available.get(item.sale_line_id)!;
       await client.query(`INSERT INTO cash_return_lines(store_id,return_id,sale_line_id,quantity,disposition,unit_amount_cents)
