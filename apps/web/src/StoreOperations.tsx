@@ -13,6 +13,7 @@ import {SalesBars,RetailEmpty} from './RetailUI.tsx';
 import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
 import {ManagementFinance} from './ManagementFinance.tsx';
 import {ManagementCustomers} from './ManagementCustomers.tsx';
+import {ManagementInventory} from './ManagementInventory.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -23,7 +24,7 @@ type Item = {id:string; name:string; color:string; size:string; price_cents:stri
 
 export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
   const [refresh,setRefresh] = useState(0);
-  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'>('vendas');
+  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'|'inventario'>('vendas');
   const [supplierOpen,setSupplierOpen] = useState(false);
   const [returnOpen,setReturnOpen] = useState(false);
   const [returnLocked,setReturnLocked] = useState(false);
@@ -98,6 +99,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {key:'inteligencia',label:'Inteligência'},
     {key:'financeiro',label:'Despesas'},
     {key:'clientes',label:'Clientes'},
+    {key:'inventario',label:'Inventário'},
     ...(!physical?[{key:'vitrine' as const,label:'Vitrine'}]:[]),
   ] as const;
   return <div className="operation-panel">
@@ -153,6 +155,7 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     </div>}
     {section==='financeiro'&&<ManagementFinance session={session}/>}
     {section==='clientes'&&<ManagementCustomers session={session}/>}
+    {section==='inventario'&&<ManagementInventory session={session} onSaved={()=>{setRefresh(n=>n+1);onReturned();}}/>}
     {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>

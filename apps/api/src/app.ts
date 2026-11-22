@@ -25,6 +25,7 @@ import { registerStaticUi } from './static-ui.ts';
 import { registerMarketplaceBridge } from './marketplace-bridge.ts';
 import {editionFromEnv,blockedInPhysicalEdition} from './physical-edition.ts';
 import {registerPhysicalManagement} from './physical-management.ts';
+import {registerPhysicalInventory} from './physical-inventory.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -66,6 +67,7 @@ export function buildApp(db: Pool) {
   registerStaticUi(app);
   registerMarketplaceBridge(app,db);
   registerPhysicalManagement(app,db);
+  registerPhysicalInventory(app,db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });
