@@ -73,7 +73,10 @@ jobs:
           test -s "$archive"
           # Validar assinatura PGDMP dentro do arquivo GPG sem deixar dump em disco.
           source scripts/lan-common.sh
-          backup_gpg --decrypt "$archive" | lan exec -T postgres pg_restore --list -U loja | grep -F "TABLE DATA"
+          # Guardar apenas a lista de objetos em memória evita SIGPIPE quando o grep
+          # termina antes de o pg_restore consumir todo o arquivo criptografado.
+          objects=$(backup_gpg --decrypt "$archive" | lan exec -T postgres pg_restore --list -U loja)
+          grep -Fq "TABLE DATA" <<< "$objects"
           test -z "$(find "$RUNNER_TEMP/loja-rotativa" -maxdepth 1 -name '.loja-backup.*' -print -quit)"
       - name: Verificar perda e recuperação do banco
         run: |
