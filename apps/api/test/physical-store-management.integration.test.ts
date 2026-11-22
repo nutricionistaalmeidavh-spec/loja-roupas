@@ -21,6 +21,11 @@ test('P1 físico: despesas, clientes e inventário isolados por loja e idempoten
   await db.query("INSERT INTO auth_sessions(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '1 hour')",[user,tokenHash]);
   const common={authorization:'Bearer '+token,'x-store-id':store};
   const write=(key=randomUUID())=>({...common,'idempotency-key':key});
+  const backupAccess=await app.inject({url:'/v1/management/backup/authorization',headers:common});
+  assert.equal(backupAccess.statusCode,200,backupAccess.body);
+  assert.equal(backupAccess.json().allowed,true);
+  const unauthedBackup=await app.inject({url:'/v1/management/backup/authorization'});
+  assert.equal(unauthedBackup.statusCode,401,unauthedBackup.body);
   const expense={category:'Aluguel',description:'Despesa de teste',occurred_on:'2026-11-22',amount_cents:23000};
   const fixedKey=randomUUID();
   const sendExpense=()=>app.inject({method:'POST',url:'/v1/management/expenses',headers:write(fixedKey),payload:expense});
