@@ -1,0 +1,71 @@
+name: Loja Física - segurança e carga OSS
+on:
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'infra/**'
+      - 'qa/**'
+      - '.github/workflows/retail-physical-quality.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks OSS (sem OSV-Scanner)
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.24.3 dir /repo --redact --no-banner
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: loja
+          POSTGRES_USER: loja
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U loja -d loja"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
+      TEST_DATABASE_URL: postgresql://loja:ci-only-password@127.0.0.1:5432/loja
+      LOJA_EDITION: physical
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências OSS existentes
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+      - name: Migrar e criar base descartável
+        env:
+          BOOTSTRAP_STORE: Loja Física QA
+          BOOTSTRAP_ADMIN_LOGIN: qa-admin
+          BOOTSTRAP_ADMIN_PASSWORD: Senha-QA-Somente-CI-2026
+        run: |
+          pnpm --filter @loja/api migrate
+          pnpm --filter @loja/api bootstrap
+      - name: Iniciar API local
+        run: |
+          pnpm --filter @loja/api start > /tmp/loja-api-qa.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/v1/ready >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          tail -n 60 /tmp/loja-api-qa.log
+          exit 1
+      - name: k6 OSS — concorrência de catálogo/estoque
+        run: |
+          docker run --rm --network host -v "$PWD/qa/k6:/qa:ro"             -e LOJA_BASE_URL=http://127.0.0.1:3000             grafana/k6:0.52.0 run /qa/physical-pdv.js
