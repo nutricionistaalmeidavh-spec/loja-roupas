@@ -30,3 +30,15 @@ test('backup custom é gravado atomicamente e recusa sobrescrever arquivo anteri
   assert.deepEqual((await fs.readdir(root)).filter(x=>x.includes('.partial-')),[]);
  }finally{await fs.rm(root,{recursive:true,force:true});}
 });
+
+const {isPgDumpArchive}=require('../src/local-backup.cjs');
+test('a validação da restauração rejeita dados que não são dump PostgreSQL',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'loja-restore-test-'));
+ try{
+  const valid=path.join(root,'valid.dump'),fake=path.join(root,'fake.dump');
+  await fs.writeFile(valid,Buffer.concat([Buffer.from('PGDMP'),Buffer.alloc(64)]));
+  await fs.writeFile(fake,Buffer.from('not a database'));
+  assert.equal(await isPgDumpArchive(valid),true);
+  assert.equal(await isPgDumpArchive(fake),false);
+ }finally{await fs.rm(root,{recursive:true,force:true});}
+});
