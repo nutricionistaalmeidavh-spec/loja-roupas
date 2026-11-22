@@ -1,4 +1,4 @@
-const {app,BrowserWindow,dialog,shell,ipcMain}=require('electron');
+const {app,BrowserWindow,dialog,shell,ipcMain,Menu}=require('electron');
 const {readFileSync} =require('node:fs');
 const fs=require('node:fs/promises');
 const path=require('node:path');
@@ -264,7 +264,11 @@ async function start(){
  await setupWindow.loadFile(path.join(__dirname,'setup.html'));
  await beginLocal();
 }
-app.whenReady().then(start).catch(error=>{dialog.showErrorBox('Iniciar Loja de Roupas',error.message);app.quit();});
+app.whenReady().then(()=>{
+ // Não exibir o menu de desenvolvimento File/Edit/View na loja instalada.
+ Menu.setApplicationMenu(null);
+ return start();
+}).catch(error=>{dialog.showErrorBox('Iniciar Loja de Roupas',error.message);app.quit();});
 app.on('before-quit',event=>{
  if(!runtime||quitting)return;
  event.preventDefault();quitting=true;

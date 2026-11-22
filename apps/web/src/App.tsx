@@ -1,4 +1,5 @@
 import { requestId } from './request-id.ts';
+import { InterfaceRecovery } from './InterfaceRecovery.tsx';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
@@ -202,7 +203,7 @@ export function App() {
     return ()=>controller.abort();
   },[session,debouncedSearch,refetch,category]);
   useEffect(()=>{
-    if(!session||page!=='estoque'){setAllProducts([]);return;}
+    if(!session||page!=='estoque'||stockAction!=='receive'){setAllProducts([]);setStockLoading(false);return;}
     const controller=new AbortController();
     setStockLoading(true);
     void listCatalog(session,stockSearch,fetch,controller.signal).then(data=>{
@@ -211,7 +212,7 @@ export function App() {
       if(!controller.signal.aborted){setAllProducts([]);setCatalogError(error instanceof Error?error.message:'Falha ao carregar estoque');}
     }).finally(()=>{if(!controller.signal.aborted)setStockLoading(false);});
     return ()=>controller.abort();
-  },[session,page,refetch,stockSearch]);
+  },[session,page,stockAction,refetch,stockSearch]);
 
   async function loadMore(){
     if(!session||!cursor||paging)return;
@@ -441,10 +442,12 @@ export function App() {
             {manager&&<button className="light-button" onClick={()=>setStockAction('adjust')}>Ajustar estoque</button>}
           </div>
         </section>
-        <Suspense fallback={<p role="status">Carregando planilha de estoque…</p>}>
+        <InterfaceRecovery scope="estoque">
+          <Suspense fallback={<p role="status">Carregando planilha de estoque…</p>}>
           <InventorySpreadsheet session={session} onSaved={refreshed}
             canEdit={manager} canReceive={directAccess}/>
         </Suspense>
+        </InterfaceRecovery>
       </div>}
     </main>
     {page==='estoque'&&directAccess&&stockAction==='receive'&&<TaskDialog title="Receber estoque" wide busy={stockLocked}

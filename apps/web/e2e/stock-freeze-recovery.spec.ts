@@ -21,7 +21,7 @@ test('Estoque mantém a navegação visível quando o chunk da planilha falha',a
 test('abrir Estoque não dispara busca adicional de catálogo do recebimento',async({page})=>{
  let productsRequests=0;
  await login(page);
- await page.waitForResponse(r=>r.url().includes('/v1/catalog/products?')&&r.status()===200).catch(()=>{});
+ await page.waitForLoadState('networkidle');
  page.on('request',r=>{if(r.url().includes('/v1/catalog/products?'))productsRequests++;});
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
  await expect(page.getByRole('heading',{name:'Planilha operacional'})).toBeVisible({timeout:15000});
