@@ -1,7 +1,7 @@
 import {expect,type Page} from '@playwright/test';
 export async function stockVisualProduct(page:Page,sku:string){
  await page.getByRole('button',{name:'Entrada de estoque'}).click();
- await page.getByRole('button',{name:'Entrada direta'}).click();
+ await page.getByRole('button',{name:'Entrada direta',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Entrada direta'});
  await dialog.getByLabel('Localizar peça para recebimento (nome ou SKU)').fill(sku);
  const choice=dialog.getByLabel('Variante (SKU)');
