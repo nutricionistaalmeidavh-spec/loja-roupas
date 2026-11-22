@@ -57,6 +57,16 @@ async function applyReturn(c:PoolClient,auth:AuthContext,operationId:string,oldV
   VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,
   [auth.storeId,oldVariant,Number(b.rows[0].revision),JSON.stringify({operation_id:operationId})]);
 }
+async function reverseCommission(c:PoolClient,auth:AuthContext,saleId:string,operationId:string,amount:number){
+ const row=await c.query<{seller_id:string;rate_bps:number}>(`SELECT seller_id::text,rate_bps
+  FROM retail_commission_entries WHERE store_id=$1 AND sale_id=$2 FOR UPDATE`,[auth.storeId,saleId]);
+ if(row.rowCount){
+  await c.query(`INSERT INTO retail_commission_reversals(store_id,sale_id,operation_id,seller_id,amount_cents)
+   VALUES($1,$2,$3,$4,$5)`,
+   [auth.storeId,saleId,operationId,row.rows[0].seller_id,commissionCents(amount,row.rows[0].rate_bps)]);
+ }
+}
+
 async function reverseLoyalty(c:PoolClient,auth:AuthContext,originalSaleId:string,customerId:string|null,amount:number){
  if(!customerId||!loyaltyPoints(amount))return;
  const earned=await c.query(`SELECT 1 FROM retail_loyalty_events WHERE store_id=$1 AND sale_id=$2 AND kind='earn'`,
@@ -104,6 +114,7 @@ export function registerRetailAfterSales(app:FastifyInstance,db:Pool){
      VALUES($1,$2,$3,$4,$5,$6)`,[auth.storeId,id,b.sale_line_id,b.quantity,b.condition,line.unit_price_cents]);
     await applyReturn(c,auth,id,line.variant_id,b.quantity,b.condition);
     await reverseLoyalty(c,auth,line.sale_id,line.customer_id,amount);
+    await reverseCommission(c,auth,line.sale_id,id,amount);
     const status=await finalizeOldSale(c,auth.storeId,line.sale_id);
     await c.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
      VALUES($1,$2,'sales.external_refund',$3,$4::jsonb)`,
@@ -220,6 +231,7 @@ export function registerRetailAfterSales(app:FastifyInstance,db:Pool){
       VALUES($1,$2,$3,$4,$5,$6)`,
       [auth.storeId,newSaleId,seller,outgoingValue,rate.rows[0].rate_bps,commissionCents(outgoingValue,rate.rows[0].rate_bps)]);
     await reverseLoyalty(c,auth,line.sale_id,line.customer_id,returnedValue);
+    await reverseCommission(c,auth,line.sale_id,opId,returnedValue);
     if(customerId){
      const opt=await c.query<{loyalty_opt_in:boolean}>(`SELECT loyalty_opt_in
        FROM retail_customers WHERE store_id=$1 AND id=$2`,[auth.storeId,customerId]);

@@ -22,23 +22,39 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
   return {items:q.rows};
  });
  app.post<{Body:{kind:'payable'|'receivable';description:string;amount_cents:number;due_on:string;
-  customer_id?:string;supplier_id?:string}}>('/v1/management/accounts',{
+  customer_id?:string;supplier_id?:string;recognized_on?:string;category?:string}}>('/v1/management/accounts',{
   schema:{body:{type:'object',additionalProperties:false,required:['kind','description','amount_cents','due_on'],
    properties:{kind:{type:'string',enum:['payable','receivable']},description:{type:'string',minLength:3,maxLength:240},
-    amount_cents:money,due_on:{type:'string',maxLength:10},customer_id:{type:'string',pattern:uuid},
+    amount_cents:money,due_on:{type:'string',maxLength:10},
+    recognized_on:{type:'string',maxLength:10},category:{type:'string',minLength:1,maxLength:80},
+    customer_id:{type:'string',pattern:uuid},
     supplier_id:{type:'string',pattern:uuid}}}}
  },async(req,reply)=>{
   if(requirePermission(req,reply,'finance.write'))return reply;
   const auth=req.authContext!,body=req.body;
-  if(!validDate(body.due_on))throw new DomainError(422,'INVALID_DATE','Vencimento inválido');
+  if(!validDate(body.due_on)||body.recognized_on&&!validDate(body.recognized_on))
+   throw new DomainError(422,'INVALID_DATE','Vencimento ou competência inválidos');
+  if(body.kind==='receivable'&&(body.recognized_on||body.category))
+   throw new DomainError(422,'ACCOUNT_KIND','Reconhecimento de despesa é somente para contas a pagar');
   if(body.kind==='receivable'&&body.supplier_id||body.kind==='payable'&&body.customer_id)
    throw new DomainError(422,'ACCOUNT_LINK','Cliente/fornecedor incompatível com o tipo');
   const out=await withIdempotentTransaction(db,auth,'retail.account.create',key(req.headers['idempotency-key']),body,async client=>{
+   let expenseId:string|null=null;
+   if(body.kind==='payable'){
+    const expense=await client.query<{id:string}>(`INSERT INTO operating_expenses
+     (store_id,created_by,category,description,amount_cents,occurred_on)
+     VALUES($1,$2,$3,$4,$5,$6) RETURNING id::text`,
+     [auth.storeId,auth.userId,body.category||'Contas a pagar',body.description.trim(),
+      body.amount_cents,body.recognized_on||body.due_on]);
+    expenseId=expense.rows[0].id;
+   }
    const q=await client.query<{id:string}>(`INSERT INTO retail_accounts
-    (store_id,kind,customer_id,supplier_id,description,amount_cents,due_on,created_by)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text`,
+    (store_id,kind,customer_id,supplier_id,description,amount_cents,due_on,
+     recognized_on,expense_category,expense_record_id,created_by)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id::text`,
     [auth.storeId,body.kind,body.customer_id||null,body.supplier_id||null,body.description.trim(),
-     body.amount_cents,body.due_on,auth.userId]);
+     body.amount_cents,body.due_on,body.kind==='payable'?(body.recognized_on||body.due_on):null,
+     body.kind==='payable'?(body.category||'Contas a pagar'):null,expenseId,auth.userId]);
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id)
     VALUES($1,$2,'accounts.create',$3)`,[auth.storeId,auth.userId,q.rows[0].id]);
    return {id:q.rows[0].id,...body};
@@ -131,8 +147,10 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
   if(requirePermission(req,reply,'finance.read'))return reply;
   const q=await db.query(`SELECT u.id::text AS seller_id,u.login,
    coalesce(r.rate_bps,0)::int AS rate_bps,
-   coalesce((SELECT sum(e.amount_cents) FROM retail_commission_entries e
-    WHERE e.store_id=$1 AND e.seller_id=u.id),0)::text AS accrued_cents
+   (coalesce((SELECT sum(e.amount_cents) FROM retail_commission_entries e
+    WHERE e.store_id=$1 AND e.seller_id=u.id),0)
+    -coalesce((SELECT sum(x.amount_cents) FROM retail_commission_reversals x
+     WHERE x.store_id=$1 AND x.seller_id=u.id),0))::text AS accrued_cents
    FROM users u JOIN user_store_roles ur ON ur.user_id=u.id AND ur.store_id=$1
    LEFT JOIN retail_commission_rules r ON r.store_id=$1 AND r.seller_id=u.id
    WHERE u.status='active' GROUP BY u.id,u.login,r.rate_bps ORDER BY u.login LIMIT 100`,
@@ -207,8 +225,8 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    throw new DomainError(422,'INVALID_MONTH','Mês inválido');
   const store=req.authContext!.storeId,month=req.query.month+'-01';
   const row=await db.query<{
-   gross:string;cost:string;unknown:string;cash_returns:string;external_returns:string;
-   expenses:string;tax:string;commissions:string;
+   gross:string;cost:string;returned_cost:string;unknown:string;cash_returns:string;external_returns:string;
+   expenses:string;tax:string;commissions:string;reversed_commissions:string;
   }>(`SELECT
    (SELECT coalesce(sum(total_cents),0)::text FROM sales WHERE store_id=$1
     AND created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
@@ -217,6 +235,18 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
     JOIN sales s ON s.id=l.sale_id AND s.store_id=l.store_id WHERE s.store_id=$1
     AND s.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
     AND s.created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS cost,
+   ((SELECT coalesce(sum(r.quantity*l.cost_unit_cents),0) FROM cash_return_lines r
+      JOIN sale_lines l ON l.id=r.sale_line_id AND l.store_id=r.store_id
+      JOIN cash_sale_returns cr ON cr.id=r.return_id AND cr.store_id=r.store_id
+      WHERE r.store_id=$1 AND r.disposition='resellable'
+       AND cr.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+       AND cr.created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone))
+     +(SELECT coalesce(sum(l.cost_unit_cents*x.quantity),0)
+      FROM retail_after_sale_lines x JOIN sale_lines l ON l.id=x.sale_line_id AND l.store_id=x.store_id
+      JOIN retail_after_sales a ON a.id=x.operation_id AND a.store_id=x.store_id
+      WHERE x.store_id=$1 AND x.disposition='resellable'
+       AND a.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+       AND a.created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)))::text AS returned_cost,
    (SELECT count(*)::text FROM sale_lines l JOIN sales s ON s.id=l.sale_id AND s.store_id=l.store_id
     WHERE s.store_id=$1 AND l.cost_unit_cents IS NULL
     AND s.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
@@ -233,16 +263,22 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
     AND lower(category)='tributos' AND occurred_on >= $2::date AND occurred_on<($2::date+interval '1 month')) AS tax,
    (SELECT coalesce(sum(e.amount_cents),0)::text FROM retail_commission_entries e
     WHERE e.store_id=$1 AND e.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
-    AND e.created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS commissions
+    AND e.created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS commissions,
+   (SELECT coalesce(sum(e.amount_cents),0)::text FROM retail_commission_reversals e
+    WHERE e.store_id=$1 AND e.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+    AND e.created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS reversed_commissions
    FROM stores st WHERE st.id=$1`,[store,month]);
   if(!row.rowCount)throw new DomainError(404,'STORE_NOT_FOUND','Loja não encontrada');
   const r=row.rows[0],sum=dreTotals({gross_cents:Number(r.gross),
-   returns_cents:Number(r.cash_returns)+Number(r.external_returns),cost_cents:Number(r.cost),
-   expenses_cents:Number(r.expenses),tax_cents:Number(r.tax),commissions_cents:Number(r.commissions),
+   returns_cents:Number(r.cash_returns)+Number(r.external_returns),
+   cost_cents:Number(r.cost)-Number(r.returned_cost),
+   expenses_cents:Number(r.expenses),tax_cents:Number(r.tax),
+   commissions_cents:Number(r.commissions)-Number(r.reversed_commissions),
    unknown_cost_lines:Number(r.unknown)});
   return {month:req.query.month, ...sum, gross_cents:Number(r.gross),
-   returns_cents:Number(r.cash_returns)+Number(r.external_returns),cost_cents:Number(r.cost),
-   expenses_cents:Number(r.expenses),tax_cents:Number(r.tax),commissions_cents:Number(r.commissions),
+   returns_cents:Number(r.cash_returns)+Number(r.external_returns),
+   cost_cents:Number(r.cost)-Number(r.returned_cost),expenses_cents:Number(r.expenses),
+   tax_cents:Number(r.tax),commissions_cents:Number(r.commissions)-Number(r.reversed_commissions),
    note:sum.complete?'DRE gerencial estimada, não fiscal.':'DRE incompleta: custo de peças não informado; não interprete o resultado como lucro real.'};
  });
 }

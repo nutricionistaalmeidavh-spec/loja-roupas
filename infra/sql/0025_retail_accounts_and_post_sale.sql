@@ -16,7 +16,9 @@ CREATE TABLE retail_accounts (
  description text NOT NULL CHECK(length(trim(description)) BETWEEN 3 AND 240),
  amount_cents bigint NOT NULL CHECK(amount_cents>0),
  settled_cents bigint NOT NULL DEFAULT 0 CHECK(settled_cents>=0),
- due_on date NOT NULL,created_by uuid NOT NULL REFERENCES users(id),created_at timestamptz NOT NULL DEFAULT now(),
+ due_on date NOT NULL,recognized_on date,expense_category text,
+ expense_record_id uuid REFERENCES operating_expenses(id),
+ created_by uuid NOT NULL REFERENCES users(id),created_at timestamptz NOT NULL DEFAULT now(),
  cancelled_at timestamptz,
  UNIQUE(store_id,id),CHECK(settled_cents<=amount_cents),
  FOREIGN KEY(customer_id,store_id) REFERENCES retail_customers(id,store_id),
@@ -67,6 +69,14 @@ CREATE TABLE retail_commission_entries (
 );
 CREATE INDEX retail_commissions_seller_idx ON retail_commission_entries(store_id,seller_id,created_at);
 
+CREATE TABLE retail_commission_reversals (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),store_id uuid NOT NULL REFERENCES stores(id),
+ sale_id uuid NOT NULL,operation_id uuid NOT NULL, seller_id uuid NOT NULL REFERENCES users(id),
+ amount_cents bigint NOT NULL CHECK(amount_cents>=0),
+ created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(store_id,operation_id),
+ FOREIGN KEY(sale_id,store_id) REFERENCES sales(id,store_id)
+);
+CREATE INDEX retail_commission_reversals_seller_idx ON retail_commission_reversals(store_id,seller_id,created_at);
 CREATE TABLE retail_loyalty_events (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),store_id uuid NOT NULL,customer_id uuid NOT NULL,
  sale_id uuid, points bigint NOT NULL CHECK(points<>0),kind text NOT NULL CHECK(kind IN ('earn','redeem','reverse')),
