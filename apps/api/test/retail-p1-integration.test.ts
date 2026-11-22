@@ -83,6 +83,16 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
   const second=await settle();check(200,second);
   assert.equal(first.json().id,second.json().id);
   assert.equal(first.json().remaining_cents,5000);
+  const payout=await request('POST','/v1/management/commissions/'+user+'/payout',{
+   amount_cents:250,method:'bank_transfer',external_reference:'payout-'+randomUUID()});
+  check(201,payout);
+  const payoutAgain=await request('GET','/v1/management/commissions');
+  check(200,payoutAgain);
+  assert.equal(Number(payoutAgain.json().items[0].paid_cents),250);
+  const payable=await request('POST','/v1/management/accounts',{
+   kind:'payable',description:'Tributos da competência',amount_cents:1200,
+   due_on:'2026-12-01',recognized_on:'2026-11-22',category:'Tributos'});
+  check(201,payable);
   const refund=await request('POST','/v1/management/after-sales/external-refund',{
    sale_number:pix.sale_number,sale_line_id:(await request('GET','/v1/management/sales/by-number/'+pix.sale_number)).json().lines[0].id,
    quantity:1,condition:'resellable',reason:'Estorno por insatisfação',method:'pix_manual',
@@ -129,6 +139,8 @@ test('P1: crediário, clientes, caixa, comissões, fidelidade, estornos Pix e tr
   const closed=await request('POST','/v1/management/inventory-counts/'+countId+'/close');
   check(200,closed);assert.equal(closed.json().closed,true);
   const report=await request('GET','/v1/management/dre?month=2026-11');check(200,report);
+  assert.ok(report.json().tax_cents>=1200);
+  assert.ok(Number(report.json().commissions_cents)>0);
   assert.equal(report.json().complete,false);
   assert.ok(Number.isInteger(report.json().operating_result_cents));
  }finally{await app.close();await db.end();}
