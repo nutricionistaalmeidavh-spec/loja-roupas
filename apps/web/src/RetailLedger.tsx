@@ -6,7 +6,7 @@ import {requestId} from './request-id.ts';
 
 type Account={id:string;kind:'payable'|'receivable';description:string;amount_cents:string;settled_cents:string;due_on:string};
 type Credit={id:string;name:string;enabled:boolean|null;credit_limit_cents:string|null;outstanding_cents:string};
-type Commission={seller_id:string;login:string;rate_bps:number;accrued_cents:string};
+type Commission={seller_id:string;login:string;rate_bps:number;accrued_cents:string;paid_cents:string};
 type Dre={month:string;gross_cents:number;returns_cents:number;cost_cents:number;expenses_cents:number;
  commissions_cents:number;tax_cents:number;net_revenue_cents:number;gross_profit_cents:number;
  operating_result_cents:number;complete:boolean;unknown_cost_lines:number;note:string};
@@ -135,8 +135,9 @@ export function RetailLedger({session,cashId}:{session:Session;cashId:string|nul
   </div>
   <h3>Comissões por vendedor</h3>
   <div className="management-table-scroll" role="region" tabIndex={0}>
-   <table><thead><tr><th>Operador</th><th>Acumulado</th><th>Regra percentual</th></tr></thead>
-   <tbody>{commissions.map(s=><tr key={s.seller_id}><td>{s.login}</td><td>{brl(s.accrued_cents)}</td><td>
+   <table><thead><tr><th>Operador</th><th>Comissão gerada</th><th>Pago</th><th>Devido</th><th>Regra e baixa</th></tr></thead>
+   <tbody>{commissions.map(s=><tr key={s.seller_id}><td>{s.login}</td><td>{brl(s.accrued_cents)}</td><td>{brl(s.paid_cents)}</td>
+    <td>{brl(Number(s.accrued_cents)-Number(s.paid_cents))}</td><td>
     <form className="management-form" onSubmit={e=>{
      e.preventDefault();const v=String(new FormData(e.currentTarget).get('rate')||'').replace(',','.');
      const rate=Number(v);
@@ -144,6 +145,24 @@ export function RetailLedger({session,cashId}:{session:Session;cashId:string|nul
      void write('/v1/management/commissions/'+s.seller_id+'/rule',{rate_bps:Math.round(rate*100)},'Regra de comissão atualizada.');
     }}><input name="rate" aria-label={'Comissão de '+s.login} defaultValue={(s.rate_bps/100).toFixed(2)} inputMode="decimal"/>
      <button disabled={busy}>Definir %</button></form>
+    {Number(s.accrued_cents)>Number(s.paid_cents)&&<form className="management-form" onSubmit={e=>{
+     e.preventDefault();const f=new FormData(e.currentTarget);
+     try{
+      const amount_cents=cents(String(f.get('amount'))),method=String(f.get('method'));
+      const ref=String(f.get('reference')).trim();
+      if(method==='cash'&&!cashId){setError('Caixa precisa estar aberto para pagar em dinheiro');return;}
+      void write('/v1/management/commissions/'+s.seller_id+'/payout',
+       {amount_cents,method,...(method==='cash'?{cash_session_id:cashId}:{external_reference:ref})},
+       'Comissão liquidada e auditada.');
+     }catch(err){setError(err instanceof Error?err.message:'Valor inválido');}
+    }}>
+     <input name="amount" aria-label={'Liquidar comissão de '+s.login} placeholder="Valor R$" required inputMode="decimal"/>
+     <select name="method" aria-label="Forma de pagamento de comissão">
+      <option value="bank_transfer">Transferência</option>{cashId&&<option value="cash">Caixa aberto</option>}
+     </select>
+     <input name="reference" aria-label="Referência da transferência" placeholder="Comprovante externo"/>
+     <button disabled={busy}>Pagar comissão</button>
+    </form>}
    </td></tr>)}</tbody></table>
   </div>
  </section>;

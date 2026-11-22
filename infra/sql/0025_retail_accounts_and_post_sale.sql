@@ -7,7 +7,7 @@ ALTER TABLE sale_lines ADD COLUMN cost_unit_cents bigint CHECK(cost_unit_cents>=
 ALTER TABLE sale_payments DROP CONSTRAINT sale_payments_method_check;
 ALTER TABLE sale_payments ADD CONSTRAINT sale_payments_method_check CHECK(method IN ('cash','pix_manual','card_external','store_credit','customer_credit','exchange_credit'));
 ALTER TABLE cash_movements DROP CONSTRAINT cash_movements_kind_check;
-ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_kind_check CHECK(kind IN ('supply','withdrawal','refund','credit_collection','exchange_collection','account_payment'));
+ALTER TABLE cash_movements ADD CONSTRAINT cash_movements_kind_check CHECK(kind IN ('supply','withdrawal','refund','credit_collection','exchange_collection','account_payment','commission_payment'));
 
 CREATE TABLE retail_accounts (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,6 +77,22 @@ CREATE TABLE retail_commission_reversals (
  FOREIGN KEY(sale_id,store_id) REFERENCES sales(id,store_id)
 );
 CREATE INDEX retail_commission_reversals_seller_idx ON retail_commission_reversals(store_id,seller_id,created_at);
+CREATE TABLE retail_commission_payouts(
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ store_id uuid NOT NULL REFERENCES stores(id), seller_id uuid NOT NULL REFERENCES users(id),
+ amount_cents bigint NOT NULL CHECK(amount_cents>0),
+ method text NOT NULL CHECK(method IN ('cash','bank_transfer')),
+ cash_session_id uuid,external_reference text,
+ actor_id uuid NOT NULL REFERENCES users(id),
+ created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(store_id,id),
+ FOREIGN KEY(cash_session_id,store_id) REFERENCES cash_sessions(id,store_id),
+ CHECK ((method='cash' AND cash_session_id IS NOT NULL AND external_reference IS NULL)
+  OR (method='bank_transfer' AND cash_session_id IS NULL AND external_reference IS NOT NULL
+   AND length(trim(external_reference))>=6))
+);
+CREATE UNIQUE INDEX retail_commission_payout_external ON retail_commission_payouts
+ (store_id,external_reference) WHERE method='bank_transfer';
+CREATE INDEX retail_commission_payouts_seller_idx ON retail_commission_payouts(store_id,seller_id,created_at);
 CREATE TABLE retail_loyalty_events (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),store_id uuid NOT NULL,customer_id uuid NOT NULL,
  sale_id uuid, points bigint NOT NULL CHECK(points<>0),kind text NOT NULL CHECK(kind IN ('earn','redeem','reverse')),

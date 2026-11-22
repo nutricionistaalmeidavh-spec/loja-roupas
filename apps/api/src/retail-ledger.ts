@@ -150,7 +150,9 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    (coalesce((SELECT sum(e.amount_cents) FROM retail_commission_entries e
     WHERE e.store_id=$1 AND e.seller_id=u.id),0)
     -coalesce((SELECT sum(x.amount_cents) FROM retail_commission_reversals x
-     WHERE x.store_id=$1 AND x.seller_id=u.id),0))::text AS accrued_cents
+     WHERE x.store_id=$1 AND x.seller_id=u.id),0))::text AS accrued_cents,
+   coalesce((SELECT sum(p.amount_cents) FROM retail_commission_payouts p
+    WHERE p.store_id=$1 AND p.seller_id=u.id),0)::text AS paid_cents
    FROM users u JOIN user_store_roles ur ON ur.user_id=u.id AND ur.store_id=$1
    LEFT JOIN retail_commission_rules r ON r.store_id=$1 AND r.seller_id=u.id
    WHERE u.status='active' GROUP BY u.id,u.login,r.rate_bps ORDER BY u.login LIMIT 100`,
@@ -179,6 +181,54 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
   return out.result;
  });
 
+ app.post<{Params:{id:string};Body:{amount_cents:number;method:'cash'|'bank_transfer';
+  cash_session_id?:string;external_reference?:string}}>('/v1/management/commissions/:id/payout',{
+  schema:{params,body:{type:'object',additionalProperties:false,required:['amount_cents','method'],
+   properties:{amount_cents:money,method:{type:'string',enum:['cash','bank_transfer']},
+    cash_session_id:{type:'string',pattern:uuid},external_reference:{type:'string',minLength:6,maxLength:128}}}}
+ },async(req,reply)=>{
+  if(requirePermission(req,reply,'finance.write'))return reply;
+  const auth=req.authContext!,b=req.body;
+  if(b.method==='cash'?(!b.cash_session_id||b.external_reference):
+   (!b.external_reference||b.cash_session_id))
+   throw new DomainError(422,'COMMISSION_PAYOUT_PROOF','Dinheiro exige caixa; transferência exige referência');
+  const out=await withIdempotentTransaction(db,auth,'retail.commission.payout:'+req.params.id,
+   key(req.headers['idempotency-key']),b,async client=>{
+   const rule=await client.query(`SELECT 1 FROM retail_commission_rules
+    WHERE store_id=$1 AND seller_id=$2 FOR UPDATE`,[auth.storeId,req.params.id]);
+   if(!rule.rowCount)throw new DomainError(404,'COMMISSION_RULE_MISSING','Defina taxa antes de liquidar comissões');
+   const sums=await client.query<{accrued:string;reversed:string;paid:string}>(`SELECT
+    (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_entries
+     WHERE store_id=$1 AND seller_id=$2) AS accrued,
+    (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_reversals
+     WHERE store_id=$1 AND seller_id=$2) AS reversed,
+    (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_payouts
+     WHERE store_id=$1 AND seller_id=$2) AS paid`,[auth.storeId,req.params.id]);
+   const due=Number(sums.rows[0].accrued)-Number(sums.rows[0].reversed)-Number(sums.rows[0].paid);
+   if(b.amount_cents>due)throw new DomainError(409,'COMMISSION_DUE','Valor supera comissão devida');
+   if(b.method==='cash'){
+    const cash=await client.query<{opening_cents:string;closed_at:Date|null}>(`SELECT opening_cents::text,closed_at
+     FROM cash_sessions WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,b.cash_session_id]);
+    if(!cash.rowCount||cash.rows[0].closed_at)throw new DomainError(409,'CASH_CLOSED','Caixa não aberto');
+    const available=await expectedCash(client,auth.storeId,b.cash_session_id!,Number(cash.rows[0].opening_cents));
+    if(b.amount_cents>available)throw new DomainError(409,'INSUFFICIENT_CASH','Dinheiro insuficiente');
+    await client.query(`INSERT INTO cash_movements(store_id,cash_session_id,actor_id,kind,amount_cents,reason)
+     VALUES($1,$2,$3,'commission_payment',$4,$5)`,
+     [auth.storeId,b.cash_session_id,auth.userId,b.amount_cents,'Comissão vendedor '+req.params.id]);
+   }
+   const q=await client.query<{id:string}>(`INSERT INTO retail_commission_payouts
+    (store_id,seller_id,amount_cents,method,cash_session_id,external_reference,actor_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,
+    [auth.storeId,req.params.id,b.amount_cents,b.method,b.cash_session_id||null,
+     b.method==='cash'?null:b.external_reference!.trim(),auth.userId]);
+   await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
+    VALUES($1,$2,'commissions.payout',$3,$4::jsonb)`,
+    [auth.storeId,auth.userId,q.rows[0].id,
+     JSON.stringify({seller_id:req.params.id,amount_cents:b.amount_cents,method:b.method})]);
+   return {id:q.rows[0].id,remaining_cents:due-b.amount_cents};
+  });
+  return reply.code(out.replayed?200:201).send({...out.result,replayed:out.replayed});
+ });
  app.get<{Params:{id:string}}>('/v1/management/customers/:id/loyalty',{schema:{params}},async(req,reply)=>{
   if(requirePermission(req,reply,'customer.read'))return reply;
   const c=await db.query(`SELECT id FROM retail_customers WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL`,
