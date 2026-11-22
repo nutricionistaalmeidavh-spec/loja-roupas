@@ -1,6 +1,6 @@
 # Backup cifrado e retenção — Loja de Roupas LAN
 
-O banco PostgreSQL permanece canônico e local. O script `scripts/backup-lan.sh` cria um dump custom `pg_dump -Fc` e cifra com **GnuPG AES-256**, gratuito. O novo `scripts/backup-lan-rotate.sh` faz execução com trava `flock`, nome único UTC, exige senha fora do repositório e elimina apenas arquivos antigos da própria rotina depois de um backup completo.
+O banco PostgreSQL permanece canônico e local. Backup e restauração usam **pipes cifrados GnuPG**, sem gravar um dump PostgreSQL temporário em texto claro no diretório externo. O script `scripts/backup-lan.sh` cria um dump custom `pg_dump -Fc` e cifra com **GnuPG AES-256**, gratuito. O novo `scripts/backup-lan-rotate.sh` faz execução com trava `flock`, nome único UTC, exige senha fora do repositório e elimina apenas arquivos antigos da própria rotina depois de um backup completo.
 
 ## Preparar
 
