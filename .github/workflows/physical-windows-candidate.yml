@@ -1,0 +1,81 @@
+name: Loja Física - instalador candidato Windows
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/api/**'
+      - 'apps/web/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - '.github/workflows/physical-windows-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    env:
+      LOJA_PHYSICAL_EDITION: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependências OSS fixadas
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+          if($LASTEXITCODE -ne 0){throw 'Dependências falharam'}
+      - name: Testes e build edição física
+        shell: pwsh
+        run: |
+          pnpm --filter @loja/api typecheck
+          if($LASTEXITCODE -ne 0){throw 'Typecheck API falhou'}
+          pnpm --filter @loja/api test
+          if($LASTEXITCODE -ne 0){throw 'API tests falharam'}
+          pnpm --filter @loja/desktop test
+          if($LASTEXITCODE -ne 0){throw 'Desktop tests falharam'}
+          pnpm --filter @loja/web build
+          if($LASTEXITCODE -ne 0){throw 'Web build falhou'}
+          pnpm --filter @loja/desktop build
+          if($LASTEXITCODE -ne 0){throw 'Desktop build falhou'}
+          $marker='dist/desktop-win32-x64/resources/app/physical-edition.json'
+          if(!(Test-Path $marker)){throw 'Marcador da edição física ausente'}
+          $edition=Get-Content $marker -Raw | ConvertFrom-Json
+          if($edition.edition -ne 'physical'){throw 'Marcador da edição física inválido'}
+          pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
+          if($LASTEXITCODE -ne 0){throw 'Empacotamento da API/Postgres falhou'}
+      - name: Criar e validar instalador NSIS
+        shell: pwsh
+        run: |
+          $compiler="${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if(!(Test-Path $compiler)){
+            choco install nsis --yes --no-progress
+            if($LASTEXITCODE -ne 0){throw 'NSIS indisponível'}
+          }
+          & $compiler /V2 infra/desktop/loja-roupas.nsi
+          if($LASTEXITCODE -ne 0){throw 'NSIS falhou'}
+          $installer=(Resolve-Path 'dist/Loja-de-Roupas-Setup-x64.exe').Path
+          $install=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas'
+          $process=Start-Process $installer -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Instalação falhou'}
+          node scripts/smoke-single-machine.mjs "$install/app/electron.exe"
+          if($LASTEXITCODE -ne 0){throw 'Smoke primeiro uso falhou'}
+          $installed="$install/app/resources/app/physical-edition.json"
+          if(!(Test-Path $installed)){throw 'Edição incorreta instalada'}
+          $process=Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
+          $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Loja-de-Roupas-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
+      - name: Arquivar somente candidata sem publicar release
+        uses: actions/upload-artifact@v4
+        with:
+          name: loja-fisica-windows-candidata
+          path: |
+            dist/Loja-de-Roupas-Setup-x64.exe
+            dist/SHA256SUMS
+          retention-days: 7
+          if-no-files-found: error
