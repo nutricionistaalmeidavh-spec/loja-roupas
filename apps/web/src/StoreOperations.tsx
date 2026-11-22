@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+declare global{interface Window{lojaPrinter?:{
+ list():Promise<Array<{name:string;displayName:string;isDefault:boolean}>>;
+ print(request:{deviceName:string;paperMm:58|80}):Promise<{submitted:boolean}>;
+}}}
 import type { FormEvent } from 'react';
 import { ApiError, headers, jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
@@ -282,6 +286,13 @@ export function Storefront({storeId}:{storeId:string}) {
 
 export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready:boolean}) {
   const [paper,setPaper] = useState<58|80>(80);
+  const [printer,setPrinter]=useState('');
+  const [devices,setDevices]=useState<Array<{name:string;displayName:string;isDefault:boolean}>>([]);
+  useEffect(()=>{
+   let alive=true;
+   void window.lojaPrinter?.list().then(found=>{if(alive)setDevices(found);}).catch(()=>{});
+   return ()=>{alive=false;};
+  },[]);
   const [error,setError] = useState('');
   const [busy,setBusy] = useState(false);
   const pending = useRef<{paper:58|80;key:string} | null>(null);
@@ -298,7 +309,10 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
       }, fetch);
       pending.current = null;
       document.documentElement.dataset.receiptPaper = String(paper);
-      try { window.print(); } finally { delete document.documentElement.dataset.receiptPaper; }
+      try {
+        if(printer&&window.lojaPrinter)await window.lojaPrinter.print({deviceName:printer,paperMm:paper});
+        else window.print();
+      } finally { delete document.documentElement.dataset.receiptPaper; }
     } catch (error) {
       setError(message(error));
     } finally {
@@ -309,6 +323,11 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
     <label>Papel <select value={paper} disabled={busy} onChange={event => setPaper(event.target.value==='58'?58:80)}>
       <option value={58}>58 mm</option><option value={80}>80 mm</option>
     </select></label>
+    {window.lojaPrinter&&<label>Impressora
+      <select aria-label="Impressora do comprovante" value={printer} disabled={busy} onChange={event=>setPrinter(event.target.value)}>
+       <option value="">Escolher na janela do Windows</option>
+       {devices.map(device=><option key={device.name} value={device.name}>{device.displayName}{device.isDefault?' (padrão)':''}</option>)}
+      </select></label>}
     <button className="light-button" disabled={!ready || busy} onClick={() => void print()}>Imprimir comprovante não fiscal</button>
     {error && <p role="alert" className="error">{error}</p>}
   </div>;
