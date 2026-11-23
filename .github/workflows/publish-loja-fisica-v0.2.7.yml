@@ -1,0 +1,193 @@
+name: Publicar Loja Física v0.2.7 — Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/desktop/**'
+      - 'apps/api/**'
+      - 'apps/web/**'
+      - 'infra/**'
+      - 'scripts/**'
+      - '.github/workflows/publish-loja-fisica-v0.2.7.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-loja-fisica-v0.2.7]')
+    runs-on: windows-latest
+    timeout-minutes: 55
+    env:
+      LOJA_PHYSICAL_EDITION: 'true'
+      LOJA_PHYSICAL_VERSION: '0.2.7'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependências OSS fixadas
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+          if($LASTEXITCODE -ne 0){throw 'Dependências falharam'}
+      - name: Testes e build edição física
+        shell: pwsh
+        run: |
+          pnpm --filter @loja/api typecheck
+          if($LASTEXITCODE -ne 0){throw 'Typecheck API falhou'}
+          pnpm --filter @loja/api test
+          if($LASTEXITCODE -ne 0){throw 'API tests falharam'}
+          pnpm --filter @loja/desktop test
+          if($LASTEXITCODE -ne 0){throw 'Desktop tests falharam'}
+          pnpm --filter @loja/web build
+          if($LASTEXITCODE -ne 0){throw 'Web build falhou'}
+          pnpm --filter @loja/desktop build
+          if($LASTEXITCODE -ne 0){throw 'Desktop build falhou'}
+          $marker='dist/desktop-win32-x64/resources/app/physical-edition.json'
+          if(!(Test-Path $marker)){throw 'Marcador da edição física ausente'}
+          $edition=Get-Content $marker -Raw | ConvertFrom-Json
+          $version=(Get-Content 'dist/desktop-win32-x64/resources/app/package.json' -Raw | ConvertFrom-Json).version
+          if($version -ne '0.2.7'){throw 'Versão física incorreta'}
+          if($edition.edition -ne 'physical'){throw 'Marcador da edição física inválido'}
+          pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
+          if($LASTEXITCODE -ne 0){throw 'Empacotamento da API/Postgres falhou'}
+      - name: Criar e validar instalador NSIS
+        shell: pwsh
+        run: |
+          $compiler="${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if(!(Test-Path $compiler)){
+            choco install nsis --yes --no-progress
+            if($LASTEXITCODE -ne 0){throw 'NSIS indisponível'}
+          }
+          & $compiler /V2 infra/desktop/loja-roupas-fisica.nsi
+          if($LASTEXITCODE -ne 0){throw 'NSIS falhou'}
+          $installer=(Resolve-Path 'dist/Loja-de-Roupas-Fisica-Setup-x64.exe').Path
+          $install=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica'
+          $process=Start-Process $installer -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Instalação falhou'}
+          $icon=Join-Path $install 'app/resources/app/assets/loja-roupas.ico'
+          if(!(Test-Path $icon -PathType Leaf)){throw 'Ícone do aplicativo não foi instalado'}
+          $shell=New-Object -ComObject WScript.Shell
+          foreach($shortcutPath in @(
+            (Join-Path ([Environment]::GetFolderPath('Programs')) 'Loja de Roupas Fisica.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Loja de Roupas Fisica.lnk')
+          )){
+            if(!(Test-Path $shortcutPath -PathType Leaf)){throw "Atalho Windows ausente: $shortcutPath"}
+            $shortcut=$shell.CreateShortcut($shortcutPath)
+            if($shortcut.IconLocation -notlike '*loja-roupas.ico*'){throw "Atalho sem ícone personalizado: $shortcutPath"}
+            if($shortcut.TargetPath -ne (Join-Path $install 'app/electron.exe')){throw "Destino do atalho incorreto: $shortcutPath"}
+          }
+          node scripts/smoke-single-machine.mjs "$install/app/electron.exe"
+          if($LASTEXITCODE -ne 0){throw 'Smoke primeiro uso falhou'}
+          $installed="$install/app/resources/app/physical-edition.json"
+          if(!(Test-Path $installed)){throw 'Edição incorreta instalada'}
+          if((Get-Content "$install/app/resources/app/package.json" -Raw | ConvertFrom-Json).version -ne '0.2.7'){throw 'Versão física instalada incorreta'}
+          $process=Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
+          $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Loja-de-Roupas-Fisica-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
+      - name: Validar migração real v0.2.6 para v0.2.7 e preservar perfil
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $base='https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/download/loja-fisica-v0.2.6/'
+          $oldFile=Join-Path $env:RUNNER_TEMP 'Loja-Fisica-v0.2.6-original.exe'
+          $oldManifest=Join-Path $env:RUNNER_TEMP 'Loja-Fisica-v0.2.6-SHA256SUMS'
+          Invoke-WebRequest -Uri ($base+'Loja-de-Roupas-Fisica-Setup-x64.exe') -OutFile $oldFile
+          Invoke-WebRequest -Uri ($base+'SHA256SUMS') -OutFile $oldManifest
+          $manifest=Get-Content $oldManifest -Raw
+          $pattern='(?m)^([A-Fa-f0-9]{64}) [ *]Loja-de-Roupas-Fisica-Setup-x64\.exe\r?$'
+          $checksumMatches=[regex]::Matches($manifest,$pattern)
+          if($checksumMatches.Count -ne 1){throw 'Checksum anterior ausente ou duplicado'}
+          $expected=$checksumMatches[0].Groups[1].Value.ToLowerInvariant()
+          $actual=(Get-FileHash $oldFile -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($actual -ne $expected){throw 'Checksum do instalador físico anterior inválido'}
+          $root=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica'
+          $old=Start-Process $oldFile -ArgumentList ('/S /D='+$root) -Wait -PassThru
+          if($old.ExitCode -ne 0){throw 'Instalação física v0.2.6 não concluída'}
+          $oldVersion=(Get-Content (Join-Path $root 'app/resources/app/package.json') -Raw | ConvertFrom-Json).version
+          if($oldVersion -ne '0.2.6'){throw 'Versão física original incorreta'}
+          $profile=Join-Path $env:APPDATA 'loja-roupas-fisica'
+          New-Item -ItemType Directory -Force -Path $profile|Out-Null
+          $canary=Join-Path $profile 'qa-upgrade-preserve.txt'
+          Set-Content -LiteralPath $canary -Value 'DADOS LOCAIS PRESERVAR' -Encoding UTF8
+          $newInstaller=(Resolve-Path 'dist/Loja-de-Roupas-Fisica-Setup-x64.exe').Path
+          $hash=(Get-FileHash $newInstaller -Algorithm SHA256).Hash
+          $result=Join-Path $env:RUNNER_TEMP 'loja-upgrade-026-027-result.json'
+          $rollback=Join-Path $env:RUNNER_TEMP 'loja-upgrade-026-027-rollback'
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File apps/desktop/src/update-helper.ps1 -ParentPid 999999 -Installer $newInstaller -ExpectedSha256 $hash -ExpectedVersion '0.2.7' -InstallDir $root -RollbackDir $rollback -ResultFile $result
+          if($LASTEXITCODE -ne 0){
+            if(Test-Path $result){Write-Host (Get-Content $result -Raw)}
+            throw 'Atualizador v0.2.6 -> v0.2.7 falhou'
+          }
+          $updateResult=Get-Content $result -Raw|ConvertFrom-Json
+          if($updateResult.status -ne 'success'){throw "Atualização não concluída: $($updateResult.message)"}
+          $newVersion=(Get-Content (Join-Path $root 'app/resources/app/package.json') -Raw | ConvertFrom-Json).version
+          if($newVersion -ne '0.2.7'){throw 'Nova versão física incorreta após upgrade'}
+          if(!(Test-Path (Join-Path $root 'app/resources/app/assets/loja-roupas.ico'))){throw 'Ícone ausente após upgrade'}
+          if(!(Test-Path (Join-Path $rollback 'app/electron.exe'))){throw 'Snapshot de rollback não criado'}
+          if((Get-Content $canary -Raw).Trim() -ne 'DADOS LOCAIS PRESERVAR'){throw 'Dados locais do perfil foram alterados'}
+          Start-Sleep -Seconds 2
+          Get-CimInstance Win32_Process -Filter "Name='electron.exe'" |
+            Where-Object { $_.ExecutablePath -eq (Join-Path $root 'app/electron.exe') } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          $uninstall=Start-Process (Join-Path $root 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+          if($uninstall.ExitCode -ne 0){throw 'Desinstalação após upgrade falhou'}
+          if(!(Test-Path $canary)){throw 'Desinstalação removeu os dados locais'}
+      - name: Arquivar instalador validado para release
+        uses: actions/upload-artifact@v4
+        with:
+          name: loja-fisica-v0.2.7-windows-release
+          path: |
+            dist/Loja-de-Roupas-Fisica-Setup-x64.exe
+            dist/SHA256SUMS
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publicar pré-release física isolada v0.2.7
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo='${{ github.repository }}'
+          $tag='loja-fisica-v0.2.7'
+          $exe='dist/Loja-de-Roupas-Fisica-Setup-x64.exe'
+          $checksum='dist/SHA256SUMS'
+          if(!(Test-Path $exe -PathType Leaf) -or !(Test-Path $checksum -PathType Leaf)){
+            throw 'Artefatos obrigatórios ausentes'
+          }
+          if((Get-Item $exe).Length -lt 30000000){throw 'Instalador inválido ou incompleto'}
+          $digest=(Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest=(Get-Content $checksum -Raw).Trim()
+          if($manifest -ne "$digest  Loja-de-Roupas-Fisica-Setup-x64.exe"){
+            throw 'Checksum de distribuição divergente'
+          }
+          gh release view $tag --repo $repo --json tagName *> $null
+          if($LASTEXITCODE -eq 0){throw "Release $tag já publicada: não sobrescrever"}
+          @'
+          ## Loja de Roupas Física v0.2.7 — Windows 64 bits
+
+          ### Novo ícone da Loja de Roupas
+          - Ícone próprio no instalador Windows, na desinstalação e nas janelas Electron.
+          - Atalhos personalizados na Área de Trabalho e no Menu Iniciar; não usa mais o símbolo genérico do Electron.
+          - ICO multirresolução e fonte SVG editável incluídos no projeto.
+
+          ### Atualização segura
+          - Continua verificando apenas releases físicas e solicitando confirmação do usuário para baixar e instalar.
+          - Testa instalação real e atualização da edição física v0.2.6, com validação SHA-256 e preservação do perfil local.
+          - Preserva backup local PostgreSQL, rollback e o comportamento operacional de versões anteriores.
+
+          Instalador Windows 64 bits para comércio presencial: caixa, estoque, cadastro de produtos, inventário, despesas, clientes e comprovantes NÃO FISCAIS.
+          Banco PostgreSQL, API e interface incluídos localmente. Núcleo R$ 0, open source e self-hosted; sem assinatura ou ativação paga obrigatória.
+          Esta é uma pré-release isolada da edição física, sem alteração no canal da edição completa.
+          Para atualizar quem já tem a edição física instalada, use o próprio atualizador ou execute este instalador sem desinstalar a versão anterior. Nunca apague a pasta de dados.
+          Confira o SHA256SUMS. Equipamentos e periféricos exigem homologação em ambiente real.
+          '@ | Set-Content -LiteralPath 'dist/RELEASE_NOTES_FISICA.md' -Encoding UTF8
+          gh release create $tag $exe $checksum --repo $repo --target '${{ github.sha }}' --title 'Loja de Roupas Física v0.2.7' --notes-file 'dist/RELEASE_NOTES_FISICA.md' --prerelease --latest=false
+          if($LASTEXITCODE -ne 0){throw 'Falha ao publicar a release física'}
+          $published=gh release view $tag --repo $repo --json tagName,isDraft,isPrerelease,assets,url | ConvertFrom-Json
+          if($published.isDraft -or !$published.isPrerelease){throw 'Canal de release incorreto'}
+          if(!($published.assets.name -contains 'Loja-de-Roupas-Fisica-Setup-x64.exe')){throw 'EXE não publicado'}
+          if(!($published.assets.name -contains 'SHA256SUMS')){throw 'Manifesto SHA256 não publicado'}
+          Write-Host "PUBLICADO: $($published.url)"
