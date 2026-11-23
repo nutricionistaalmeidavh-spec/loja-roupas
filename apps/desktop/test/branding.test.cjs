@@ -28,22 +28,22 @@ test('ícone Windows possui resoluções apropriadas para atalhos e telas de alt
 
 test('empacotador inclui ícone dentro de resources/app/assets',()=>{
  const source=read('scripts/package-desktop.mjs');
- assert.match(source,/assets['"],'loja-roupas\\.ico'/);
+ assert.match(source,/assets['"],'loja-roupas\.ico'/);
 });
 
 test('ambos os instaladores criam atalhos com ícone próprio',()=>{
  for(const filename of ['loja-roupas.nsi','loja-roupas-fisica.nsi']){
   const source=read('infra/desktop/'+filename);
-  assert.match(source,/(?:^Icon|^!define MUI_ICON)\\s+"[^\\r\\n]*loja-roupas\\.ico"/m);
-  assert.match(source,/(?:^UninstallIcon|^!define MUI_UNICON)\\s+"[^\\r\\n]*loja-roupas\\.ico"/m);
-  assert.match(source,/CreateShortcut\\s+"\\$SMPROGRAMS\\\\[^\\r\\n]+loja-roupas\\.ico"\\s+0/);
-  assert.match(source,/CreateShortcut\\s+"\\$DESKTOP\\\\[^\\r\\n]+loja-roupas\\.ico"\\s+0/);
-  assert.match(source,/Delete\\s+"\\$DESKTOP\\\\/);
+  assert.match(source,/(?:^Icon|^!define MUI_ICON)\s+"[^\r\n]*loja-roupas\.ico"/m);
+  assert.match(source,/(?:^UninstallIcon|^!define MUI_UNICON)\s+"[^\r\n]*loja-roupas\.ico"/m);
+  assert.match(source,/CreateShortcut\s+"\$SMPROGRAMS\\[^\r\n]+loja-roupas\.ico"\s+0/);
+  assert.match(source,/CreateShortcut\s+"\$DESKTOP\\[^\r\n]+loja-roupas\.ico"\s+0/);
+  assert.match(source,/Delete\s+"\$DESKTOP\\/);
  }
 });
 
 test('janelas do Electron apontam para o ícone instalado no Windows',()=>{
  const source=read('apps/desktop/src/main.cjs');
- assert.match(source,/loja-roupas\\.ico/);
+ assert.match(source,/loja-roupas\.ico/);
  assert.equal((source.match(/icon:desktopIcon/g)||[]).length,3);
 });
