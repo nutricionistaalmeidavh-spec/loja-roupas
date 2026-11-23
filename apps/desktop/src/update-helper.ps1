@@ -77,12 +77,17 @@ try {
    if(!(Test-Path -LiteralPath (Join-Path $appPath 'electron.exe'))){throw 'Cópia restaurada incompleta'}
    $message+='; versão anterior restaurada'
   }
-  # Even if the error happened before installer execution, reopen the
-  # existing program so users are not left with a closed shop.
+ }catch{$message+='; restauração automática falhou: '+$_.Exception.Message}
+ # Persist the error BEFORE launching Electron, so the newly opened UI reads
+ # the failure instead of the stale 'pending' marker.
+ Save-Result $false $message
+ try{
   if(Test-Path -LiteralPath (Join-Path $appPath 'electron.exe')){
    Open-InstalledApp $appPath
   }
- }catch{$message+='; recuperação/reabertura falhou: '+$_.Exception.Message}
- Save-Result $false $message
+ }catch{
+  $message+='; reabertura também falhou: '+$_.Exception.Message
+  Save-Result $false $message
+ }
  exit 1
 }
