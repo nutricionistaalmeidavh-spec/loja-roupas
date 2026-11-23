@@ -87,9 +87,9 @@ jobs:
           Invoke-WebRequest -Uri ($base+'SHA256SUMS') -OutFile $oldManifest
           $manifest=Get-Content $oldManifest -Raw
           $pattern='(?m)^([A-Fa-f0-9]{64}) [ *]Loja-de-Roupas-Fisica-Setup-x64\.exe\r?$'
-          $matches=[regex]::Matches($manifest,$pattern)
-          if($matches.Count -ne 1){throw 'Checksum anterior ausente ou duplicado'}
-          $expected=$matches[0].Groups[1].Value.ToLowerInvariant()
+          $checksumMatches=[regex]::Matches($manifest,$pattern)
+          if($checksumMatches.Count -ne 1){throw 'Checksum anterior ausente ou duplicado'}
+          $expected=$checksumMatches[0].Groups[1].Value.ToLowerInvariant()
           $actual=(Get-FileHash $oldFile -Algorithm SHA256).Hash.ToLowerInvariant()
           if($actual -ne $expected){throw 'Checksum do instalador físico anterior inválido'}
           $root=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica'
