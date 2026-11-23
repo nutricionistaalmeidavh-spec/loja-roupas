@@ -37,6 +37,11 @@ try{
   appWindow=instance.windows().find(w=>w.url().startsWith('http://127.0.0.1:'));
  }
  assert.ok(appWindow,'Aplicativo não abriu após bootstrap');
+ // O aviso de atualização pode aparecer após o primeiro carregamento. No smoke,
+ // apenas dispensar o modal, sem instalar ou baixar nenhuma atualização.
+ await appWindow.addLocatorHandler(appWindow.getByRole('dialog',{name:'Atualização da loja'}),async modal=>{
+  await modal.getByRole('button',{name:'Agora não'}).click();
+ });
  try {
   await appWindow.getByRole('heading',{name:'Bem-vindo à sua loja'}).waitFor({timeout:30000});
  } catch(error){
