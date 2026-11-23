@@ -14,6 +14,8 @@ await mkdir(output,{recursive:true});
 await cp(distribution,output,{recursive:true,verbatimSymlinks:true});
 const application = path.join(resources,'app');
 await mkdir(application,{recursive:true});
+await mkdir(path.join(application,'assets'),{recursive:true});
+await cp(new URL('../apps/desktop/assets/loja-roupas.ico',import.meta.url),path.join(application,'assets','loja-roupas.ico'));
 await cp(new URL('../apps/desktop/src/main.cjs',import.meta.url),path.join(application,'main.cjs'));
 await cp(new URL('../apps/desktop/src/local-runtime.cjs',import.meta.url),path.join(application,'local-runtime.cjs'));
 await cp(new URL('../apps/desktop/src/local-backup.cjs',import.meta.url),path.join(application,'local-backup.cjs'));
