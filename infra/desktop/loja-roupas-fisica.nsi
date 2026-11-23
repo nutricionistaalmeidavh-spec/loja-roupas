@@ -4,6 +4,8 @@ OutFile "../../dist/Loja-de-Roupas-Fisica-Setup-x64.exe"
 InstallDir "$LOCALAPPDATA\Programs\Loja de Roupas Fisica"
 InstallDirRegKey HKCU "Software\Loja de Roupas Fisica" "InstallDir"
 RequestExecutionLevel user
+!define MUI_ICON "..\..\apps\desktop\assets\loja-roupas.ico"
+!define MUI_UNICON "..\..\apps\desktop\assets\loja-roupas.ico"
 !include "MUI2.nsh"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\app\electron.exe"
@@ -20,7 +22,8 @@ Section "Loja de Roupas Fisica"
   SetOutPath "$INSTDIR\app"
   File /r "..\..\dist\desktop-win32-x64\*"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
-  CreateShortcut "$SMPROGRAMS\Loja de Roupas Fisica.lnk" "$INSTDIR\app\electron.exe"
+  CreateShortcut "$SMPROGRAMS\Loja de Roupas Fisica.lnk" "$INSTDIR\app\electron.exe" "" "$INSTDIR\app\resources\app\assets\loja-roupas.ico" 0
+  CreateShortcut "$DESKTOP\Loja de Roupas Fisica.lnk" "$INSTDIR\app\electron.exe" "" "$INSTDIR\app\resources\app\assets\loja-roupas.ico" 0
   WriteRegStr HKCU "Software\Loja de Roupas Fisica" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Loja de Roupas Fisica" "DisplayName" "Loja de Roupas Fisica"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Loja de Roupas Fisica" "UninstallString" '"$INSTDIR\Uninstall.exe"'
@@ -31,6 +34,7 @@ SectionEnd
 
 Section "Uninstall"
   SetShellVarContext current
+  Delete "$DESKTOP\Loja de Roupas Fisica.lnk"
   Delete "$SMPROGRAMS\Loja de Roupas Fisica.lnk"
   RMDir /r "$INSTDIR\app"
   Delete "$INSTDIR\Uninstall.exe"

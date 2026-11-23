@@ -9,6 +9,7 @@ const {createDesktopUpdater}=require('./desktop-updater.cjs');
 const {backupFilename}=require('./local-backup.cjs');
 const {validatePrinterSelection}=require('./native-print.cjs');
 
+const desktopIcon=process.platform==='win32'?path.join(__dirname,'assets','loja-roupas.ico'):undefined;
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
 const commercialEdition=existsSync(path.join(__dirname,'commercial-edition.json'));
 const physicalEdition=existsSync(path.join(__dirname,'physical-edition.json'));
@@ -44,7 +45,7 @@ function configuredUrl(){
 function openWindow(url){
  const window=new BrowserWindow({
   width:1440,height:900,minWidth:760,minHeight:560,
-  show:false,backgroundColor:'#f7f6f4',
+  show:false,backgroundColor:'#f7f6f4',icon:desktopIcon,
   webPreferences:{preload:path.join(__dirname,'update-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
  });
@@ -173,7 +174,7 @@ function registerRecoveryHandlers(){
   if(recoveryWindow&&!recoveryWindow.isDestroyed()){recoveryWindow.focus();return {ok:true};}
   recoveryWindow=new BrowserWindow({
    width:600,height:720,minWidth:500,minHeight:620,
-   parent:BrowserWindow.fromWebContents(event.sender),modal:true,
+   parent:BrowserWindow.fromWebContents(event.sender),modal:true,icon:desktopIcon,
    webPreferences:{preload:path.join(__dirname,'recovery-preload.cjs'),
      contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}
   });
@@ -276,7 +277,7 @@ async function start(){
  registerRecoveryHandlers();
  registerBackupHandlers();
  registerPrinterHandlers();
- setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,
+ setupWindow=new BrowserWindow({width:670,height:820,minWidth:530,minHeight:670,icon:desktopIcon,
   webPreferences:{preload:path.join(__dirname,'setup-preload.cjs'),
    contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true}});
  await setupWindow.loadFile(path.join(__dirname,'setup.html'));
