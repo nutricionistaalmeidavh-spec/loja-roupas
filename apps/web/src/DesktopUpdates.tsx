@@ -61,6 +61,7 @@ export function UpdateStartupDialog(){
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState<Progress|null>(null);
  const [error,setError]=useState('');
+ const [lastResult,setLastResult]=useState<LastResult>(null);
  const dialogRef=useRef<HTMLDialogElement>(null);
  useEffect(()=>{
   const bridge=window.lojaUpdates;
@@ -75,6 +76,7 @@ export function UpdateStartupDialog(){
    }
   });
   void bridge.check().then(result=>{if(alive&&result.available)setRelease(result.available);}).catch(()=>{});
+  void bridge.lastResult().then(result=>{if(alive)setLastResult(result);}).catch(()=>{});
   return ()=>{alive=false;unsubscribe();};
  },[]);
  useEffect(()=>{
@@ -84,7 +86,7 @@ export function UpdateStartupDialog(){
  },[release,dismissed]);
  async function install(){
   if(!window.lojaUpdates||busy)return;
-  setBusy(true);setProgress(null);setError('');
+  setBusy(true);setProgress(null);setError('');setLastResult(null);
   try{
    const result=await window.lojaUpdates.install();
    if(result.cancelled||!result.started)setBusy(false);
@@ -95,6 +97,8 @@ export function UpdateStartupDialog(){
  }
  if(!release||dismissed)return null;
  const percent=busy?downloadPercentage(progress):null;
+ const previousFailure=!busy&&!error&&lastResult?.status==='failed'?(lastResult.message||'A atualização não foi concluída.'):null;
+ const pending=!busy&&!error&&lastResult?.status==='pending';
  return <dialog ref={dialogRef} className="update-dialog" aria-label="Atualização da loja"
     onCancel={event=>{if(busy){event.preventDefault();return;}setDismissed(true);}}>
   <div className="update-dialog-content">
@@ -127,10 +131,11 @@ export function UpdateStartupDialog(){
      <span>{updateStage(progress)}</span>
     </div>:
     <p className="update-confirmation-note">O download começa somente depois da sua confirmação.</p>}
-   {error&&<div className="update-dialog-error" role="alert">
+   {pending&&<p role="status" className="update-confirmation-note">A última atualização não foi confirmada. Verifique a versão instalada antes de tentar novamente.</p>}
+   {(error||previousFailure)&&<div className="update-dialog-error" role="alert">
     <strong>Não foi possível concluir a atualização.</strong>
     <p>Você pode tentar novamente.</p>
-    <details><summary>Detalhes do erro</summary><p>{error}</p></details>
+    <details><summary>Detalhes do erro</summary><p>{error||previousFailure}</p></details>
    </div>}
   </div>
   <div className="update-dialog-actions">
