@@ -68,3 +68,22 @@ test('falhas apresentam mensagem simples e detalhes recolhidos',async({page})=>{
  await expect(dialog.getByText('SHA-256: invalid checksum')).toBeHidden();
  await expect(dialog.getByRole('button',{name:'Atualizar agora'})).toBeEnabled();
 });
+
+test('tentativa anterior malsucedida fica visível quando a atualização volta a ser oferecida',async({page})=>{
+ await page.addInitScript(()=>{
+  (window as any).lojaUpdates={
+   info:async()=>({supported:true,currentVersion:'0.2.4'}),
+   check:async()=>({supported:true,currentVersion:'0.2.4',
+    available:{version:'0.2.5',notes:'Interno do instalador',size:250000000}}),
+   lastResult:async()=>({status:'failed',message:'Não foi possível substituir os arquivos; versão anterior restaurada'}),
+   install:async()=>({started:false,cancelled:true}),
+   onProgress:()=>()=>{}
+  };
+ });
+ await page.goto('/');
+ const dialog=page.getByRole('dialog',{name:'Atualização da loja'});
+ await expect(dialog).toBeVisible();
+ await expect(dialog.getByRole('alert')).toContainText('Não foi possível concluir a atualização.');
+ await expect(dialog.getByText('Não foi possível substituir os arquivos; versão anterior restaurada')).toBeHidden();
+ await expect(dialog.getByRole('button',{name:'Atualizar agora'})).toBeEnabled();
+});
