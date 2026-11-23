@@ -78,6 +78,48 @@ jobs:
           if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
           $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  Loja-de-Roupas-Fisica-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
+      - name: Simular atualizador real v0.2.4 para candidata Windows
+        shell: pwsh
+        run: |
+          $source='https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/download/loja-fisica-v0.2.4/Loja-de-Roupas-Fisica-Setup-x64.exe'
+          $oldFile=Join-Path $env:RUNNER_TEMP 'Loja-Fisica-0.2.4-original.exe'
+          Invoke-WebRequest -Uri $source -OutFile $oldFile
+          $expected='73ae899e626879cd3962e71ff3e84689cf7a0b868d834abf8b5237d12a57bc31'
+          if((Get-FileHash -LiteralPath $oldFile -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected){
+            throw 'Checksum da versão antiga não confere'
+          }
+          $root=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica'
+          $legacy=Start-Process $oldFile -ArgumentList ('/S /D='+$root) -Wait -PassThru
+          if($legacy.ExitCode -ne 0){throw 'Instalação antiga falhou'}
+          $legacyVersion=(Get-Content (Join-Path $root 'app/resources/app/package.json') -Raw|ConvertFrom-Json).version
+          if($legacyVersion -ne '0.2.4'){throw 'Pré-condição v0.2.4 incorreta'}
+          $profile=Join-Path $env:APPDATA 'loja-roupas-fisica'
+          New-Item -ItemType Directory -Force -Path $profile|Out-Null
+          $canary=Join-Path $profile 'qa-upgrade-preserve.txt'
+          Set-Content -LiteralPath $canary -Value 'PRESERVAR-DADOS' -Encoding UTF8
+          $newInstaller=(Resolve-Path 'dist/Loja-de-Roupas-Fisica-Setup-x64.exe').Path
+          $hash=(Get-FileHash -LiteralPath $newInstaller -Algorithm SHA256).Hash
+          $result=Join-Path $env:RUNNER_TEMP 'loja-update-test-result.json'
+          $rollback=Join-Path $env:RUNNER_TEMP 'loja-update-test-rollback'
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File apps/desktop/src/update-helper.ps1 -ParentPid 999999 -Installer $newInstaller -ExpectedSha256 $hash -ExpectedVersion '0.2.5' -InstallDir $root -RollbackDir $rollback -ResultFile $result
+          if($LASTEXITCODE -ne 0){
+            if(Test-Path $result){Write-Host (Get-Content $result -Raw)}
+            throw 'Atualizador em Windows falhou'
+          }
+          $updateResult=Get-Content $result -Raw|ConvertFrom-Json
+          if($updateResult.status -ne 'success'){throw "Atualizador não concluiu: $($updateResult.message)"}
+          $newVersion=(Get-Content (Join-Path $root 'app/resources/app/package.json') -Raw|ConvertFrom-Json).version
+          if($newVersion -ne '0.2.5'){throw 'Versão após atualização diferente da candidata'}
+          if(!(Test-Path (Join-Path $rollback 'app/electron.exe'))){throw 'Snapshot anterior ausente'}
+          if((Get-Content $canary -Raw).Trim() -ne 'PRESERVAR-DADOS'){throw 'Perfil de dados foi alterado'}
+          # A versão atualizada relança o app; encerrá-lo antes de desinstalar.
+          Start-Sleep -Seconds 2
+          Get-CimInstance Win32_Process -Filter "Name='electron.exe'" |
+            Where-Object { $_.ExecutablePath -eq (Join-Path $root 'app/electron.exe') } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+          $uninstall=Start-Process (Join-Path $root 'Uninstall.exe') -ArgumentList '/S' -Wait -PassThru
+          if($uninstall.ExitCode -ne 0){throw 'Desinstalação após update falhou'}
+          if(!(Test-Path $canary)){throw 'Desinstalação apagou perfil'}
       - name: Arquivar somente candidata sem publicar release
         uses: actions/upload-artifact@v4
         with:
