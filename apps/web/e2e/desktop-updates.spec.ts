@@ -19,10 +19,11 @@ test('jetlog ao abrir e atualização em Configurações nunca fazem download se
   });
  });
  await page.goto('/');
- const modal=page.getByRole('dialog',{name:/Uma nova versão da Loja de Roupas/});
+ const modal=page.getByRole('dialog',{name:'Atualização da loja'});
  await expect(modal).toBeVisible();
  await expect(modal.getByText('v0.2.0')).toBeVisible();
- await expect(modal.getByText(/Correções de estabilidade/)).toBeVisible();
+ await expect(modal.locator('.update-motion')).toBeVisible();
+ await expect(modal.getByText(/Correções de estabilidade/)).toHaveCount(0);
  expect(await page.evaluate(()=>(window as unknown as {__installCount:number}).__installCount)).toBe(0);
  await modal.getByRole('button',{name:'Agora não'}).click();
  await expect(modal).toHaveCount(0);
