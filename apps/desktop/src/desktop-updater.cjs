@@ -66,6 +66,8 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
   });
   if(answer.response!==1)return {started:false,cancelled:true};
   busy=true;
+  let resultFilePath=null;
+  let helperLaunched=false;
   try{
    // Revalidate release at the actual moment of user consent.
    available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition});
@@ -82,8 +84,14 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
    const rollback=path.join(dir,'rollback-'+app.getVersion()+'-'+timestamp);
    const script=path.join(dir,'upgrade-helper-'+version+'.ps1');
    const resultFile=path.join(dir,'last-result.json');
+   resultFilePath=resultFile;
    await fs.copyFile(path.join(__dirname,'update-helper.ps1'),script);
-   await fs.rm(resultFile,{force:true});
+   // Store a durable marker before quitting. If the detached helper is blocked
+   // or never starts, the next launch can explain the incomplete attempt.
+   await fs.writeFile(resultFile,JSON.stringify({
+    status:'pending',version,message:'Aguardando o instalador concluir a atualização.',
+    updated_at:new Date().toISOString()
+   }),{encoding:'utf8',mode:0o600});
    // PowerShell is built into Windows. It remains running after Electron exits,
    // when the API and PostgreSQL are already stopped by the existing quit flow.
    const args=['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass',
@@ -93,11 +101,18 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
    const child=spawn('powershell.exe',args,{detached:true,stdio:'ignore',windowsHide:true});
    await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
    child.unref();
+   helperLaunched=true;
    emit({phase:'installing',version,backupCreated:Boolean(backup)});
    setTimeout(()=>app.quit(),400);
    return {started:true,backupCreated:Boolean(backup)};
   }catch(error){
-   emit({phase:'error',message:error instanceof Error?error.message:'Falha ao preparar atualização'});
+   const message=error instanceof Error?error.message:'Falha ao preparar atualização';
+   if(resultFilePath&&!helperLaunched){
+    await fs.writeFile(resultFilePath,JSON.stringify({
+     status:'failed',message,updated_at:new Date().toISOString()
+    }),{encoding:'utf8',mode:0o600}).catch(()=>{});
+   }
+   emit({phase:'error',message});
    throw error;
   }finally{busy=false;}
  }

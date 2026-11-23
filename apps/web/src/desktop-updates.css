@@ -1,17 +1,56 @@
-.update-dialog{width:min(560px,calc(100% - 26px));max-height:calc(100dvh - 36px);overflow:auto;border:1px solid #e5e3df;border-radius:20px;background:#fff;color:#222;box-shadow:0 30px 90px #0003;padding:0;font:inherit}
-.update-dialog::backdrop{background:rgba(16,18,22,.55);backdrop-filter:blur(5px)}
-.update-dialog-top{padding:28px 30px 18px;background:linear-gradient(145deg,#f9f8f6,#fff);border-bottom:1px solid #efede9}
+.update-dialog{
+ width:min(448px,calc(100% - 28px));max-height:calc(100dvh - 32px);overflow:auto;
+ border:1px solid rgba(255,255,255,.16);border-radius:26px;
+ background:radial-gradient(ellipse 82% 55% at 50% 7%,rgba(139,116,213,.17),transparent 85%),linear-gradient(150deg,#252331,#17161e 82%);
+ color:#f9f8fc;box-shadow:0 32px 100px rgba(12,9,22,.46);padding:0;font:inherit;
+}
+.update-dialog::backdrop{background:rgba(15,15,22,.65);backdrop-filter:blur(7px)}
+.update-dialog-content{padding:34px 32px 24px;text-align:center}
+.update-motion{position:relative;width:178px;height:178px;margin:0 auto 22px;display:grid;place-items:center;isolation:isolate}
+.update-motion-glow{position:absolute;inset:20px;border-radius:50%;background:radial-gradient(circle,rgba(174,144,255,.28),transparent 72%);filter:blur(12px);animation:update-glow 3.5s ease-in-out infinite}
+.update-motion-orbit{position:absolute;inset:1px;border:1px dashed rgba(205,193,245,.28);border-radius:50%;animation:update-spin 17s linear infinite}
+.update-motion-orbit::after{content:'';position:absolute;top:18px;right:17px;width:8px;height:8px;background:#c1afff;border-radius:50%;box-shadow:0 0 16px rgba(193,175,255,.82)}
+.update-motion-ring{position:absolute;inset:17px;border-radius:50%;background:conic-gradient(from 0deg,#c3b1ff 0 13%,transparent 13% 48%,rgba(195,177,255,.3) 48% 56%,transparent 56%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));animation:update-spin 2.4s linear infinite}
+.update-motion.is-measured .update-motion-ring{animation:none}
+.update-motion-center{position:relative;width:99px;height:99px;display:grid;place-items:center;border-radius:29px;border:1px solid rgba(224,217,255,.27);background:linear-gradient(145deg,rgba(169,142,240,.24),rgba(78,63,115,.16));box-shadow:inset 0 1px rgba(255,255,255,.15),0 16px 34px rgba(7,5,13,.2);animation:update-float 4s ease-in-out infinite}
+.update-motion-center svg{width:44px;height:44px;color:#e4d9ff}
+.update-motion-percent{font-size:27px;font-weight:750;color:#f9f7ff;font-variant-numeric:tabular-nums;letter-spacing:-.06em}
+.update-dialog-kicker{margin:0 0 11px;font-size:10px;letter-spacing:.2em;font-weight:800;color:#c5b6f2}
+.update-dialog h2{margin:0;font-size:clamp(23px,5.5vw,27px);font-weight:750;letter-spacing:-.038em;line-height:1.24;color:#fff}
+.update-dialog-description{margin:12px auto 0;max-width:330px;color:#c8c5d1;font-size:13px;line-height:1.65}
+.update-dialog-description strong{color:#fff;font-weight:750}
+.update-confirmation-note{margin:24px auto 0;max-width:320px;font-size:12px;line-height:1.5;color:#a7a4b3}
+.update-stage{width:fit-content;max-width:100%;display:flex;align-items:center;gap:9px;margin:23px auto 2px;padding:9px 15px;border:1px solid rgba(190,174,241,.24);border-radius:50px;background:rgba(191,174,238,.09);color:#e3dafa;font-size:12px;font-weight:650}
+.update-stage-indicator{flex:none;width:7px;height:7px;border-radius:50%;background:#c2acff;box-shadow:0 0 0 4px rgba(194,172,255,.12);animation:update-dot 1.5s ease-in-out infinite}
+.update-dialog-actions{padding:0 30px 31px;display:flex;gap:10px;align-items:center}
+.update-dialog-actions>button{flex:1;min-width:0}
+.update-dialog .update-primary,.update-dialog .update-secondary{border-radius:12px;min-height:49px;font-size:13px;transition:background .2s,border-color .2s,transform .2s}
+.update-dialog .update-primary{color:#1c1632;border:1px solid #cabaff;background:linear-gradient(130deg,#dbcfff,#af99ff);box-shadow:0 5px 20px rgba(156,124,239,.2)}
+.update-dialog .update-primary:hover{background:linear-gradient(130deg,#eee6ff,#c4b5ff);transform:translateY(-1px)}
+.update-dialog .update-secondary{color:#eeeaf6;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.15)}
+.update-dialog .update-secondary:hover{background:rgba(255,255,255,.12)}
+.update-dialog :is(.update-primary,.update-secondary):focus-visible{outline:3px solid #d4c2ff;outline-offset:3px}
+.update-running-hint{flex:1;text-align:center;color:#aaa5b9;font-size:12px;margin:0;min-height:22px}
+.update-dialog-error{margin-top:19px;padding:12px 14px;text-align:left;color:#fff;background:rgba(177,65,79,.15);border:1px solid rgba(236,120,133,.3);border-radius:13px}
+.update-dialog-error strong{font-size:12px}
+.update-dialog-error p{margin:5px 0 0;color:#e9cbd1;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.update-dialog-error details{margin-top:9px}
+.update-dialog-error summary{cursor:pointer;color:#e2c5dc;font-size:11px}
+.update-dialog-error details p{color:#e6dbe0;font-size:11px}
+@keyframes update-spin{to{transform:rotate(360deg)}}
+@keyframes update-glow{0%,100%{opacity:.6;transform:scale(.94)}50%{opacity:1;transform:scale(1.07)}}
+@keyframes update-float{0%,100%{transform:translateY(1px)}50%{transform:translateY(-5px)}}
+@keyframes update-dot{0%,100%{opacity:.6;transform:scale(.88)}50%{opacity:1;transform:scale(1.1)}}
+
+/* Página de configurações: informações detalhadas permanecem fora do diálogo de instalação. */
 .update-kicker{font-size:11px;font-weight:800;letter-spacing:.13em;color:#7b705f;margin:0 0 12px}
-.update-dialog-top h2{font-size:24px;line-height:1.25;margin:0 0 9px;color:#202020;letter-spacing:-.02em}
-.update-dialog-top>p:last-child,.update-settings-heading p:last-child{color:#666;font-size:13px;line-height:1.6;margin:0}
 .update-release{padding:22px 30px 16px}
 .update-version-line{display:flex;justify-content:space-between;gap:18px;align-items:center;border:1px solid #e8e5df;background:#fbfaf8;border-radius:12px;padding:12px 15px}
 .update-version-line span{font-size:13px;color:#666}.update-version-line strong{font-size:16px}
 .update-release h3{font-size:15px;margin:22px 0 8px}
 .update-notes{white-space:pre-wrap;overflow-wrap:anywhere;max-height:158px;overflow:auto;color:#4b4b4b;line-height:1.6;font-size:13px}
 .update-footnote{font-size:12px;color:#747474;line-height:1.65;margin:18px 0 0}
-.update-actions{display:flex;justify-content:flex-end;gap:10px;align-items:center;padding:18px 30px 24px;border-top:1px solid #eee}
-.update-primary,.update-secondary{border-radius:9px;min-height:44px;padding:12px 18px;font:inherit;font-weight:700}
+.update-primary,.update-secondary{border-radius:9px;min-height:44px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer}
 .update-primary{border:1px solid #262626;background:#252525;color:#fff}
 .update-secondary{border:1px solid #d9d9d9;background:#fff;color:#333}
 .update-primary:disabled,.update-secondary:disabled{cursor:wait;opacity:.65}
@@ -19,8 +58,22 @@
 .update-error{color:#9d2b22;background:#fff2f0;border-color:#f0cac4}
 .update-settings{margin-top:16px;padding:28px;background:#fff;border:1px solid #e8e8e8;border-radius:16px;max-width:850px}
 .update-settings-heading h2{font-size:22px;margin:0 0 8px}
+.update-settings-heading p:last-child{color:#666;font-size:13px;line-height:1.6;margin:0}
 .update-settings>.update-secondary{margin-top:20px}
 .update-settings>.update-release{padding:18px 0}
 .update-settings>.update-primary{margin:0}
 .update-settings>.update-progress,.update-settings>.update-error{margin:14px 0}
-@media(max-width:600px){.update-dialog-top{padding:22px 20px 16px}.update-dialog-top h2{font-size:21px}.update-release{padding:17px 20px}.update-actions{padding:16px 20px 22px;flex-wrap:wrap}.update-actions button{flex:1}.update-settings{padding:18px}.update-progress,.update-error{margin:10px 20px}}
+@media(max-width:600px){
+ .update-dialog{width:calc(100% - 24px);border-radius:22px}
+ .update-dialog-content{padding:24px 20px 22px}
+ .update-motion{width:150px;height:150px;margin-bottom:18px}
+ .update-motion-center{width:85px;height:85px;border-radius:25px}
+ .update-motion-center svg{width:38px;height:38px}
+ .update-dialog-actions{padding:0 20px 24px}
+ .update-settings{padding:18px}
+ .update-progress,.update-error{margin:10px 20px}
+}
+@media(prefers-reduced-motion:reduce){
+ .update-motion-glow,.update-motion-orbit,.update-motion-ring,.update-motion-center,.update-stage-indicator{animation:none}
+ .update-dialog .update-primary,.update-dialog .update-secondary{transition:none}
+}

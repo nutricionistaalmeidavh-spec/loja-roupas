@@ -13,10 +13,10 @@ test('instalação física habilitada oferece release mais nova na abertura, com
   };
  });
  await page.goto('/');
- const dialog=page.getByRole('dialog',{name:'Uma nova versão da Loja de Roupas está disponível'});
+ const dialog=page.getByRole('dialog',{name:'Atualização da loja'});
  await expect(dialog).toBeVisible();
  await expect(dialog.getByText('v0.2.5')).toBeVisible();
- await expect(dialog.getByText('O sistema não baixa arquivos automaticamente.')).toBeVisible();
+ await expect(dialog.getByText('O download começa somente depois da sua confirmação.')).toBeVisible();
  await dialog.getByRole('button',{name:'Agora não'}).click();
  await expect(dialog).toHaveCount(0);
  expect(await page.evaluate(()=>(window as any).__lojaTestInstallCalls)).toBe(0);
@@ -32,5 +32,5 @@ test('instalação sem atualização disponível não apresenta aviso',async({pa
   };
  });
  await page.goto('/');
- await expect(page.getByRole('dialog',{name:'Uma nova versão da Loja de Roupas está disponível'})).toHaveCount(0);
+ await expect(page.getByRole('dialog',{name:'Atualização da loja'})).toHaveCount(0);
 });

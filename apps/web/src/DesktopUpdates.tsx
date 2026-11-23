@@ -38,19 +38,45 @@ function Notes({release}:{release:Release}){
   <p className="update-footnote">O download só começa depois da sua confirmação. A instalação usa SHA-256, cria backup local antes de aplicar e guarda uma cópia do programa anterior.</p>
  </div>;
 }
+function updateStage(progress:Progress|null){
+ switch(progress?.phase){
+  case 'preparing':return 'Preparando os arquivos';
+  case 'download':return 'Baixando atualização';
+  case 'verified':
+  case 'checking-integrity':return 'Verificando arquivos';
+  case 'backup':
+  case 'backup-complete':return 'Protegendo seus dados';
+  case 'installing':return 'Instalando nova versão';
+  default:return 'Aguardando confirmação';
+ }
+}
+function downloadPercentage(progress:Progress|null){
+ if(progress?.phase!=='download'||!Number.isFinite(progress.bytes)||!Number.isFinite(progress.total)||
+   !progress.total||progress.total<=0||Number(progress.bytes)<0)return null;
+ return Math.max(0,Math.min(100,Math.round(Number(progress.bytes)*100/progress.total)));
+}
 export function UpdateStartupDialog(){
  const [release,setRelease]=useState<Release|null>(null);
  const [dismissed,setDismissed]=useState(false);
  const [busy,setBusy]=useState(false);
  const [progress,setProgress]=useState<Progress|null>(null);
  const [error,setError]=useState('');
+ const [lastResult,setLastResult]=useState<LastResult>(null);
  const dialogRef=useRef<HTMLDialogElement>(null);
  useEffect(()=>{
   const bridge=window.lojaUpdates;
   if(!bridge)return;
   let alive=true;
-  const unsubscribe=bridge.onProgress(value=>{if(alive)setProgress(value);});
+  const unsubscribe=bridge.onProgress(value=>{
+   if(!alive)return;
+   setProgress(value);
+   if(value.phase==='error'){
+    setError(value.message||'Falha ao preparar a atualização.');
+    setBusy(false);
+   }
+  });
   void bridge.check().then(result=>{if(alive&&result.available)setRelease(result.available);}).catch(()=>{});
+  void bridge.lastResult().then(result=>{if(alive)setLastResult(result);}).catch(()=>{});
   return ()=>{alive=false;unsubscribe();};
  },[]);
  useEffect(()=>{
@@ -60,31 +86,63 @@ export function UpdateStartupDialog(){
  },[release,dismissed]);
  async function install(){
   if(!window.lojaUpdates||busy)return;
-  setBusy(true);setError('');
+  setBusy(true);setProgress(null);setError('');setLastResult(null);
   try{
    const result=await window.lojaUpdates.install();
-   if(result.cancelled)setBusy(false);
+   if(result.cancelled||!result.started)setBusy(false);
   }catch(err){
    setError(err instanceof Error?err.message:'Não foi possível preparar a atualização.');
    setBusy(false);
   }
  }
  if(!release||dismissed)return null;
- return <dialog ref={dialogRef} className="update-dialog" aria-labelledby="update-dialog-title"
+ const percent=busy?downloadPercentage(progress):null;
+ const previousFailure=!busy&&!error&&lastResult?.status==='failed'?(lastResult.message||'A atualização não foi concluída.'):null;
+ const pending=!busy&&!error&&lastResult?.status==='pending';
+ return <dialog ref={dialogRef} className="update-dialog" aria-label="Atualização da loja"
     onCancel={event=>{if(busy){event.preventDefault();return;}setDismissed(true);}}>
-  <div className="update-dialog-top">
-   <p className="update-kicker">ATUALIZAÇÃO DISPONÍVEL</p>
-   <h2 id="update-dialog-title">Uma nova versão da Loja de Roupas está disponível</h2>
-   <p>Você decide quando atualizar. O sistema não baixa arquivos automaticamente.</p>
+  <div className="update-dialog-content">
+   <div className={`update-motion${busy?' is-running':''}${percent!==null?' is-measured':''}`}
+    role={percent!==null?'progressbar':undefined}
+    aria-label={percent!==null?'Download da atualização':undefined}
+    aria-valuemin={percent!==null?0:undefined} aria-valuemax={percent!==null?100:undefined}
+    aria-valuenow={percent??undefined}>
+    <span className="update-motion-glow" aria-hidden="true"/>
+    <span className="update-motion-orbit" aria-hidden="true"/>
+    <span className="update-motion-ring" aria-hidden="true"
+     style={percent!==null?{background:`conic-gradient(#b7a3ff ${percent}%, rgba(255,255,255,.12) 0)`}:undefined}/>
+    <span className="update-motion-center" aria-hidden="true">
+     {percent!==null?<strong className="update-motion-percent">{percent}%</strong>:
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.8"
+       strokeLinecap="round" strokeLinejoin="round">
+       <path d="M14 19h20l-2 19H16l-2-19Z"/>
+       <path d="M19 20v-5a5 5 0 0 1 10 0v5"/>
+       <path d="M19 27h10"/>
+      </svg>}
+    </span>
+   </div>
+   <p className="update-dialog-kicker">{busy?'ATUALIZAÇÃO EM ANDAMENTO':'ATUALIZAÇÃO DISPONÍVEL'}</p>
+   <h2 id="update-dialog-title">{busy?'Atualizando sua loja':'Uma nova versão está pronta'}</h2>
+   <p className="update-dialog-description">{busy
+    ?'Estamos preparando tudo para você continuar de onde parou.'
+    :<>Versão <strong>v{release.version}</strong> disponível para instalar.</>}</p>
+   {busy?<div className="update-stage" role="status" aria-live="polite">
+     <span className="update-stage-indicator" aria-hidden="true"/>
+     <span>{updateStage(progress)}</span>
+    </div>:
+    <p className="update-confirmation-note">O download começa somente depois da sua confirmação.</p>}
+   {pending&&<p role="status" className="update-confirmation-note">A última atualização não foi confirmada. Verifique a versão instalada antes de tentar novamente.</p>}
+   {(error||previousFailure)&&<div className="update-dialog-error" role="alert">
+    <strong>Não foi possível concluir a atualização.</strong>
+    <p>Você pode tentar novamente.</p>
+    <details><summary>Detalhes do erro</summary><p>{error||previousFailure}</p></details>
+   </div>}
   </div>
-  <Notes release={release}/>
-  {progress&&<p className="update-progress" role="status">{messageFor(progress)}</p>}
-  {error&&<p role="alert" className="update-error">{error}</p>}
-  <div className="update-actions">
-   <button type="button" className="update-secondary" disabled={busy} onClick={()=>setDismissed(true)}>Agora não</button>
-   <button type="button" className="update-primary" disabled={busy} onClick={()=>void install()}>
-    {busy?'Preparando atualização…':'Baixar e instalar'}
-   </button>
+  <div className="update-dialog-actions">
+   {busy?<p className="update-running-hint">Acompanhe o andamento por aqui.</p>:<>
+    <button type="button" className="update-secondary" onClick={()=>setDismissed(true)}>Agora não</button>
+    <button type="button" className="update-primary" onClick={()=>void install()}>Atualizar agora</button>
+   </>}
   </div>
  </dialog>;
 }
