@@ -12,7 +12,7 @@ test('a janela de atualização é visual e não mostra release notes nem detalh
   };
  });
  await page.goto('/');
- const dialog=page.getByRole('dialog',{name:'Uma nova versão está pronta'});
+ const dialog=page.getByRole('dialog',{name:'Atualização da loja'});
  await expect(dialog).toBeVisible();
  await expect(dialog.locator('.update-motion')).toBeVisible();
  await expect(dialog.getByText('v0.2.5')).toBeVisible();
@@ -35,7 +35,7 @@ test('download mostra o percentual real e etapas sem simular progresso',async({p
   };
  });
  await page.goto('/');
- const dialog=page.getByRole('dialog',{name:'Uma nova versão está pronta'});
+ const dialog=page.getByRole('dialog',{name:'Atualização da loja'});
  await dialog.getByRole('button',{name:'Atualizar agora'}).click();
  await expect(dialog.getByRole('heading',{name:'Atualizando sua loja'})).toBeVisible();
  await expect(dialog.getByRole('progressbar',{name:'Download da atualização'})).toHaveCount(0);
@@ -61,7 +61,7 @@ test('falhas apresentam mensagem simples e detalhes recolhidos',async({page})=>{
   };
  });
  await page.goto('/');
- const dialog=page.getByRole('dialog',{name:'Uma nova versão está pronta'});
+ const dialog=page.getByRole('dialog',{name:'Atualização da loja'});
  await dialog.getByRole('button',{name:'Atualizar agora'}).click();
  await page.evaluate(()=>(window as any).__emitUpdateProgress({phase:'error',message:'SHA-256: invalid checksum'}));
  await expect(dialog.getByRole('alert')).toContainText('Não foi possível concluir a atualização');
