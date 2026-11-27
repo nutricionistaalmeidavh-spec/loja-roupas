@@ -7,7 +7,7 @@ import type {Pending} from './idempotent-post.ts';
 
 type User={id:string;login:string;display_name:string|null;status:'active'|'blocked';roles:string[];pin_ready:boolean};
 type Profile={name:string;legal_name:string|null;document:string|null;address:string|null;phone:string|null;
- receipt_footer:string|null;max_cashier_discount_bps:number};
+ receipt_footer:string|null;max_cashier_discount_bps:number;commission_timing?:'on_sale'|'on_payment'};
 export const ROLE_LABELS:Record<string,string>={manager:'Gestor (tudo)',cashier:'Caixa',seller:'Vendedor(a)',
  stocker:'Estoque',buyer:'Compras',technician:'Suporte técnico'};
 const ROLES=Object.keys(ROLE_LABELS);
@@ -134,6 +134,12 @@ function StoreProfileForm({session}:{session:Session}){
   <label>Mensagem no fim do comprovante<input maxLength={240} value={profile.receipt_footer??''} onChange={set('receipt_footer')}
    placeholder="Ex.: Trocas em até 30 dias com etiqueta"/></label>
   <label>Desconto máximo que o caixa pode dar sem gestor (%)<input inputMode="decimal" value={limit} onChange={e=>setLimit(e.target.value)}/></label>
+  <label>Comissão de venda no crediário
+   <select value={profile.commission_timing??'on_payment'} onChange={set('commission_timing')}>
+    <option value="on_payment">Pagar ao vendedor só depois que a cliente pagar</option>
+    <option value="on_sale">Pagar ao vendedor na hora da venda</option>
+   </select></label>
+  <p className="muted small">Vale para o que ainda não foi pago aos vendedores. Vendas à vista não mudam.</p>
   <button className="primary-action" disabled={busy}>{busy?'Salvando…':'Salvar dados da loja'}</button>
   {notice&&<p role="status">{notice}</p>}{error&&<p role="alert" className="error">{error}</p>}
  </form>;

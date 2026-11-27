@@ -127,31 +127,34 @@ export function registerUsersAdmin(app:FastifyInstance,db:Pool){
 
  app.get('/v1/management/store-profile',async(req,reply)=>{
   if(requirePermission(req,reply,'catalog.read'))return reply;
-  const q=await db.query(`SELECT name,legal_name,document,address,phone,receipt_footer,max_cashier_discount_bps
+  const q=await db.query(`SELECT name,legal_name,document,address,phone,receipt_footer,max_cashier_discount_bps,commission_timing
    FROM stores WHERE id=$1`,[req.authContext!.storeId]);
   return q.rows[0];
  });
  type Profile={name:string;legal_name?:string|null;document?:string|null;address?:string|null;phone?:string|null;
-  receipt_footer?:string|null;max_cashier_discount_bps:number};
+  receipt_footer?:string|null;max_cashier_discount_bps:number;commission_timing?:'on_sale'|'on_payment'};
  app.put<{Body:Profile}>('/v1/management/store-profile',{
   schema:{body:{type:'object',additionalProperties:false,required:['name','max_cashier_discount_bps'],properties:{
    name:{type:'string',minLength:1,maxLength:120},legal_name:{type:['string','null'],maxLength:160},
    document:{type:['string','null'],maxLength:32},address:{type:['string','null'],maxLength:240},
    phone:{type:['string','null'],maxLength:32},receipt_footer:{type:['string','null'],maxLength:240},
-   max_cashier_discount_bps:{type:'integer',minimum:0,maximum:10000}}}}
+   max_cashier_discount_bps:{type:'integer',minimum:0,maximum:10000},
+   commission_timing:{type:'string',enum:['on_sale','on_payment']}}}}
  },async(req,reply)=>{
   if(requirePermission(req,reply,'users.manage'))return reply;
   const auth=req.authContext!,b=req.body;
   const opt=(v:string|null|undefined)=>v&&v.trim()?v.trim():null;
   const profile={name:b.name.trim(),legal_name:opt(b.legal_name),document:opt(b.document),address:opt(b.address),
-   phone:opt(b.phone),receipt_footer:opt(b.receipt_footer),max_cashier_discount_bps:b.max_cashier_discount_bps};
+   phone:opt(b.phone),receipt_footer:opt(b.receipt_footer),max_cashier_discount_bps:b.max_cashier_discount_bps,
+   commission_timing:b.commission_timing??null};
   if(!profile.name)throw new DomainError(422,'STORE_NAME','Informe o nome da loja');
   const out=await withIdempotentTransaction(db,auth,'store.profile',requireIdempotencyKey(req.headers['idempotency-key']),
    profile,async client=>{
     try{
      await client.query(`UPDATE stores SET name=$2,legal_name=$3,document=$4,address=$5,phone=$6,receipt_footer=$7,
-      max_cashier_discount_bps=$8 WHERE id=$1`,[auth.storeId,profile.name,profile.legal_name,profile.document,
-      profile.address,profile.phone,profile.receipt_footer,profile.max_cashier_discount_bps]);
+      max_cashier_discount_bps=$8,commission_timing=coalesce($9,commission_timing) WHERE id=$1`,[auth.storeId,profile.name,
+      profile.legal_name,profile.document,profile.address,profile.phone,profile.receipt_footer,profile.max_cashier_discount_bps,
+      profile.commission_timing]);
     }catch(error){
      if((error as {code?:string}).code==='23514')throw new DomainError(422,'STORE_PROFILE','Confira o tamanho dos campos da loja');
      throw error;

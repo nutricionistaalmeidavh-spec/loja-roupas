@@ -9,6 +9,19 @@ const params={type:'object',required:['id'],properties:{id:{type:'string',patter
 const money={type:'integer',minimum:1,maximum:999999999999};
 const key=(h:unknown)=>requireIdempotencyKey(h);
 const can=(v:number)=>Number.isSafeInteger(v)&&v>0&&v<=999999999999;
+
+/**
+ * Comissão retida: com a regra "depois do pagamento", a parte da comissão proporcional ao
+ * crediário ainda em aberto da venda só pode ser paga ao vendedor quando a cliente pagar.
+ */
+const heldCommissionSql=(seller:string)=>`(SELECT coalesce(sum(LEAST(e.amount_cents,
+   ceil(e.amount_cents*o.cents::numeric/NULLIF(e.base_cents,0)))),0)
+  FROM retail_commission_entries e
+  JOIN (SELECT source_id,sum(amount_cents-settled_cents) AS cents FROM retail_accounts
+   WHERE store_id=$1 AND kind='receivable' AND source_type='sale_credit' AND cancelled_at IS NULL
+   GROUP BY source_id) o ON o.source_id=e.sale_id
+  WHERE e.store_id=$1 AND e.seller_id=${seller}
+   AND (SELECT commission_timing FROM stores WHERE id=$1)='on_payment')`;
 export function registerRetailLedger(app:FastifyInstance,db:Pool){
  app.get<{Querystring:{kind?:'payable'|'receivable'}}>('/v1/management/accounts',{
   schema:{querystring:{type:'object',additionalProperties:false,properties:{kind:{type:'string',enum:['payable','receivable']}}}}
@@ -160,6 +173,7 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
     WHERE e.store_id=$1 AND e.seller_id=u.id),0)
     -coalesce((SELECT sum(x.amount_cents) FROM retail_commission_reversals x
      WHERE x.store_id=$1 AND x.seller_id=u.id),0))::text AS accrued_cents,
+   ${heldCommissionSql('u.id')}::text AS held_cents,
    coalesce((SELECT sum(p.amount_cents) FROM retail_commission_payouts p
     WHERE p.store_id=$1 AND p.seller_id=u.id),0)::text AS paid_cents
    FROM users u JOIN user_store_roles ur ON ur.user_id=u.id AND ur.store_id=$1
@@ -206,15 +220,17 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    const rule=await client.query(`SELECT 1 FROM retail_commission_rules
     WHERE store_id=$1 AND seller_id=$2 FOR UPDATE`,[auth.storeId,req.params.id]);
    if(!rule.rowCount)throw new DomainError(404,'COMMISSION_RULE_MISSING','Defina taxa antes de liquidar comissões');
-   const sums=await client.query<{accrued:string;reversed:string;paid:string}>(`SELECT
+   const sums=await client.query<{accrued:string;reversed:string;paid:string;held:string}>(`SELECT
     (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_entries
      WHERE store_id=$1 AND seller_id=$2) AS accrued,
     (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_reversals
      WHERE store_id=$1 AND seller_id=$2) AS reversed,
     (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_payouts
-     WHERE store_id=$1 AND seller_id=$2) AS paid`,[auth.storeId,req.params.id]);
-   const due=Number(sums.rows[0].accrued)-Number(sums.rows[0].reversed)-Number(sums.rows[0].paid);
-   if(b.amount_cents>due)throw new DomainError(409,'COMMISSION_DUE','Valor supera comissão devida');
+     WHERE store_id=$1 AND seller_id=$2) AS paid,
+    ${heldCommissionSql('$2')}::text AS held`,[auth.storeId,req.params.id]);
+   const due=Number(sums.rows[0].accrued)-Number(sums.rows[0].reversed)-Number(sums.rows[0].paid)-Number(sums.rows[0].held);
+   if(b.amount_cents>due)throw new DomainError(409,'COMMISSION_DUE',Number(sums.rows[0].held)>0
+    ?'Valor supera a comissão liberada; parte dela aguarda a cliente pagar o crediário':'Valor supera comissão devida');
    if(b.method==='cash'){
     const cash=await client.query<{opening_cents:string;opened_by:string;closed_at:Date|null}>(`SELECT opening_cents::text,opened_by::text,closed_at
      FROM cash_sessions WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,b.cash_session_id]);
