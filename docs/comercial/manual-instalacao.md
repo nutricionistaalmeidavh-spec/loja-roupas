@@ -29,4 +29,4 @@ Faça backup pelo menu de gestão e copie o arquivo para um pendrive ou nuvem. O
 - **Código recusado**: confira o e-mail usado na compra. Se persistir, fale com o suporte informando o "identificador da instalação" mostrado na tela.
 - **Erro 0xC0000135**: o próprio programa oferece instalar o componente Microsoft VC++ incluído.
 
-Suporte: [E-MAIL] · [WHATSAPP] · [HORÁRIO].
+Suporte: responda ao e-mail de liberação da ArtiSys.
