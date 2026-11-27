@@ -126,7 +126,7 @@ test.describe('Persona caixa novato', () => {
 });
 
 test('P3: divergência no fechamento do caixa mostra o aviso uma vez só', async ({ page }) => {
-  test.fail(true, 'Bug P3-12: o alerta aparece no diálogo e também na página.');
+  test.fail(true, 'Bug P3-11: o alerta aparece no diálogo e também na página.');
   await entrar(page);
   await garantirCaixaAberto(page);
   await page.getByRole('button', { name: 'Fechar caixa' }).click();
@@ -138,7 +138,7 @@ test('P3: divergência no fechamento do caixa mostra o aviso uma vez só', async
 });
 
 test('P3: o app tem ícone (favicon) e não gera erro 404 no console', async ({ request }) => {
-  test.fail(true, 'Bug P3-13: /favicon.ico responde 404.');
+  test.fail(true, 'Bug P3-12: /favicon.ico responde 404.');
   const icone = await request.get('/favicon.ico');
   expect(icone.status()).toBe(200);
 });
@@ -211,7 +211,7 @@ test.describe('Persona gerente que mexe em tudo', () => {
   });
 
   test('P3: tamanhos aparecem na ordem da grade (P antes de G)', async ({ page, request }) => {
-    test.fail(true, 'Bug P3-11: tamanhos ordenados alfabeticamente.');
+    test.fail(true, 'Bug P3-10: tamanhos ordenados alfabeticamente.');
     const produto = await produtoComEstoque(request, 'Vestido Grade QA', [{ size: 'G', quantity: 1 }, { size: 'P', quantity: 1 }]);
     await entrar(page);
     await page.getByLabel('Buscar nome, SKU ou código').fill(produto.name);
