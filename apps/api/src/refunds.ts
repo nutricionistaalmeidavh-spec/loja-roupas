@@ -193,15 +193,6 @@ export function registerRefunds(app:FastifyInstance,db:Pool){
   const cashPart=b.parts.find(p=>p.method==='cash');
   if(cashPart&&!b.cash_session_id)throw new DomainError(422,'CASH_REQUIRED','Abra o caixa para devolver dinheiro');
   const out=await withIdempotentTransaction(db,auth,'retail.refund',requireIdempotencyKey(req.headers['idempotency-key']),b,async c=>{
-   if(cashPart){
-    const cash=await c.query<{opening_cents:string;opened_by:string;closed_at:Date|null}>(`SELECT opening_cents::text,opened_by::text,closed_at
-     FROM cash_sessions WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,b.cash_session_id]);
-    if(!cash.rowCount||cash.rows[0].closed_at)throw new DomainError(409,'CASH_CLOSED','Abra o caixa antes de devolver dinheiro');
-    if(!auth.roles.includes('manager')&&cash.rows[0].opened_by!==auth.userId)
-     throw new DomainError(403,'CASH_OWNER','Este caixa pertence a outro operador');
-    const available=await expectedCash(c,auth.storeId,b.cash_session_id!,Number(cash.rows[0].opening_cents));
-    if(cashPart.amount_cents>available)throw new DomainError(409,'INSUFFICIENT_CASH','Dinheiro insuficiente no caixa para a devolução');
-   }
    const sale=await findSale(c,auth.storeId,b.sale_number,true);
    if(!['confirmed','partially_returned'].includes(sale.status))
     throw new DomainError(409,'RETURN_INELIGIBLE','Esta venda não possui peças disponíveis para devolução');
@@ -211,6 +202,15 @@ export function registerRefunds(app:FastifyInstance,db:Pool){
    const refundable=await refundableByMethod(c,auth.storeId,sale.id);
    for(const p of b.parts)if(p.amount_cents>(refundable[p.method]??0))
     throw new DomainError(409,'REFUND_PAYMENT_MISMATCH','Reembolso excede o valor pago neste meio');
+   if(cashPart){
+    const cash=await c.query<{opening_cents:string;opened_by:string;closed_at:Date|null}>(`SELECT opening_cents::text,opened_by::text,closed_at
+     FROM cash_sessions WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,b.cash_session_id]);
+    if(!cash.rowCount||cash.rows[0].closed_at)throw new DomainError(409,'CASH_CLOSED','Abra o caixa antes de devolver dinheiro');
+    if(!auth.roles.includes('manager')&&cash.rows[0].opened_by!==auth.userId)
+     throw new DomainError(403,'CASH_OWNER','Este caixa pertence a outro operador');
+    const available=await expectedCash(c,auth.storeId,b.cash_session_id!,Number(cash.rows[0].opening_cents));
+    if(cashPart.amount_cents>available)throw new DomainError(409,'INSUFFICIENT_CASH','Dinheiro insuficiente no caixa para a devolução');
+   }
    if((b.parts.some(p=>p.method==='store_credit'||p.method==='customer_credit'))&&!sale.customer_id)
     throw new DomainError(422,'CUSTOMER_REQUIRED','Venda sem cliente não aceita crédito');
    const op=await c.query<{id:string}>(`INSERT INTO retail_after_sales(store_id,sale_id,kind,actor_id,amount_cents,reason,cash_session_id)

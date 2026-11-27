@@ -17,6 +17,8 @@ type Commit={cash_session_id:string;pickup_order_id?:string;customer_id?:string;
 type VariantRow={id:string;price_cents:string;revision:string;sku:string;color:string;size:string;name:string;available:string;cost_cents:string|null};
 type SaleRow={id:string;store_id:string;sale_number:string;status:string;total_cents:string;tendered_cents:string;
  change_cents:string;created_at:Date;cash_session_id:string};
+export const PAYMENT_LABELS:Record<string,string>={cash:'DINHEIRO',pix_manual:'PIX',card_external:'CARTÃO',
+ store_credit:'CREDIÁRIO A RECEBER',customer_credit:'CRÉDITO DO CLIENTE',exchange_credit:'CRÉDITO DA TROCA'};
 function exactInteger(value:number,minimum=0){return Number.isSafeInteger(value)&&value>=minimum;}
 function validateLines(lines:readonly QuoteLine[]){
  if(lines.length<1||lines.length>100)throw new DomainError(422,'LINES_INVALID','Informe de 1 a 100 itens');
@@ -334,22 +336,51 @@ export function registerSales(app:FastifyInstance,db:Pool){
   schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uid}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'sale.read'))return reply;
-  const sale=await readSale(db,request.authContext!.storeId,request.params.id);
+  const storeId=request.authContext!.storeId;
+  const sale=await readSale(db,storeId,request.params.id);
+  const extra=await db.query<{subtotal_cents:string|null;discount_cents:string;discount_reason:string|null;customer:string|null;
+   seller:string|null;store_name:string;legal_name:string|null;document:string|null;address:string|null;phone:string|null;
+   receipt_footer:string|null;timezone:string}>(`SELECT s.subtotal_cents::text,s.discount_cents::text,s.discount_reason,
+    c.name AS customer,coalesce(u.display_name,u.login) AS seller,st.name AS store_name,st.legal_name,st.document,st.address,
+    st.phone,st.receipt_footer,st.timezone
+   FROM sales s JOIN stores st ON st.id=s.store_id LEFT JOIN retail_customers c ON c.id=s.customer_id AND c.store_id=s.store_id
+   LEFT JOIN users u ON u.id=s.seller_id WHERE s.store_id=$1 AND s.id=$2`,[storeId,sale.id]);
+  const info=extra.rows[0];
+  const installments=await db.query<{due_on:string;amount_cents:string}>(`SELECT due_on::text,amount_cents::text FROM retail_accounts
+   WHERE store_id=$1 AND source_type='sale_credit' AND source_id=$2 AND cancelled_at IS NULL ORDER BY due_on`,[storeId,sale.id]);
+  const lineDiscounts=await db.query<{discount_cents:string}>(`SELECT discount_cents::text FROM sale_lines
+   WHERE sale_id=$1 AND store_id=$2 ORDER BY id`,[sale.id,storeId]);
   const money=(n:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
+  const date=(iso:string)=>iso.split('-').reverse().join('/');
+  const discount=Number(info.discount_cents);
   const body=[
-    'LOJA DE ROUPAS','COMPROVANTE NÃO FISCAL','Não substitui documento fiscal quando exigido.',
+    info.store_name.toUpperCase(),
+    ...(info.legal_name?[info.legal_name]:[]),
+    ...(info.document?['CNPJ/CPF: '+info.document]:[]),
+    ...(info.address?[info.address]:[]),
+    ...(info.phone?['Tel.: '+info.phone]:[]),
+    'COMPROVANTE NÃO FISCAL','Não substitui documento fiscal quando exigido.',
     '--------------------------------',
     'Venda Nº '+sale.sale_number,
-    ...(sale.status==='returned'?['VENDA DEVOLVIDA']:[]),
-    'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
-    ...sale.lines.map(l=>l.quantity+' × '+l.product_name+' ('+l.color+'/'+l.size+') '+money(l.line_total_cents)),
-    '--------------------------------','TOTAL '+money(sale.total_cents),
-    ...sale.payments.map(p=>p.method==='store_credit'
-      ?'CREDIÁRIO A RECEBER '+money(p.amount_cents)
-      :p.method==='customer_credit'
-       ?'CRÉDITO DO CLIENTE '+money(p.amount_cents)
-       :p.method+' '+money(p.amount_cents)),
+    ...(sale.status==='returned'?['VENDA DEVOLVIDA']:sale.status==='partially_returned'?['VENDA COM DEVOLUÇÃO PARCIAL']:[]),
+    'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:info.timezone||'America/Sao_Paulo'}),
+    ...(info.customer?['Cliente: '+info.customer]:[]),
+    ...(info.seller?['Vendedor: '+info.seller]:[]),
+    '--------------------------------',
+    ...sale.lines.flatMap((l,i)=>{
+      const d=Number(lineDiscounts.rows[i]?.discount_cents??0);
+      return [l.quantity+' × '+l.product_name+' ('+l.color+'/'+l.size+') '+money(l.line_total_cents),
+        ...(d?['   desconto '+money(d)]:[])];
+    }),
+    '--------------------------------',
+    ...(discount?['SUBTOTAL '+money(Number(info.subtotal_cents??sale.total_cents+discount)),
+      'DESCONTO -'+money(discount)+(info.discount_reason?' ('+info.discount_reason+')':'')]:[]),
+    'TOTAL '+money(sale.total_cents),
+    ...sale.payments.map(p=>(PAYMENT_LABELS[p.method]??p.method)+' '+money(p.amount_cents)),
     'TROCO '+money(sale.change_cents),
+    ...(installments.rowCount?['PARCELAS DO CREDIÁRIO',...installments.rows.map((x,i)=>
+      (i+1)+'ª '+date(x.due_on)+' '+money(Number(x.amount_cents)))]:[]),
+    ...(info.receipt_footer?['--------------------------------',info.receipt_footer]:[]),
     'ID: '+sale.id,
   ].join('\n');
   return reply.header('cache-control','private,no-store').type('text/plain; charset=utf-8').send(body);

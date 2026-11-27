@@ -20,8 +20,8 @@ export function normalizeProductDraft(value: ProductDraft): ProductDraft {
     const barcode = v.barcode == null ? null : String(v.barcode).trim();
     if (!/^[A-Z0-9_-]{1,64}$/.test(sku) || !color || !size || color.length > 100 || size.length > 32)
       throw new Error('Variante inválida');
-    if (!Number.isSafeInteger(v.price_cents) || v.price_cents < 0)
-      throw new Error('Preço em centavos inválido');
+    if (!Number.isSafeInteger(v.price_cents) || v.price_cents < 1)
+      throw new Error('Preço em centavos inválido: informe um valor maior que zero');
     if (barcode !== null && (!barcode || barcode.length > 128))
       throw new Error('Código de barras inválido');
     const combination = color.toLowerCase() + '\u0000' + size.toLowerCase();

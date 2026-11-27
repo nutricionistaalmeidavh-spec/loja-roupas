@@ -6,7 +6,7 @@ import { requirePermission } from './auth.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 type ProductRecord = { id:string; name:string; category:string; variants:Array<{id:string;product_id:string;sku:string;color:string;size:string;price_cents:number;barcode:string|null;available:number;revision:number}> };
-type ReceiptInput = { variant_id:string; reference_id:string; quantity:number; note?:string };
+type ReceiptInput = { variant_id:string; reference_id:string; quantity:number; note?:string; unit_cost_cents?:number };
 const uuid = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
 
 export function registerMutations(app: FastifyInstance, db: Pool) {
@@ -22,8 +22,9 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
             sku:{type:'string',minLength:1,maxLength:64},
             color:{type:'string',minLength:1,maxLength:100},
             size:{type:'string',minLength:1,maxLength:32},
-            price_cents:{type:'integer',minimum:0},
-            barcode:{type:['string','null'],maxLength:128}
+            price_cents:{type:'integer',minimum:1},
+            barcode:{type:['string','null'],maxLength:128},
+            cost_cents:{type:'integer',minimum:0,maximum:9999999999}
           }
         }}
       }
@@ -42,11 +43,12 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
         [auth.storeId,input.name,input.category]);
       const productId=created.rows[0].id;
       const variants:ProductRecord['variants']=[];
-      for(const variant of input.variants){
+      for(const [index,variant] of input.variants.entries()){
+        const cost=(request.body.variants[index] as {cost_cents?:number}).cost_cents??null;
         const row=await client.query<{id:string}>(`INSERT INTO product_variants
-          (store_id,product_id,sku,barcode,color,size,price_cents)
-          VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,
-          [auth.storeId,productId,variant.sku,variant.barcode,variant.color,variant.size,variant.price_cents]);
+          (store_id,product_id,sku,barcode,color,size,price_cents,cost_cents)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text`,
+          [auth.storeId,productId,variant.sku,variant.barcode,variant.color,variant.size,variant.price_cents,cost]);
         variants.push({...variant,id:row.rows[0].id,product_id:productId,barcode:variant.barcode??null,available:0,revision:0});
       }
       await client.query(`INSERT INTO outbox_events
@@ -68,7 +70,8 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
         variant_id:{type:'string',pattern:uuid},
         reference_id:{type:'string',pattern:uuid},
         quantity:{type:'integer',minimum:1},
-        note:{type:'string',minLength:8,maxLength:250}
+        note:{type:'string',minLength:8,maxLength:250},
+        unit_cost_cents:{type:'integer',minimum:0,maximum:9999999999}
       }
     }}
   },async(request,reply)=>{
@@ -95,6 +98,9 @@ export function registerMutations(app: FastifyInstance, db: Pool) {
         ON CONFLICT (store_id,source_type,source_id,variant_id,movement_kind) DO NOTHING
         RETURNING id::text`,[auth.storeId,input.variant_id,input.reference_id,input.quantity]);
       if(!movement.rowCount)throw new DomainError(409,'RECEIPT_ALREADY_RECORDED','Entrada já registrada');
+      // Custo informado na entrada passa a valer para as próximas vendas da peça.
+      if(input.unit_cost_cents!==undefined)await client.query('UPDATE product_variants SET cost_cents=$3 WHERE id=$1 AND store_id=$2',
+        [input.variant_id,auth.storeId,input.unit_cost_cents]);
       const balance=await client.query<{on_hand:string;reserved:string;revision:string}>(`INSERT INTO stock_balances
         (store_id,variant_id,on_hand,reserved,revision)
         VALUES($1,$2,$3,0,1)
