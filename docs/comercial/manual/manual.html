@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Manual — Loja de Roupas ArtiSys</title>
+<style>
+@page{size:A4;margin:18mm 16mm}
+body{font-family:"Segoe UI",Arial,sans-serif;color:#1d1d1f;font-size:11pt;line-height:1.5}
+h1{font-size:24pt;margin:0 0 4px;color:#7a1f3d}
+h2{font-size:15pt;color:#7a1f3d;border-bottom:2px solid #f0d9e1;padding-bottom:3px;margin-top:22px;break-after:avoid}
+h3{font-size:12pt;margin:14px 0 4px}
+.sub{color:#555;margin:0 0 18px}
+.box{background:#fbf3f6;border-left:4px solid #7a1f3d;padding:8px 12px;margin:10px 0}
+.warn{background:#fff6e5;border-left:4px solid #c27c00;padding:8px 12px;margin:10px 0}
+ol li,ul li{margin:3px 0}
+code{background:#f3f3f3;padding:1px 4px;border-radius:3px;font-size:10pt}
+table{border-collapse:collapse;width:100%;margin:8px 0}td,th{border:1px solid #ddd;padding:5px 7px;text-align:left;vertical-align:top}th{background:#f7f7f7}
+.cover{break-after:page;padding-top:60mm}
+</style></head><body>
+<section class="cover">
+<h1>Loja de Roupas ArtiSys</h1>
+<p class="sub">Manual de instalação, ativação e uso — edição comercial para Windows</p>
+<div class="box">Sistema de caixa e gestão para loja de roupas física: produtos com cor, tamanho e foto, estoque, caixa, vendas, clientes, despesas e backup. Os dados ficam no computador da loja.</div>
+<div class="warn"><b>Importante:</b> o sistema <b>não emite nota fiscal</b> (NFC-e/NF-e). O comprovante impresso é não fiscal. Pix e cartão são conferidos no banco ou na maquininha e registrados manualmente.</div>
+<p>Suporte: responda ao e-mail de liberação da ArtiSys.</p>
+</section>
+
+<h2>1. Antes de instalar</h2>
+<ul>
+<li>Computador principal com Windows 10 ou 11 de 64 bits, 4 GB de memória (8 GB recomendado) e 2 GB livres.</li>
+<li>Internet apenas para a ativação. Depois disso o caixa funciona sem internet.</li>
+<li>Tenha em mãos o <b>e-mail da compra</b> e o <b>código de 6 dígitos</b> do e-mail de liberação. O código vale por 48 horas e só pode ser usado uma vez.</li>
+</ul>
+
+<h2>2. Instalar</h2>
+<ol>
+<li>Clique no link <b>DOWNLOAD DIRETO</b> do e-mail de liberação. O arquivo se chama <code>Loja-de-Roupas-Comercial-Setup-x64.exe</code>.</li>
+<li>Dê dois cliques no arquivo. Se o Windows mostrar “O Windows protegeu o computador”, clique em <b>Mais informações</b> e depois em <b>Executar assim mesmo</b>.</li>
+<li>Leia os Termos de Uso, marque que aceita e clique em <b>Avançar</b>.</li>
+<li>Mantenha a pasta sugerida e clique em <b>Instalar</b>. No final, deixe marcado <b>Iniciar</b> e clique em <b>Concluir</b>.</li>
+</ol>
+<p>O atalho <b>Loja de Roupas Comercial</b> fica na Área de Trabalho e no Menu Iniciar.</p>
+
+<h2>3. Ativar e criar a loja</h2>
+<ol>
+<li>Na tela <b>Ative sua licença comercial</b>, digite o e-mail da compra e o código de 6 dígitos e clique em <b>Ativar Loja Roupas</b>.</li>
+<li>Aguarde a preparação do banco de dados. Na primeira vez pode levar até 2 minutos.</li>
+<li>Em <b>Crie sua loja</b>, informe o nome da loja, o usuário e a senha do administrador. <b>Anote essa senha</b>: ela não é enviada para a ArtiSys e não pode ser recuperada por e-mail.</li>
+<li>O tour de primeiro acesso mostra os módulos. Ele pode ser aberto de novo em <b>Ajuda · Tour</b>.</li>
+</ol>
+<div class="box">A licença é revalidada automaticamente quando há internet. Se o computador passar <b>mais de 30 dias</b> sem nenhuma conexão, o programa pede internet antes de abrir. Nenhum dado é apagado.</div>
+
+<h2>4. Uso diário</h2>
+<h3>Produtos</h3>
+<p>Em <b>Produtos</b>, cadastre cada peça com nome, preço, foto e a grade de cores e tamanhos. Cada combinação recebe um código (SKU) para leitor de código de barras e etiqueta. Também é possível importar uma planilha Excel.</p>
+<h3>Estoque</h3>
+<p>Em <b>Estoque</b>, registre entradas de mercadoria, ajustes com justificativa e inventários. Todo movimento fica no histórico.</p>
+<h3>Caixa e vendas</h3>
+<ol>
+<li>No começo do dia, clique em <b>Abrir caixa</b> e informe o troco inicial.</li>
+<li>Para vender, leia o código de barras ou busque o produto, escolha a forma de pagamento e finalize. Em Pix e cartão, confira o recebimento no banco ou na maquininha antes de confirmar.</li>
+<li>O comprovante não fiscal pode ser impresso na impressora instalada no Windows.</li>
+<li>No fim do dia, clique em <b>Fechar caixa</b> e confira os valores.</li>
+</ol>
+<h3>Gestão</h3>
+<p>Em <b>Gestão</b> ficam clientes, despesas, resultado gerencial, usuários e o backup.</p>
+
+<h2>5. Backup — faça toda semana</h2>
+<ol>
+<li>No computador principal, abra <b>Backup da loja</b> e clique para exportar o backup completo.</li>
+<li>Salve o arquivo em um pendrive ou na nuvem, <b>fora do computador</b>.</li>
+</ol>
+<p>O backup inclui produtos, fotos, vendas e histórico. A ArtiSys não guarda os dados da loja e não consegue recuperá-los sem backup. Os dados ficam em <code>%APPDATA%\loja-roupas-comercial</code> e não são apagados quando o programa é desinstalado.</p>
+
+<h2>6. Outros computadores da loja</h2>
+<p>Instale o mesmo programa nos outros computadores e, na primeira tela, escolha conectar ao computador principal pelo endereço da rede local. Não é preciso ativar de novo. O computador principal precisa estar ligado.</p>
+
+<h2>7. Atualizações</h2>
+<p>Quando houver versão nova, o programa avisa e pede sua confirmação. Antes de atualizar, ele faz uma cópia de segurança. Nunca apague a pasta de dados.</p>
+
+<h2>8. Problemas comuns</h2>
+<table>
+<tr><th>Mensagem ou situação</th><th>O que fazer</th></tr>
+<tr><td>Código recusado</td><td>Confira se o e-mail é o mesmo da compra e se o código tem menos de 48 horas. Se persistir, responda ao e-mail de liberação informando o identificador da instalação mostrado na tela.</td></tr>
+<tr><td>“Licença sem verificação há mais de 30 dias”</td><td>Conecte o computador à internet e abra o programa de novo.</td></tr>
+<tr><td>Erro 0xC0000135 ao iniciar</td><td>Clique no botão oferecido pelo próprio programa para instalar o componente Microsoft VC++ incluído.</td></tr>
+<tr><td>Troquei ou formatei o computador</td><td>Peça à ArtiSys um novo código de reativação e restaure o último backup.</td></tr>
+</table>
+</body></html>
