@@ -40,4 +40,33 @@ async function writeBackup({destination,userData,executeDump}){
   return {file:destination,bytes:stat.size,sha256:hash.digest('hex')};
  }finally{await fs.rm(part,{force:true}).catch(()=>{});}
 }
-module.exports={backupFilename,backupDestinationAllowed,writeBackup,isPgDumpArchive};
+const AUTO_PREFIX='loja-auto-';
+/** Decide se o backup automático está vencido e quais cópias antigas apagar. Função pura, sem disco. */
+function autoBackupPlan({files,now=new Date(),intervalHours=20,keep=14}){
+ const autos=files.filter(f=>f.name.startsWith(AUTO_PREFIX)&&f.name.endsWith('.dump'))
+  .sort((a,b)=>b.mtimeMs-a.mtimeMs);
+ const newest=autos[0];
+ const due=!newest||now.getTime()-newest.mtimeMs>=intervalHours*3600_000;
+ const keepAfter=due?keep-1:keep;
+ return {due,remove:autos.slice(Math.max(0,keepAfter)).map(f=>f.name),last:newest?newest.name:null};
+}
+/** Backup automático numa pasta fixa, mantendo as últimas N cópias. */
+async function runAutoBackup({folder,userData,executeDump,now=new Date(),intervalHours=20,keep=14,force=false}){
+ if(typeof folder!=='string'||!path.isAbsolute(folder))throw Error('Pasta de backup automático inválida.');
+ await fs.mkdir(folder,{recursive:true});
+ const names=await fs.readdir(folder);
+ const files=[];
+ for(const name of names){
+  if(!name.startsWith(AUTO_PREFIX))continue;
+  const stat=await fs.stat(path.join(folder,name)).catch(()=>null);
+  if(stat?.isFile())files.push({name,mtimeMs:stat.mtimeMs});
+ }
+ const plan=autoBackupPlan({files,now,intervalHours,keep});
+ if(!plan.due&&!force)return {skipped:true,last:plan.last};
+ const destination=path.join(folder,AUTO_PREFIX+backupFilename(now).slice('loja-'.length));
+ const saved=await writeBackup({destination,userData,executeDump});
+ const removePlan=autoBackupPlan({files,now,intervalHours,keep}).remove;
+ for(const name of removePlan)await fs.rm(path.join(folder,name),{force:true}).catch(()=>{});
+ return {skipped:false,...saved,removed:removePlan};
+}
+module.exports={backupFilename,backupDestinationAllowed,writeBackup,isPgDumpArchive,autoBackupPlan,runAutoBackup,AUTO_PREFIX};
