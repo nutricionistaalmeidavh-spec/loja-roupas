@@ -69,7 +69,7 @@ async function produtoComEstoque(request: APIRequestContext, nome: string,
 }
 
 async function adicionarAoCarrinho(page: Page, nome: string, tamanho?: string) {
-  await page.getByRole('button', { name: 'PDV' }).click();
+  await page.getByRole('button', { name: 'PDV', exact: true }).click();
   await page.getByLabel('Buscar nome, SKU ou código').fill(nome);
   const card = page.getByRole('article').filter({ has: page.getByRole('heading', { name: nome }) });
   await expect(card).toBeVisible();
@@ -161,7 +161,7 @@ test.describe('Persona operador que fecha o app no meio da venda', () => {
     page.on('dialog', dialog => void dialog.accept());
     await page.reload();
     await entrar(page);
-    await page.getByRole('button', { name: 'PDV' }).click();
+    await page.getByRole('button', { name: 'PDV', exact: true }).click();
     const recuperar = page.getByRole('button', { name: 'Recuperar carrinho' });
     // Esperado: não oferecer o carrinho como venda nova, ou avisar que a venda pode já estar registrada.
     if (await recuperar.count()) {
