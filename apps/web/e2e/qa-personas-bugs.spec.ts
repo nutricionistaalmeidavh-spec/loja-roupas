@@ -104,7 +104,7 @@ test.describe('Persona caixa novato', () => {
     test.fail(true, 'Bug P2-06: mostra o formulário de abertura e responde "Conflito de integridade ou duplicidade".');
     const { headers } = await api(request);
     const login = 'qa.caixa.' + randomUUID().slice(0, 6);
-    const password = 'Senha-Caixa-QA-2026';
+    const password = 'Caixa-' + randomUUID(); // senha descartável por execução
     const user = await request.post('/v1/management/users', {
       headers: headers(), data: { login, display_name: 'Caixa QA', password, roles: ['cashier'] },
     });
