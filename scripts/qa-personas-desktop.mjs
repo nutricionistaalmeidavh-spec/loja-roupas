@@ -110,7 +110,7 @@ async function salesCount() {
 }
 async function openCash(value = '100,00') {
   await win.getByRole('button', { name: 'Caixa', exact: true }).click();
-  await win.getByText('Consultando caixa no servidor…').waitFor({ state: 'hidden' }).catch(() => {});
+  await win.getByText('Consultando caixa…').waitFor({ state: 'hidden' }).catch(() => {});
   if (await win.getByRole('button', { name: 'Abrir caixa', exact: true }).count()) {
     await win.getByLabel('Valor inicial (R$)').fill(value);
     await win.getByRole('button', { name: 'Abrir caixa', exact: true }).click();
@@ -212,7 +212,7 @@ try {
 
   await scenario('S03', 'Caixa novato', 'Abrir caixa digitando "100,000" e depois corrigir para "100.00"', async note => {
     await win.getByRole('button', { name: 'Caixa', exact: true }).click();
-    await win.getByText('Consultando caixa no servidor…').waitFor({ state: 'hidden' }).catch(() => {});
+    await win.getByText('Consultando caixa…').waitFor({ state: 'hidden' }).catch(() => {});
     await win.getByLabel('Valor inicial (R$)').fill('100,000');
     await win.getByRole('button', { name: 'Abrir caixa', exact: true }).click();
     await sleep(800);

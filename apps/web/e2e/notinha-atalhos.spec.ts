@@ -21,7 +21,7 @@ async function entrar(page: Page) {
 
 async function garantirCaixaAberto(page: Page) {
   await page.getByRole('button', { name: 'Caixa', exact: true }).click();
-  await expect(page.getByText('Consultando caixa no servidor…')).toBeHidden();
+  await expect(page.getByText('Consultando caixa…')).toBeHidden();
   if (await page.getByRole('button', { name: 'Abrir caixa', exact: true }).count()) {
     await page.getByLabel('Valor inicial (R$)').fill('100,00');
     await page.getByRole('button', { name: 'Abrir caixa', exact: true }).click();

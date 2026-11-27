@@ -27,6 +27,11 @@ import {ManagementUsers} from './ManagementUsers.tsx';
 import {BatchPurchaseForm} from './BatchPurchaseForm.tsx';
 import {CashHistory} from './CashHistory.tsx';
 import {QuarantinePanel} from './QuarantinePanel.tsx';
+import {BirthdayList,ConsignmentList,FashionReports,PromotionsPanel} from './RetailExtras.tsx';
+import type {CartLine} from './RetailExtras.tsx';
+
+type Section='vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'|'inventario'|'caixas'|'pessoas'
+ |'promocoes'|'relatorios'|'condicional'|'aniversariantes';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -35,9 +40,9 @@ type Day = {day:string; sale_count:number; gross_cents:string; refunded_cents:st
 type Supplier = {id:string; name:string};
 type Item = {id:string; name:string; color:string; size:string; price_cents:string; available:boolean; photo_url:string|null};
 
-export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
+export function StoreOperations({session,cashId,onReturned,onToCart}:{session:Session;cashId:string|null;onReturned:()=>void;onToCart?:(lines:CartLine[])=>void}) {
   const [refresh,setRefresh] = useState(0);
-  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'|'inventario'|'caixas'|'pessoas'>('vendas');
+  const [section,setSection] = useState<Section>('vendas');
   const [supplierOpen,setSupplierOpen] = useState(false);
   const [returnOpen,setReturnOpen] = useState(false);
   const [returnLocked,setReturnLocked] = useState(false);
@@ -104,32 +109,35 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
 
   const salesCount=days.reduce((sum,day)=>sum+Number(day.sale_count||0),0);
   const activeDays=days.filter(day=>Number(day.sale_count)>0).length;
-  const sections=[
-    {key:'vendas',label:'Vendas'},
-    {key:'fornecedores',label:'Fornecedores'},
-    {key:'posvenda',label:'Pós-venda'},
-    {key:'operacoes',label:'Operações'},
-    {key:'inteligencia',label:'Inteligência'},
-    {key:'financeiro',label:'Financeiro'},
-    {key:'caixas',label:'Caixas'},
-    {key:'clientes',label:'Clientes'},
-    {key:'inventario',label:'Inventário'},
-    ...(!physical?[{key:'vitrine' as const,label:'Vitrine'}]:[]),
-    ...(session.roles.includes('manager')?[{key:'pessoas' as const,label:'Pessoas e loja'}]:[]),
-  ] as const;
+  const groups:Array<{key:string;label:string;items:Array<{key:Section;label:string}>}>=[
+    {key:'vendas',label:'Vendas',items:[{key:'vendas',label:'Resumo'},{key:'promocoes',label:'Promoções'},
+      {key:'relatorios',label:'Relatórios de moda'},{key:'inteligencia',label:'Inteligência'}]},
+    {key:'estoque',label:'Estoque e compras',items:[{key:'operacoes',label:'Operações'},{key:'fornecedores',label:'Fornecedores'},{key:'inventario',label:'Inventário'}]},
+    {key:'clientes',label:'Clientes e trocas',items:[{key:'clientes',label:'Clientes'},{key:'condicional',label:'Condicional'},
+      {key:'aniversariantes',label:'Aniversariantes'},{key:'posvenda',label:'Pós-venda'}]},
+    {key:'dinheiro',label:'Dinheiro',items:[{key:'financeiro',label:'Financeiro'},{key:'caixas',label:'Caixas'}]},
+    ...(session.roles.includes('manager')?[{key:'pessoas',label:'Pessoas e loja',items:[{key:'pessoas' as const,label:'Pessoas e loja'}]}]:[]),
+    ...(!physical?[{key:'vitrine',label:'Vitrine',items:[{key:'vitrine' as const,label:'Vitrine'}]}]:[]),
+  ];
+  const group=groups.find(g=>g.items.some(i=>i.key===section))??groups[0];
   return <div className="operation-panel">
     <nav className="management-jump" aria-label="Atalhos da gestão">
-      {sections.map(item=><a key={item.key} href={'#gestao-'+item.key}
-        className={section===item.key?'active':''}
-        aria-current={section===item.key?'page':undefined}
-        onClick={event=>{event.preventDefault();setSection(item.key);}}>
+      {groups.map(item=><a key={item.key} href={'#gestao-'+item.items[0].key}
+        className={group.key===item.key?'active':''}
+        aria-current={group.key===item.key?'page':undefined}
+        onClick={event=>{event.preventDefault();setSection(item.items[0].key);}}>
         {item.label}
       </a>)}
     </nav>
+    {group.items.length>1&&<nav className="management-subnav" aria-label={'Seções de '+group.label}>
+      {group.items.map(item=><a key={item.key} href={'#gestao-'+item.key}
+        className={section===item.key?'active':''} aria-current={section===item.key?'page':undefined}
+        onClick={event=>{event.preventDefault();setSection(item.key);}}>{item.label}</a>)}
+    </nav>}
     <OperationsActionCenter session={session} revision={refresh} onNavigate={setSection}/>
     {section==='vendas'&&<section id="gestao-vendas" className="management-section">
       <div className="management-section-head">
-        <div><h2>Vendas e devoluções nos últimos 30 dias</h2><p>Informações registradas no servidor da loja.</p></div>
+        <div><h2>Vendas e devoluções nos últimos 30 dias</h2><p>Tudo o que foi vendido e devolvido no período.</p></div>
       </div>
       {!ready&&!error&&<p role="status" className="management-loading">Carregando resumo comercial…</p>}
       {error&&!ready&&<div role="alert" className="management-error"><p>{error}</p><button className="light-button" onClick={()=>{setError('');setRefresh(value=>value+1);}}>Tentar novamente</button></div>}
@@ -176,6 +184,10 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
       <QuarantinePanel session={session} onChanged={()=>{setRefresh(n=>n+1);onReturned();}}/></>}
     {section==='caixas'&&<CashHistory session={session}/>}
     {section==='pessoas'&&<ManagementUsers session={session}/>}
+    {section==='promocoes'&&<PromotionsPanel session={session}/>}
+    {section==='relatorios'&&<FashionReports session={session}/>}
+    {section==='condicional'&&<ConsignmentList session={session} onToCart={onToCart??(()=>{})}/>}
+    {section==='aniversariantes'&&<BirthdayList session={session} storeName={session.storeName??'loja'}/>}
     {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
@@ -305,6 +317,7 @@ export function ReceiptPanel({session,saleId,allowAutoPrint=false}:{session:Sess
   const [settings,setSettings]=useState<ReceiptSettings>(()=>loadReceiptSettings(session.storeId));
   const [devices,setDevices]=useState<Array<{name:string;displayName:string;isDefault:boolean}>>([]);
   const [text,setText]=useState('');
+  const [gift,setGift]=useState(false);
   const [error,setError] = useState('');
   const [busy,setBusy] = useState(false);
   const pending = useRef<{paper:ReceiptPaper;key:string} | null>(null);
@@ -316,10 +329,10 @@ export function ReceiptPanel({session,saleId,allowAutoPrint=false}:{session:Sess
   },[]);
   useEffect(()=>{
    let alive=true;setText('');
-   void receiptText(session,saleId,fetch,receiptColumns(settings.paper)).then(value=>{if(alive)setText(value);})
+   void receiptText(session,saleId,fetch,receiptColumns(settings.paper),gift).then(value=>{if(alive)setText(value);})
     .catch(err=>{if(alive)setError(err instanceof Error?err.message:'Não foi possível obter o comprovante');});
    return ()=>{alive=false;};
-  },[session,saleId,settings.paper]);
+  },[session,saleId,settings.paper,gift]);
   function update(change:Partial<ReceiptSettings>){
    setSettings(current=>{const next={...current,...change};saveReceiptSettings(session.storeId,next);return next;});
   }
@@ -349,7 +362,7 @@ export function ReceiptPanel({session,saleId,allowAutoPrint=false}:{session:Sess
     }
   }
   useEffect(()=>{
-   if(allowAutoPrint&&settings.autoPrint&&text&&!autoPrinted.current){autoPrinted.current=true;void print();}
+   if(allowAutoPrint&&settings.autoPrint&&text&&!gift&&!autoPrinted.current){autoPrinted.current=true;void print();}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[text,settings.autoPrint]);
   return <div className="receipt-panel">
@@ -364,7 +377,8 @@ export function ReceiptPanel({session,saleId,allowAutoPrint=false}:{session:Sess
          {devices.map(device=><option key={device.name} value={device.name}>{device.displayName}{device.isDefault?' (padrão)':''}</option>)}
         </select></label>}
       <label className="receipt-auto"><input type="checkbox" checked={settings.autoPrint} onChange={event=>update({autoPrint:event.target.checked})}/> Imprimir automaticamente ao finalizar</label>
-      <button className="light-button" disabled={!text || busy} onClick={() => void print()}>Imprimir comprovante não fiscal</button>
+      <label className="receipt-auto"><input type="checkbox" checked={gift} disabled={busy} onChange={event=>setGift(event.target.checked)}/> Vale-troca (sem preços, para presente)</label>
+      <button className="light-button" disabled={!text || busy} onClick={() => void print()}>{gift?'Imprimir vale-troca':'Imprimir comprovante não fiscal'}</button>
     </div>
     {error && <p role="alert" className="error">{error}</p>}
   </div>;

@@ -51,7 +51,7 @@ export function ManagementCustomers({session}:{session:Session}){
   const ok=await write('/v1/management/customers',{
    name:String(form.get('name')).trim(),phone:String(form.get('phone')).trim()||null,
    email:String(form.get('email')).trim()||null,marketing_consent:form.get('marketing')==='on',
-   loyalty_opt_in:form.get('loyalty')==='on'
+   loyalty_opt_in:form.get('loyalty')==='on',birth_date:String(form.get('birth')??'')||null
   },'Cliente cadastrado.');
   if(ok)f.reset();
  }
@@ -78,12 +78,13 @@ export function ManagementCustomers({session}:{session:Session}){
  }
  return <section className="management-section" aria-label="Clientes e fidelidade">
   <h2>Clientes e fidelidade</h2>
-  <p>Cadastro e pontos locais. Marketing é opt-in separado da fidelidade. Nenhuma mensagem é enviada automaticamente.</p>
+  <p>Cadastro e pontos da loja. A autorização para mensagens é separada da fidelidade. Nenhuma mensagem é enviada sozinha.</p>
   {notice&&<p role="status">{notice}</p>}{error&&<p className="error" role="alert">{error}</p>}
   <form className="management-form" onSubmit={e=>void submit(e)}>
    <label>Nome<input name="name" minLength={2} maxLength={120} required/></label>
    <label>Telefone (opcional)<input name="phone" type="tel" maxLength={24}/></label>
    <label>E-mail (opcional)<input name="email" type="email" maxLength={254}/></label>
+   <label>Aniversário (opcional)<input name="birth" type="date" max={new Date().toISOString().slice(0,10)}/></label>
    <label><input type="checkbox" name="marketing"/> Autoriza comunicação comercial</label>
    <label><input type="checkbox" name="loyalty"/> Adere ao programa de pontos da loja</label>
    <button className="primary-action" disabled={busy}>Cadastrar cliente</button>
@@ -106,7 +107,7 @@ export function ManagementCustomers({session}:{session:Session}){
     <div><span>Saldo de pontos</span><strong>{points?.points??'…'}</strong></div>
     <div><span>Crédito disponível para compras</span><strong>{points?brl(points.credit_cents):'…'}</strong></div>
    </div>
-   <p>Acúmulo: 1 ponto por R$ 1 de compra. Resgate: 1 ponto convertido em R$ 0,01 de crédito da loja, sem API paga.</p>
+   <p>Acúmulo: 1 ponto por R$ 1 de compra. Resgate: 1 ponto convertido em R$ 0,01 de crédito da loja.</p>
    <div className="management-form">
     <label><input type="checkbox" checked={loyalty} onChange={e=>setLoyalty(e.target.checked)}/>
      Participação em fidelidade</label>

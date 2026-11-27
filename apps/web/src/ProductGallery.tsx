@@ -96,7 +96,7 @@ export function ProductGallery({session,product,onSaved}:{session:Session;produc
  const filled=items.filter(item=>!item.primary).length;
  return <section className="editor-block" aria-label="Galeria de fotografias do produto">
   <h3>Galeria de fotografias</h3>
-  <p className="muted small">Foto principal preservada. Até 7 fotos adicionais por produto, inclusive vinculadas a uma variante. Armazenamento e miniaturas no PostgreSQL local.</p>
+  <p className="muted small">Foto principal preservada. Até 7 fotos adicionais por produto, inclusive vinculadas a uma variante.</p>
   {loading&&<p role="status">Carregando galeria…</p>}
   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:10}}>
    {items.map(item=><Tile key={item.id} session={session} product={product} item={item} onDelete={id=>void remove(id)} busy={busy}/>)}

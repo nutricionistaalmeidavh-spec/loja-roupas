@@ -91,7 +91,7 @@ export function SpreadsheetBulkEditor({session,rows,onClose,onSaved}:{
     </table>
     {preview.updates.length>12&&<p className="muted small">Prévia de 12 das {preview.updates.length} alterações.</p>}
    </div>}
-   {uncertain&&<p role="alert" className="error">Não foi possível confirmar a resposta do servidor.
+   {uncertain&&<p role="alert" className="error">Não deu para confirmar se a edição foi salva.
     Não altere o texto; clique em repetir com a mesma chave para evitar duplicação.</p>}
    {error&&<p role="alert" className="error">{error}</p>}
    {message&&<p role="status" className="notice">{message}</p>}

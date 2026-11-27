@@ -3,11 +3,13 @@ import type {FormEvent} from 'react';
 import {headers,jsonRequest} from './api-client.ts';
 import type {Session} from './api-client.ts';
 import {errorText,sendOnce} from './idempotent-post.ts';
+import {forgetPixProfile} from './PixQrCode.tsx';
 import type {Pending} from './idempotent-post.ts';
 
 type User={id:string;login:string;display_name:string|null;status:'active'|'blocked';roles:string[];pin_ready:boolean};
 type Profile={name:string;legal_name:string|null;document:string|null;address:string|null;phone:string|null;
- receipt_footer:string|null;max_cashier_discount_bps:number;commission_timing?:'on_sale'|'on_payment'};
+ receipt_footer:string|null;max_cashier_discount_bps:number;commission_timing?:'on_sale'|'on_payment';
+ pix_key?:string|null;pix_city?:string|null};
 export const ROLE_LABELS:Record<string,string>={manager:'Gestor (tudo)',cashier:'Caixa',seller:'Vendedor(a)',
  stocker:'Estoque',buyer:'Compras',technician:'Suporte técnico'};
 const ROLES=Object.keys(ROLE_LABELS);
@@ -117,6 +119,7 @@ function StoreProfileForm({session}:{session:Session}){
   setBusy(true);setError('');setNotice('');
   try{
    await sendOnce(session,'PUT','/v1/management/store-profile',{...profile,max_cashier_discount_bps:Math.round(percent*100)},pending);
+   forgetPixProfile();
    setNotice('Dados da loja salvos. Os próximos comprovantes já saem com eles.');
   }catch(e){setError(errorText(e));}
   finally{setBusy(false);}
@@ -133,6 +136,12 @@ function StoreProfileForm({session}:{session:Session}){
   <label>Endereço<input maxLength={240} value={profile.address??''} onChange={set('address')}/></label>
   <label>Mensagem no fim do comprovante<input maxLength={240} value={profile.receipt_footer??''} onChange={set('receipt_footer')}
    placeholder="Ex.: Trocas em até 30 dias com etiqueta"/></label>
+  <div className="fields-two">
+   <label>Chave Pix da loja<input maxLength={77} value={profile.pix_key??''} onChange={set('pix_key')}
+    placeholder="CNPJ, e-mail, telefone ou chave aleatória"/></label>
+   <label>Cidade (para o QR Code do Pix)<input maxLength={60} value={profile.pix_city??''} onChange={set('pix_city')} placeholder="Ex.: São Paulo"/></label>
+  </div>
+  <p className="muted small">Com a chave cadastrada, o caixa mostra um QR Code com o valor da venda para a cliente pagar pelo celular.</p>
   <label>Desconto máximo que o caixa pode dar sem gestor (%)<input inputMode="decimal" value={limit} onChange={e=>setLimit(e.target.value)}/></label>
   <label>Comissão de venda no crediário
    <select value={profile.commission_timing??'on_payment'} onChange={set('commission_timing')}>

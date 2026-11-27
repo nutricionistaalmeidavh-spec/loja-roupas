@@ -27,7 +27,8 @@ test('P2: axe-core WCAG 2.2 AA no painel e diálogo de gestão',async({page})=>{
     'Violações de acessibilidade em '+selector).toEqual([]);
  };
  await audit('.operations-overview');
- await page.getByRole('link',{name:'Fornecedores'}).click();
+ await page.getByRole('link',{name:'Estoque e compras'}).click();
+  await page.getByRole('link',{name:'Fornecedores'}).click();
  await page.getByRole('button',{name:'Novo fornecedor'}).click();
  await expect(page.getByRole('dialog',{name:'Novo fornecedor'})).toBeVisible();
  await audit('.task-dialog');

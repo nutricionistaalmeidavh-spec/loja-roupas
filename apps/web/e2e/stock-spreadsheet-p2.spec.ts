@@ -46,7 +46,7 @@ test('P2: copiar/colar Excel, desfazer, lote atômico, exportar filtro e histór
  await expect(textarea).toHaveValue(original);
  await textarea.fill(modified);
  await bulk.getByRole('button',{name:'Salvar 1 alterações juntas'}).click();
- await expect(page.getByRole('status').filter({hasText:'Edição em lote registrada'})).toBeVisible();
+ await expect(page.getByRole('status').filter({hasText:'Edição em lote salva'})).toBeVisible();
  await expect(page.getByRole('dialog',{name:'Edição em lote — copiar e colar do Excel'})).toHaveCount(0);
  const grid=page.getByRole('region',{name:'Planilha de produtos e estoque'});
  const row=grid.getByRole('row').filter({hasText:sku});

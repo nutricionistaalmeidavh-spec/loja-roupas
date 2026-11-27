@@ -5,7 +5,8 @@ export type CashState = CashSession | {active:false;terminal_code:string};
 export type SaleLineInput = {variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number};
 export type PaymentInput={method:'cash'|'pix_manual'|'card_external'|'store_credit'|'customer_credit';amount_cents:number;confirmed:boolean;external_reference?:string};
 export type QuoteLine={variant_id:string;quantity:number;sku:string;product_name:string;price_cents:number;price_revision:number;available:number};
-export type SaleQuote={total_cents:number;can_commit:boolean;lines:QuoteLine[];subtotal_cents?:number;discount_cents?:number;
+export type SaleQuote={total_cents:number;can_commit:boolean;lines:Array<QuoteLine&{promotion_name?:string|null;promotion_cents?:number}>;subtotal_cents?:number;discount_cents?:number;
+ promotion_cents?:number;
  discount_requires_manager?:boolean;cashier_discount_limit_bps?:number};
 export type Sale={id:string;sale_number:number;status:string;total_cents:number;tendered_cents:number;
  change_cents:number;created_at:string;cash_session_id:string};
@@ -49,11 +50,11 @@ export function saleDetail(session:Session,id:string,fetchImpl:typeof fetch=fetc
   method:'GET',headers:headers(session)
  },fetchImpl);
 }
-export async function receiptText(session:Session,id:string,fetchImpl:typeof fetch=fetch,cols?:32|42|90){
+export async function receiptText(session:Session,id:string,fetchImpl:typeof fetch=fetch,cols?:32|42|90,gift=false){
  let res:Response;
- try{res=await fetchImpl('/v1/sales/'+encodeURIComponent(id)+'/receipt'+(cols?'?cols='+cols:''),{
+ try{res=await fetchImpl('/v1/sales/'+encodeURIComponent(id)+'/receipt'+(cols||gift?'?'+new URLSearchParams({...(cols?{cols:String(cols)}:{}),...(gift?{gift:'true'}:{})}):''),{
   method:'GET',headers:headers(session),cache:'no-store'
- });}catch{throw new ApiError(0,'NETWORK_ERROR','Servidor LAN indisponível');}
+ });}catch{throw new ApiError(0,'NETWORK_ERROR','Sem conexão com o sistema da loja');}
  if(!res.ok)throw new ApiError(res.status,'RECEIPT_FAILED','Não foi possível obter o comprovante');
  return res.text();
 }

@@ -73,7 +73,7 @@ export function CreateProductForm({ session, onSaved, onLockChange }: { session:
     } finally { setBusy(false); }
   }
   return <form className="management-form" onSubmit={event=>void submit(event)}>
-    <div className="form-heading"><h2>Cadastrar produto</h2><p>Cadastre o produto e suas variações reais no PostgreSQL. O estoque começa em zero.</p></div>
+    <div className="form-heading"><h2>Cadastrar produto</h2><p>Cadastre a peça com cores e tamanhos. O estoque começa em zero.</p></div>
     <div className="fields-two">
       <label>Nome da peça<input required maxLength={200} placeholder="Ex.: Camisa de linho" value={name} disabled={busy||uncertain} onChange={e=>setName(e.target.value)}/></label>
       <label>Categoria<select value={category} disabled={busy||uncertain} onChange={e=>setCategory(e.target.value)}>
@@ -94,7 +94,7 @@ export function CreateProductForm({ session, onSaved, onLockChange }: { session:
       {rows.length>1&&<button type="button" className="light-button" onClick={()=>setRows(x=>x.filter((_,i)=>i!==index))}>Remover variante</button>}
     </fieldset>)}
     <button type="button" disabled={busy||uncertain||rows.length>=200} className="light-button" onClick={()=>setRows(r=>[...r,blankVariant()])}>+ Adicionar cor/tamanho</button>
-    {error&&<p className="error" role="alert">{error}{uncertain&&' O servidor pode ter concluído. Use a mesma chave ao tentar novamente.'}</p>}
+    {error&&<p className="error" role="alert">{error}{uncertain&&' O cadastro pode ter sido salvo. Clique de novo no mesmo botão, sem mudar nada, para não duplicar.'}</p>}
     {notice&&<p className="notice" role="status">{notice}</p>}
     <button className="primary-action" type="submit" disabled={busy}>{busy?'Salvando…':uncertain?'Repetir mesma solicitação':'Cadastrar produto'}</button>
   </form>;

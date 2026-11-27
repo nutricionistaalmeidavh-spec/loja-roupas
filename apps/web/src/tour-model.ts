@@ -7,7 +7,7 @@ export function tourStepsFor(roles:string[]):TourStep[]{
  const canCash=manager||roles.includes('cashier');
  const steps:TourStep[]=[
   step('inicio','pdv','overview','Sua loja, em um só lugar','Este guia apresenta os fluxos reais, sem criar vendas, produtos ou movimentações. Você pode pular e voltar quando quiser.'),
-  step('busca','pdv','search','Localize cada peça','Busque por nome, SKU ou código de barras. O catálogo é lido do PostgreSQL da loja.'),
+  step('busca','pdv','search','Localize cada peça','Busque por nome, código da peça ou código de barras.'),
   step('variantes','pdv','variants','Cor, tamanho e disponibilidade','Selecione a variação certa antes de adicionar ao carrinho. O estoque é confirmado novamente ao vender.'),
   step('carrinho','pdv','cart','Carrinho e pagamento','Revise as peças e suspensa a venda se necessário. Pix e cartão são registrados somente após confirmação externa.'),
  ];

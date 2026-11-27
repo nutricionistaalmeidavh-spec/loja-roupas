@@ -7,7 +7,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Caixa',exact:true}).click();
- await expect(page.getByText('Consultando caixa no servidor…')).toBeHidden();
+ await expect(page.getByText('Consultando caixa…')).toBeHidden();
  if(await page.getByRole('button',{name:'Abrir caixa',exact:true}).count()){
   await page.getByLabel('Valor inicial (R$)').fill('0,00');
   await page.getByRole('button',{name:'Abrir caixa',exact:true}).click();
@@ -41,7 +41,7 @@ test('M3: suspender e retomar venda sem lançar estoque nem pagamento',async({pa
  await card.getByRole('button',{name:'Adicionar '+productName}).click();
  await expect(page.getByText('1 peça adicionada')).toBeVisible();
  await page.getByRole('button',{name:'Suspender venda'}).click();
- await expect(page.getByText(/Venda suspensa e salva no servidor/)).toBeVisible();
+ await expect(page.getByText(/Venda suspensa e guardada/)).toBeVisible();
  await expect(page.getByText('0 peças adicionadas')).toBeVisible();
  await page.getByRole('button',{name:/Retomar venda · 1 itens/}).click();
  await expect(page.getByText('1 peça adicionada')).toBeVisible();

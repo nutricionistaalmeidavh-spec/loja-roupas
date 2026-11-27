@@ -14,7 +14,7 @@ test('M3: caixa → venda com Pix manual + dinheiro → recibo não fiscal → f
  await page.getByLabel('Senha').fill('Senha-QA-Somente-CI-2026');
  await page.getByRole('button',{name:'Entrar na loja'}).click();
  await page.getByRole('button',{name:'Caixa',exact:true}).click();
- await expect(page.getByText('Consultando caixa no servidor…')).toBeHidden();
+ await expect(page.getByText('Consultando caixa…')).toBeHidden();
  if(await page.getByRole('button',{name:'Abrir caixa',exact:true}).count()){
    await page.getByLabel('Valor inicial (R$)').fill('100,00');
    await page.getByRole('button',{name:'Abrir caixa',exact:true}).click();
@@ -73,7 +73,7 @@ await page.getByRole('combobox',{name:'Produto para editar',exact:true}).selectO
  await dialog.getByLabel('Valor pagamento 1').fill('49,90');
  await dialog.getByLabel('Referência pagamento 1').fill('PIX-QA-'+sku);
  await dialog.getByLabel('Pagamento confirmado fora deste sistema e conferido').check();
- await dialog.getByRole('button',{name:'+ Adicionar pagamento'}).click();
+ await dialog.getByRole('button',{name:'+ Dividir em outra forma de pagamento'}).click();
  await dialog.getByLabel('Método pagamento 2').selectOption('cash');
  await dialog.getByLabel('Valor pagamento 2').fill('110,00');
  await dialog.getByLabel('Dinheiro recebido e conferido').check();

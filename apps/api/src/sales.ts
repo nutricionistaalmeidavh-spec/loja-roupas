@@ -7,6 +7,7 @@ import type { AuthContext } from './auth.ts';
 import { validatePickupSale } from './pickup-orders.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 import {allocateDiscounts,commissionCents,creditInstallments,loyaltyPoints} from './retail-rules.ts';
+import {linePromotions} from './promotions.ts';
 import {consumeHolds,releasePickupReservation,sweepExpiredReservations,sweepExpiredReservationsTx} from './reservations.ts';
 
 const uid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
@@ -141,11 +142,14 @@ export function registerSales(app:FastifyInstance,db:Pool){
     color:item.color,size:item.size,price_cents:price,price_revision:priceRevision,available,
     gross_cents:subtotal,discount_cents:line.discount_cents??0});
   }
-  const d=await applySaleDiscounts(db,auth,lines,request.body.discount_cents??0,undefined,false);
-  return {subtotal_cents:d.subtotal,discount_cents:d.discount,total_cents:d.total,
+  const promo=await linePromotions(db,auth.storeId,lines);
+  const promoTotal=promo.cents.reduce((n,c)=>n+c,0);
+  const d=await applySaleDiscounts(db,auth,lines.map((l,i)=>({...l,gross_cents:l.gross_cents-promo.cents[i]})),request.body.discount_cents??0,undefined,false);
+  return {subtotal_cents:gross,discount_cents:promoTotal+d.discount,promotion_cents:promoTotal,total_cents:d.total,
    discount_requires_manager:d.needsManager,cashier_discount_limit_bps:d.limit_bps,
    can_commit:lines.every(l=>l.available>=l.quantity),
-   lines:lines.map((l,i)=>({...l,discount_cents:d.perLine[i],line_total_cents:l.gross_cents-d.perLine[i]}))};
+   lines:lines.map((l,i)=>({...l,promotion_name:promo.names[i],promotion_cents:promo.cents[i],
+    discount_cents:d.perLine[i]+promo.cents[i],line_total_cents:l.gross_cents-d.perLine[i]-promo.cents[i]}))};
  });
  app.post<{Body:Commit}>('/v1/sales',{
   schema:{body:{type:'object',additionalProperties:false,required:['cash_session_id','lines','payments'],properties:{
@@ -203,8 +207,13 @@ export function registerSales(app:FastifyInstance,db:Pool){
      throw new DomainError(422,'TOTAL_OVERFLOW','Valor da venda excede os limites');
     total+=subtotal;priced.push({line,row,price,subtotal});
    }
-   const discounts=await applySaleDiscounts(client,auth,priced.map(x=>({gross_cents:x.subtotal,discount_cents:x.line.discount_cents??0})),
+   const promo=await linePromotions(client,auth.storeId,priced.map(x=>({variant_id:x.line.variant_id,quantity:x.line.quantity,price_cents:x.price})));
+   const promoTotal=promo.cents.reduce((n,c)=>n+c,0);
+   const manual=await applySaleDiscounts(client,auth,priced.map((x,i)=>({gross_cents:x.subtotal-promo.cents[i],discount_cents:x.line.discount_cents??0})),
     body.discount_cents??0,body.discount_reason,true);
+   const discounts={...manual,discount:manual.discount+promoTotal,perLine:manual.perLine.map((c,i)=>c+promo.cents[i])};
+   const promoNames=[...new Set(promo.names.filter((n):n is string=>Boolean(n)))];
+   const discountReason=manual.discount?body.discount_reason!.trim():promoTotal?('Promoção: '+promoNames.join(', ')).slice(0,160):null;
    const subtotalCents=total;total=discounts.total;
    const {tendered,change}=validatePayments(body.payments,total);
    const storeCredit=body.payments.filter(p=>p.method==='store_credit').reduce((sum,p)=>sum+p.amount_cents,0);
@@ -266,10 +275,10 @@ export function registerSales(app:FastifyInstance,db:Pool){
    const number=toMoney(num.rows[0].last_number);
    const created=await client.query<{id:string;created_at:Date}>(`INSERT INTO sales
     (store_id,sale_number,cash_session_id,cashier_id,total_cents,tendered_cents,change_cents,customer_id,seller_id,
-     subtotal_cents,discount_cents,discount_reason,discount_by)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id::text,created_at`,
+     subtotal_cents,discount_cents,discount_reason,discount_by,promotion_cents)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id::text,created_at`,
     [auth.storeId,number,body.cash_session_id,auth.userId,total,tendered,change,body.customer_id||null,sellerId,
-     subtotalCents,discounts.discount,discounts.discount?body.discount_reason!.trim():null,discounts.discount?auth.userId:null]);
+     subtotalCents,discounts.discount,discountReason,manual.discount?auth.userId:null,promoTotal]);
    const saleId=created.rows[0].id;
    if(body.pickup_order_id)await client.query('UPDATE pickup_orders SET sale_id=$3 WHERE store_id=$1 AND id=$2',
      [auth.storeId,body.pickup_order_id,saleId]);
@@ -358,9 +367,9 @@ export function registerSales(app:FastifyInstance,db:Pool){
    throw new DomainError(404,'SALE_NOT_FOUND','Venda não encontrada');
   return {id:row.id,sale_number:Number(row.sale_number),total_cents:Number(row.total_cents),created_at:row.created_at,status:row.status};
  });
- app.get<{Params:{id:string};Querystring:{cols?:number}}>('/v1/sales/:id/receipt',{
+ app.get<{Params:{id:string};Querystring:{cols?:number;gift?:boolean}}>('/v1/sales/:id/receipt',{
   schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uid}}},
-   querystring:{type:'object',additionalProperties:false,properties:{cols:{type:'integer',enum:[...RECEIPT_COLUMNS]}}}}
+   querystring:{type:'object',additionalProperties:false,properties:{cols:{type:'integer',enum:[...RECEIPT_COLUMNS]},gift:{type:'boolean'}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'sale.read'))return reply;
   const storeId=request.authContext!.storeId;
@@ -381,6 +390,26 @@ export function registerSales(app:FastifyInstance,db:Pool){
   const date=(iso:string)=>iso.split('-').reverse().join('/');
   const discount=Number(info.discount_cents);
   const cols=request.query.cols;
+  if(request.query.gift){
+   // Vale-troca: comprovante de presente sem preços nem pagamentos.
+   const rows:ReceiptRow[]=[
+    {kind:'center',text:info.store_name.toUpperCase()},
+    ...(info.address?[{kind:'center',text:info.address} as const]:[]),
+    ...(info.phone?[{kind:'center',text:'Tel.: '+info.phone} as const]:[]),
+    {kind:'rule'},
+    {kind:'center',text:'VALE-TROCA'},
+    {kind:'center',text:'Sem valor. Apresente para trocar as peças.'},
+    {kind:'rule'},
+    {kind:'text',text:'Venda Nº '+sale.sale_number},
+    {kind:'text',text:'Data: '+new Date(sale.created_at).toLocaleDateString('pt-BR',{timeZone:info.timezone||'America/Sao_Paulo'})},
+    {kind:'rule'},
+    ...sale.lines.map(l=>({kind:'pair',label:l.product_name+' ('+l.color+'/'+l.size+')',value:l.quantity+' un.'} as const)),
+    ...(info.receipt_footer?[{kind:'rule'} as const,{kind:'center',text:info.receipt_footer} as const]:[]),
+    {kind:'rule'},
+    {kind:'center',text:'Código '+sale.id.slice(0,8).toUpperCase()},
+   ];
+   return reply.header('cache-control','private,no-store').type('text/plain; charset=utf-8').send(formatReceipt(rows,cols??42));
+  }
   if(cols){
    // Cupom em colunas para bobina 58/80 mm ou A4 meia folha: valores alinhados à direita.
    const rows:ReceiptRow[]=[

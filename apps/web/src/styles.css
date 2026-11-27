@@ -365,3 +365,82 @@
  .operations-overview-item button{width:100%}
 }
 @media(max-width:390px){.operations-overview-grid{grid-template-columns:1fr}}
+/* Checkout em uma tela: itens e total no topo, pagamento logo abaixo, extras recolhidos, rodapé fixo com Confirmar. */
+.checkout-summary{border:1px solid var(--retail-border);border-radius:10px;padding:12px 14px;display:grid;gap:6px}
+.checkout-items{list-style:none;margin:0;padding:0;display:grid;gap:4px;max-height:120px;overflow:auto}
+.checkout-items .total-row{font-size:14px}.checkout-items .total-row strong{font-size:14px}
+.checkout-grand-total{border-top:1px solid #eee;padding-top:6px}
+.checkout-form{gap:12px}.checkout-form .editor-block{padding:12px 14px;gap:10px}
+.checkout-modal label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:650;color:#444;min-width:0}
+.checkout-modal input:not([type=checkbox]):not([type=radio]),.checkout-modal select{width:100%;height:40px;border:1px solid #ddd;border-radius:9px;background:white;padding:8px 11px;font-size:14px;color:#171717}
+.checkout-more{border:1px solid var(--retail-border);border-radius:10px;padding:0 14px}
+.checkout-more summary{cursor:pointer;font-weight:700;padding:11px 0;list-style-position:inside}
+.checkout-more-body{border:0;margin:0;padding:0 0 14px;display:grid;gap:10px;min-width:0}
+.discount-field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:650;color:#444;min-width:0}
+.discount-inputs{display:grid;grid-template-columns:minmax(0,1fr) 72px auto;gap:6px}
+.discount-inputs .light-button{white-space:nowrap;padding:0 14px}
+.checkout-footer{position:sticky;bottom:-25px;background:white;margin:0 -25px -25px;padding:12px 25px 18px;border-top:1px solid #ececec;display:grid;gap:10px;z-index:2}
+.checkout-footer .checkout-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:10px 12px}
+.checkout-footer .checkout-totals div{display:flex;flex-direction:column;gap:2px}
+.checkout-footer .checkout-totals span{font-size:12px;color:var(--retail-muted)}
+.checkout-footer .checkout-totals strong{font-size:17px}
+.key-hint{font-size:11px;opacity:.75;font-weight:600;margin-left:4px}
+.pix-qr{display:flex;gap:14px;align-items:center;background:#f7f5f1;border-radius:10px;padding:10px}
+.pix-qr-image{width:150px;height:150px;flex:0 0 150px;background:white;border-radius:8px}
+.pix-qr-image svg{width:100%;height:100%}
+.pix-qr-copy{display:grid;gap:8px}
+@media(max-width:640px){.checkout-footer{margin:0 -16px -16px;padding:12px 16px}.checkout-footer .checkout-totals{grid-template-columns:repeat(2,1fr)}.pix-qr{flex-direction:column}}
+@media(max-width:640px){.checkout-footer .checkout-buttons{position:static;border:0;padding:0}}
+.cash-turn{display:grid;gap:10px;margin-top:6px}
+.cash-drawer-now{display:flex;justify-content:space-between;align-items:baseline;background:#f7f5f1;border-radius:9px;padding:10px 12px}
+.cash-drawer-now strong{font-size:22px}
+.cash-turn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin:0}
+.cash-turn-grid div{border:1px solid var(--retail-border);border-radius:8px;padding:8px 10px}
+.cash-turn-grid dt{font-size:12px;color:var(--retail-muted)}.cash-turn-grid dd{margin:2px 0 0;font-weight:700}
+/* Menu lateral com nome embaixo do ícone. */
+.icon-rail{width:76px}
+.icon-rail button{width:60px;height:auto;min-height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px}
+.icon-rail .rail-label{font-size:10.5px;font-weight:650;line-height:1.1;letter-spacing:0}
+.icon-rail .logo{font-size:16px;letter-spacing:.5px}
+/* PDV compacto: mais peças por tela, preço sempre visível, alternância cartões/lista. */
+.pdv-view-toggle{display:flex;gap:6px;justify-content:flex-end;margin:-6px 0 10px}
+.pdv-view-toggle button{border:1px solid var(--retail-border);background:white;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:650}
+.pdv-view-toggle .chosen{background:var(--retail-primary);border-color:var(--retail-primary);color:white}
+.product-grid{grid-template-columns:repeat(auto-fill,minmax(205px,1fr))!important;gap:10px!important}
+.product-card .product-visual{height:120px!important}
+.product-card .product-visual.no-photo{height:46px!important;border-radius:8px}
+.product-card .product-visual.no-photo svg{height:34px!important;width:38px!important}
+.garment-placeholder.compact{display:grid;place-items:center;height:100%}
+.garment-placeholder.compact span{display:none}
+.product-card .card-copy{padding-top:8px}
+.product-card .price{margin:2px 0 6px;font-size:15px}
+.product-card .stock-hint{margin:4px 0 0}
+.product-grid.list-view{grid-template-columns:1fr!important;gap:6px!important}
+.product-grid.list-view .product-card{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:center;padding:8px 10px}
+.product-grid.list-view .product-visual{height:52px!important;width:52px}
+.product-grid.list-view .product-visual svg{height:36px!important;width:38px!important}
+.product-grid.list-view .card-copy{display:grid;grid-template-columns:minmax(140px,1.4fr) 90px minmax(120px,1.4fr) auto;align-items:center;gap:10px;padding:0}
+.product-grid.list-view .card-copy .price{margin:0}
+.product-grid.list-view .card-bottom{margin:0;gap:10px}
+.product-grid.list-view .sizes{min-height:0}
+.product-grid.list-view .stock-hint{grid-column:1/-1;margin:0;font-size:11px}
+@media(max-width:900px){.product-grid.list-view .card-copy{grid-template-columns:1fr auto}.product-grid.list-view .sizes{grid-column:1/-1}}
+@media(max-width:600px){.product-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+.promo-row{color:#2f6b3a}
+.management-subnav{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+.management-subnav a{padding:7px 12px;border-radius:999px;border:1px solid var(--retail-border);background:white;color:var(--retail-primary);text-decoration:none;font-weight:650;font-size:13px}
+.management-subnav a.active{background:var(--retail-primary);color:white;border-color:var(--retail-primary)}
+.pdv-tools{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:-6px 0 10px;flex-wrap:wrap}
+.pdv-tools .pdv-view-toggle{margin:0}
+.pdv-tools .light-button{padding:6px 12px;font-size:12.5px}
+.cart-secondary{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.cart-secondary .light-button{font-size:12.5px;padding:8px 6px}
+.consignment-lines{margin:0;padding-left:18px}
+tr.overdue td{background:#fff6ec}.tag-warning{color:#9a4a12;font-size:12px}
+.abc{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;color:white}
+.abc-A{background:#2f6b3a}.abc-B{background:#a0782e}.abc-C{background:#8b8b8b}
+.fashion-turnover{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.fashion-reports .bar{display:inline-block;height:8px;background:#c8b48f;border-radius:4px;margin-right:6px;vertical-align:middle;max-width:60px}
+.birthday-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.birthday-list li{display:flex;gap:10px;align-items:center;border:1px solid var(--retail-border);border-radius:9px;padding:8px 12px}
+.birthday-list li .light-button{margin-left:auto;text-decoration:none}

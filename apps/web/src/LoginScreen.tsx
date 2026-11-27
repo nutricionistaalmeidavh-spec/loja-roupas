@@ -62,6 +62,6 @@ export function LoginScreen({onAuthenticated}:{onAuthenticated:(session:Session)
         Esqueci minha senha · Recuperar neste computador
       </button>}
     </form>}
-    <details className="login-help"><summary>Primeiro acesso ou instalação</summary><p>No Windows, abra o aplicativo e siga o assistente para criar sua loja. Para servidor LAN no Linux, consulte o guia de instalação local. Não é necessário serviço comercial de nuvem.</p></details>
+    <details className="login-help"><summary>Primeiro acesso ou instalação</summary><p>Na primeira vez, o aplicativo abre um assistente para criar sua loja e o usuário do gestor. Não precisa de internet.</p></details>
   </section></div>;
 }

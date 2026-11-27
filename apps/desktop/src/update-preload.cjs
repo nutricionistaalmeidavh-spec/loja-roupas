@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld('lojaBackups',{
  autoRun:auth=>ipcRenderer.invoke('loja:backup:auto-run',auth),
  restore:auth=>ipcRenderer.invoke('loja:backup:restore',auth)
 });
+contextBridge.exposeInMainWorld('lojaDiagnostics',{
+ export:()=>ipcRenderer.invoke('loja:diagnostic:export')
+});
 contextBridge.exposeInMainWorld('lojaUpdates',{
  info:()=>ipcRenderer.invoke('loja:updates:info'),
  check:()=>ipcRenderer.invoke('loja:updates:check'),

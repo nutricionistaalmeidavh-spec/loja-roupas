@@ -63,7 +63,7 @@ async function ready(url,child){
  }
  throw new Error('API local indisponível. Confira o antivírus e as portas locais.');
 }
-async function launchLocalRuntime({resources,userData,exe,physicalEdition=false,progress=()=>{}}){
+async function launchLocalRuntime({resources,userData,exe,physicalEdition=false,progress=()=>{},log=null}){
  if(process.platform!=='win32')throw new Error('Instalação local autônoma disponível atualmente para Windows x64.');
  const binaries=expectedBinaries(resources);
  for(const binary of binaries)if(!existsSync(binary))throw new Error('Instalador incompleto: falta '+path.basename(binary));
@@ -141,7 +141,7 @@ async function launchLocalRuntime({resources,userData,exe,physicalEdition=false,
   apiChild=spawn(exe,['--import','tsx',path.join(apiRoot,'src','main.ts')],{
    cwd:apiRoot,env:appEnv,windowsHide:true,stdio:['ignore','pipe','pipe']
   });
-  const capture=data=>{apiDiagnostic=(apiDiagnostic+String(data)).slice(-12000);};
+  const capture=data=>{apiDiagnostic=(apiDiagnostic+String(data)).slice(-12000);log?.write('api',String(data));};
   apiChild.stderr.on('data',capture);
   apiChild.stdout.on('data',capture);
   apiChild.on('error',error=>capture('Erro ao iniciar a API: '+error.message));

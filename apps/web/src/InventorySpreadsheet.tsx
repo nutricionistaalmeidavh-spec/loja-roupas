@@ -97,7 +97,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
    }catch(err){
     if(active&&!ctrl.signal.aborted)setError(
      err instanceof ApiError&&err.code==='NETWORK_ERROR'
-      ?'A consulta de estoque demorou demais ou o servidor não respondeu. Verifique a conexão e tente novamente.'
+      ?'A consulta de estoque demorou demais. Tente de novo em alguns segundos.'
       :err instanceof Error?err.message:'Falha ao atualizar a planilha'
     );
    }finally{
@@ -134,7 +134,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
    return;
   }
   setRows(next);dirtyRef.current=changed.variant_id;setDirty(changed.variant_id);
-  setNotice('Alterações locais ainda não foram salvas no servidor.');
+  setNotice('Há alterações ainda não salvas.');
  }
 
  function discard(){
@@ -164,7 +164,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   try{
    await patchSpreadsheetRow(session,row.variant_id,JSON.parse(body),key);
    setPending(null);dirtyRef.current=null;setDirty(null);
-   setNotice('Alterações salvas e auditadas no servidor.');
+   setNotice('Alterações salvas.');
    setRefreshKey(n=>n+1);onSaved();
   }catch(err){
    setError(err instanceof Error?err.message:'Falha ao salvar a linha');
@@ -209,7 +209,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
  return <div className="stock-spreadsheet">
   <div className="sheet-toolbar">
    <div><h2>Planilha operacional</h2>
-    <p>Dados reais por SKU. Edite o cadastro na célula; entradas e saídas são movimentos auditados.</p>
+    <p>Edite o cadastro direto na célula. Entradas e saídas ficam no histórico de cada peça.</p>
    </div>
    <div className="workspace-actions">
     <button type="button" className="light-button" disabled={saving}
@@ -229,7 +229,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
         .catch(err=>{setExportStatus('');setError(err instanceof Error?err.message:'Falha na exportação filtrada');})
         .finally(()=>setExporting(false));
       }}>{exporting?'Exportando…':'Exportar resultados filtrados XLSX'}</button>
-    {canEdit&&<button type="button" className="light-button" onClick={()=>setPermissionsOpen(true)}>Autorizar entrada direta</button>}
+    {canEdit&&<button type="button" className="light-button" onClick={()=>setPermissionsOpen(true)}>Quem pode lançar entrada</button>}
     <button type="button" className="light-button" onClick={()=>setFullHistoryOpen(true)}>
       Histórico completo
     </button>
@@ -257,7 +257,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   {error&&<div className="error" role="alert">{error} <button type="button" className="light-button" onClick={()=>{setError('');setRefreshKey(n=>n+1);}}>Tentar novamente</button></div>}
   {notice&&<p role="status" className="notice">{notice}</p>}
   {exportStatus&&<p role="status" className="notice">{exportStatus}</p>}
-  {stale&&<p role="status" className="notice">Há dados novos no servidor. Conclua a edição atual e atualize a planilha.</p>}
+  {stale&&<p role="status" className="notice">Alguém mudou o estoque agora. Termine a edição e atualize a planilha.</p>}
   {selectedRow&&<div className="sheet-selection-toolbar" role="group" aria-label="Ações da variante selecionada">
     <div><span className="muted small">Peça selecionada</span><strong>{selectedRow.name} · {selectedRow.sku}</strong></div>
     <div className="workspace-actions">
@@ -296,7 +296,7 @@ export default function InventorySpreadsheet({session,onSaved,canEdit,canReceive
   </footer>
   {bulkOpen&&<SpreadsheetBulkEditor session={session} rows={rows}
    onClose={()=>setBulkOpen(false)}
-   onSaved={()=>{setBulkOpen(false);setNotice('Edição em lote registrada no servidor.');setRefreshKey(n=>n+1);onSaved();}}/>}
+   onSaved={()=>{setBulkOpen(false);setNotice('Edição em lote salva.');setRefreshKey(n=>n+1);onSaved();}}/>}
   {permissionsOpen&&<DirectReceiptPermissions session={session} onClose={()=>setPermissionsOpen(false)}/>}
   {fullHistoryOpen&&<StockMovementHistory session={session} onClose={()=>setFullHistoryOpen(false)}/>}
   {action?.kind==='history'&&<StockMovementHistory session={session}

@@ -26,6 +26,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByLabel('Senha').fill(login.password);
   await page.getByRole('button',{name:'Entrar na loja'}).click();
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('link',{name:'Estoque e compras'}).click();
   await page.getByRole('link',{name:'Fornecedores'}).click();
   await page.getByRole('button',{name:'Novo fornecedor'}).click();
   await page.getByLabel('Nome do fornecedor',{exact:true}).fill(supplier);
@@ -48,6 +49,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await expect(item.getByText('Esgotado')).toBeVisible();
 
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('link',{name:'Clientes e trocas'}).click();
   await page.getByRole('link',{name:'Pós-venda'}).click();
   await page.getByRole('listitem').filter({hasText:new RegExp(sku,'i')})
     .getByRole('button',{name:'Liberar reserva'}).click();
@@ -94,6 +96,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   expect(printJob.status()).toBe(201);
   await page.getByRole('button',{name:'Nova venda',exact:true}).click();
   await page.getByRole('button',{name:'Gestão',exact:true}).click();
+  await page.getByRole('link',{name:'Estoque e compras'}).click();
   await page.getByRole('link',{name:'Operações'}).click();
   await page.getByRole('listitem').filter({hasText:'Venda '+saleNumber})
     .getByRole('button',{name:'Abrir comprovante'}).click();
@@ -105,6 +108,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await expect(page.locator('body')).toHaveAttribute('data-qa-print-triggered','true');
   await page.getByRole('button',{name:'Confirmar impressão'}).click();
   await expect(page.getByText('Impressão confirmada.')).toBeVisible();
+  await page.getByRole('link',{name:'Clientes e trocas'}).click();
   await page.getByRole('link',{name:'Pós-venda'}).click();
   await page.getByRole('button',{name:'Nova devolução'}).click();
   await page.getByLabel('Número da venda').fill(saleNumber!);
@@ -116,6 +120,7 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByRole('button',{name:'Registrar devolução e reembolso'}).click();
   await expect(page.getByText(/Devolução registrada/)).toBeVisible();
   await page.getByRole('button',{name:'Fechar Registrar devolução'}).click();
+  await page.getByRole('link',{name:'Estoque e compras'}).click();
   await page.getByRole('link',{name:'Operações'}).click();
   await storefront.reload();
   await expect(item.getByText('Disponível')).toBeVisible();
