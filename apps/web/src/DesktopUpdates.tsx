@@ -152,6 +152,14 @@ export function UpdateStartupDialog(){
   </div>
  </dialog>;
 }
+/** Erros do canal do Electron chegam como "Error invoking remote method '…': Error: …". */
+export function backupErrorMessage(error:unknown,fallback:string){
+ const raw=error instanceof Error?error.message:'';
+ if(/No handler registered/i.test(raw))
+  return 'O backup só pode ser feito no computador principal da loja, onde fica o banco de dados. Faça o backup por lá.';
+ const clean=raw.replace(/^Error invoking remote method '[^']*':\s*(Error:\s*)?/i,'').trim();
+ return clean||fallback;
+}
 export function LocalBackupSettings({session}:{session:Session}){
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
  const [auto,setAuto]=useState<AutoBackupStatus|null>(null),[autoRevision,setAutoRevision]=useState(0);
@@ -166,7 +174,7 @@ export function LocalBackupSettings({session}:{session:Session}){
  function act(task:()=>Promise<string|null>){
   setBusy(true);setError('');setNotice('');
   void task().then(text=>{if(text)setNotice(text);setAutoRevision(n=>n+1);})
-   .catch(e=>setError(e instanceof Error?e.message:'Falha na operação de backup')).finally(()=>setBusy(false));
+   .catch(e=>setError(backupErrorMessage(e,'Falha na operação de backup'))).finally(()=>setBusy(false));
  }
  if(!bridge)return <section className="update-settings"><h2>Backup da loja</h2><p>Faça o backup no computador principal. Terminais de rede não possuem o banco de dados.</p></section>;
  return <section className="update-settings" aria-label="Backup local da loja">
@@ -174,11 +182,11 @@ export function LocalBackupSettings({session}:{session:Session}){
   <p>Salve o arquivo PostgreSQL em unidade externa. Inclui produtos, fotos, vendas e histórico. Guarde uma cópia fora do computador principal.</p>
   <button className="update-primary" disabled={busy} onClick={()=>{setBusy(true);setError('');setNotice('');
    void bridge.create({token:session.token,storeId:session.storeId}).then(result=>{if(!result.cancelled)setNotice('Backup concluído e conferido · '+result.bytes+' bytes · SHA-256 '+result.sha256);})
-    .catch(e=>setError(e instanceof Error?e.message:'Falha ao criar backup')).finally(()=>setBusy(false));
+    .catch(e=>setError(backupErrorMessage(e,'Falha ao criar backup'))).finally(()=>setBusy(false));
   }}>{busy?'Criando backup…':'Escolher destino e exportar backup'}</button>
   <button className="update-secondary" disabled={busy} onClick={()=>{setBusy(true);setNotice('');setError('');
    void bridge.verify({token:session.token,storeId:session.storeId}).then(result=>{if(!result.cancelled)setNotice('Restauração testada com sucesso em banco isolado: '+result.sales+' vendas, '+result.photos+' fotos. Nenhum dado atual foi substituído.');})
-    .catch(e=>setError(e instanceof Error?e.message:'Falha ao validar restauração')).finally(()=>setBusy(false));
+    .catch(e=>setError(backupErrorMessage(e,'Falha ao validar restauração'))).finally(()=>setBusy(false));
   }}>Verificar arquivo e testar restauração</button>
   {bridge.autoStatus&&<>
    <h2>Backup automático</h2>

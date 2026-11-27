@@ -47,6 +47,8 @@ export function CreateProductForm({ session, onSaved, onLockChange }: { session:
       };
       if (!payload.name || !payload.category || payload.variants.some(v => !v.sku || !v.color || !v.size))
         throw new Error('Preencha nome, categoria, SKU, cor e tamanho de todas as variantes.');
+      if (payload.variants.some(v => v.price_cents <= 0))
+        throw new Error('O preço de venda precisa ser maior que zero. Para brindes, use um valor simbólico e aplique desconto na venda.');
     } catch (err) { setError(mutationError(err)); return; }
     const body = JSON.stringify(payload);
     if (pending && pending.body !== body && uncertain) {

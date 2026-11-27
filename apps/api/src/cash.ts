@@ -87,6 +87,10 @@ export function registerCash(app:FastifyInstance,db:Pool){
   const auth=request.authContext!,body={terminal_code:request.body.terminal_code.trim().toUpperCase(),opening_cents:request.body.opening_cents};
   const key=requireIdempotencyKey(request.headers['idempotency-key']);
   const out=await withIdempotentTransaction(db,auth,'cash.open:'+body.terminal_code,key,body,async client=>{
+   const open=await client.query<{opened_by:string}>(`SELECT opened_by::text FROM cash_sessions
+    WHERE store_id=$1 AND terminal_code=$2 AND closed_at IS NULL LIMIT 1`,[auth.storeId,body.terminal_code]);
+   if(open.rowCount)throw new DomainError(409,open.rows[0].opened_by===auth.userId?'CASH_ALREADY_OPEN':'CASH_OWNER',
+    open.rows[0].opened_by===auth.userId?'Este caixa já está aberto':'Este caixa pertence a outro operador');
    const row=await client.query<{id:string;opened_at:Date}>(`INSERT INTO cash_sessions
     (store_id,terminal_code,opened_by,opening_cents)
     VALUES($1,$2,$3,$4) RETURNING id::text,opened_at`,[auth.storeId,body.terminal_code,auth.userId,body.opening_cents]);

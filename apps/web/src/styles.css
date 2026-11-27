@@ -71,6 +71,7 @@
  border:1px solid var(--retail-border);padding:13px;border-radius:11px;margin:12px 0}
 .suspended-bar strong{font-size:13px}
 .suspended-bar .light-button{font-size:12px}
+.suspended-bar .error{flex-basis:100%;margin:0}
 .cart-footer>.light-button{display:block;width:100%;margin-bottom:9px;text-align:center}
 .operation-panel{padding:clamp(16px,4vw,40px);display:grid;gap:24px;align-content:start}
 .operation-panel section,.storefront li{padding:16px;background:var(--retail-surface);border:1px solid var(--retail-border);border-radius:12px}

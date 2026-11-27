@@ -5,6 +5,7 @@ import type { DraftLine } from '@loja/domain';
 import { ApiError,headers,jsonRequest } from './api-client.ts';
 import type { Session } from './api-client.ts';
 import { reaisToCents } from './catalog-model.ts';
+import { markUncertainSale, clearUncertainSale } from './uncertain-sale.ts';
 import { commitSale,quoteSale } from './pos-client.ts';
 import type { PickupOrder } from './PickupOrders.tsx';
 import type { PaymentInput,Sale,SaleQuote } from './pos-client.ts';
@@ -44,6 +45,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
  const [refresh,setRefresh]=useState(0);
  const [discountText,setDiscountText]=useState(''),[discountMode,setDiscountMode]=useState<'reais'|'percent'>('reais');
  const [discount,setDiscount]=useState(0),[discountReason,setDiscountReason]=useState('');
+ const [discountError,setDiscountError]=useState('');
  const [customerQuery,setCustomerQuery]=useState('');
  const [busy,setBusy]=useState(false);
  const [pending,setPending]=useState<{key:string;body:string}|null>(null);
@@ -108,7 +110,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   return ()=>{cancelled=true;};
  },[session,draft,pickup,refresh,discount]);
  function applyDiscount(){
-  setError('');
+  setError('');setDiscountError('');
   if(!discountText.trim()){setDiscount(0);return;}
   try{
    const gross=quote?.subtotal_cents??quote?.total_cents??0;
@@ -120,13 +122,19 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
    }else cents=reaisToCents(discountText);
    if(cents>=gross)throw new Error('O desconto precisa ser menor que o total da venda.');
    setDiscount(cents);
-  }catch(e){setError(e instanceof Error?e.message:'Desconto inválido');}
+  }catch(e){setDiscountError(e instanceof Error?e.message:'Desconto inválido');}
  }
  const tendered=useMemo(()=>{
   try{return tenders.reduce((sum,x)=>sum+reaisToCents(x.amount),0);}
   catch{return 0;}
  },[tenders]);
- const change=quote?Math.max(0,tendered-quote.total_cents):0;
+ const cashTendered=useMemo(()=>{
+  try{return tenders.filter(x=>x.method==='cash').reduce((sum,x)=>sum+reaisToCents(x.amount),0);}
+  catch{return 0;}
+ },[tenders]);
+ // Troco só sai do dinheiro: Pix/cartão acima do total não vira troco.
+ const change=quote?Math.min(cashTendered,Math.max(0,tendered-quote.total_cents)):0;
+ const nonCashOver=quote?tendered-cashTendered>quote.total_cents:false;
  const due=quote?Math.max(0,quote.total_cents-tendered):0;
  function update(key:string,changes:Partial<Tender>){
   setTenders(all=>all.map(x=>x.key===key?{...x,...changes}:x));
@@ -175,13 +183,13 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   setBusy(true);
   try{
    const sold=await commitSale(session,cashSessionId,lines,payments,key,fetch,pickup?.id,extras);
-   setPending(null);setUncertain(false);onConfirmed(sold);
+   setPending(null);setUncertain(false);clearUncertainSale(cashSessionId);onConfirmed(sold);
   }catch(err){
    setError(err instanceof Error?err.message:'Falha ao confirmar venda');
    if(err instanceof ApiError && err.status>=400 && err.status<500){
     setPending(null);setUncertain(false);
     if(err.status===409&&!err.code.startsWith('ORDER_'))setError('O estoque, preço ou caixa mudou. Revise a cotação antes de tentar novamente.');
-   }else setUncertain(true);
+   }else{setUncertain(true);markUncertainSale(cashSessionId);}
   }finally{setBusy(false);}
  }
  return <div className="drawer-backdrop checkout-overlay" onMouseDown={()=>{if(!busy&&!uncertain)onClose();}}>
@@ -215,8 +223,9 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
        <label>Motivo do desconto
         <input maxLength={160} value={discountReason} placeholder="Ex.: cliente fiel, peça com detalhe" onChange={e=>setDiscountReason(e.target.value)}/></label>
       </div>
+      {discountError&&<p role="alert" className="error">{discountError}</p>}
       {quote.discount_requires_manager&&<p role="alert" className="error">Este desconto passa do limite do caixa ({((quote.cashier_discount_limit_bps??0)/100).toLocaleString('pt-BR')}%). Só um gestor pode confirmar.</p>}
-      {discount>0&&<button type="button" className="text-btn" onClick={()=>{setDiscount(0);setDiscountText('');}}>Remover desconto</button>}
+      {discount>0&&<button type="button" className="text-btn" onClick={()=>{setDiscount(0);setDiscountText('');setDiscountError('');}}>Remover desconto</button>}
     </fieldset>
     <div className="editor-block"><h3>Cliente e vendedor</h3>
       <div className="fields-two">
@@ -277,6 +286,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
       <div className="total-row"><span>Informado</span><strong>{brl(tendered)}</strong></div>
       <div className="total-row"><span>Restante</span><strong>{brl(due)}</strong></div>
       <div className="total-row"><span>Troco (somente em dinheiro)</span><strong>{brl(change)}</strong></div>
+      {nonCashOver&&<p className="error small" role="status">Pix e cartão não geram troco: o valor informado passa do total da venda.</p>}
     </div>
     {error&&<p role="alert" className="error">{error}{uncertain&&' A operação pode ter sido gravada. Não crie outra venda; repita usando a mesma chave.'}</p>}
     <div className="checkout-buttons">

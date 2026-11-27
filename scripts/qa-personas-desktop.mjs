@@ -210,14 +210,15 @@ try {
     await snap('pdv-tamanhos');
   });
 
-  await scenario('S03', 'Caixa novato', 'Abrir caixa digitando "100.00" e depois corrigir', async note => {
+  await scenario('S03', 'Caixa novato', 'Abrir caixa digitando "100,000" e depois corrigir para "100.00"', async note => {
     await win.getByRole('button', { name: 'Caixa', exact: true }).click();
     await win.getByText('Consultando caixa no servidor…').waitFor({ state: 'hidden' }).catch(() => {});
-    await win.getByLabel('Valor inicial (R$)').fill('100.00');
+    await win.getByLabel('Valor inicial (R$)').fill('100,000');
     await win.getByRole('button', { name: 'Abrir caixa', exact: true }).click();
     await sleep(800);
-    note('Com "100.00": ' + (await win.getByRole('alert').allInnerTexts()).join(' / '));
-    await win.getByLabel('Valor inicial (R$)').fill('100,00');
+    note('Com "100,000": ' + (await win.getByRole('alert').allInnerTexts()).join(' / '));
+    // Corrige usando ponto decimal, como vem do teclado numérico.
+    await win.getByLabel('Valor inicial (R$)').fill('100.00');
     await win.getByRole('button', { name: 'Abrir caixa', exact: true }).click();
     await sleep(1200);
     await snap('caixa-apos-corrigir');
@@ -258,18 +259,34 @@ try {
   await scenario('S05', 'Operador que fecha o app', 'Clicar no X com peça no carrinho', async note => {
     await addToCart(PRODUCT, 'G');
     await snap('carrinho-antes-de-fechar');
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('http'))?.close());
-    await sleep(3000);
+    // A pergunta nativa é síncrona: troca por um registro para o roteiro não ficar preso nela.
+    const closeWithAnswer = answer => app.evaluate(({ BrowserWindow, dialog }, choice) => {
+      globalThis.__qaClosePrompt = null;
+      dialog.showMessageBoxSync = (_w, options) => { globalThis.__qaClosePrompt = options?.message ?? ''; return choice; };
+      BrowserWindow.getAllWindows().find(w => w.webContents.getURL().startsWith('http'))?.close();
+    }, answer);
+    await closeWithAnswer(0);
+    await sleep(2000);
+    const prompt = await app.evaluate(() => globalThis.__qaClosePrompt).catch(() => null);
     const open = await windowsOpen();
-    note('Janelas abertas 3 s depois de clicar no X: ' + open);
-    if (open > 0) finding(note, 'P2', 'com peça no carrinho, o X não fecha o app e não mostra aviso');
+    note('Pergunta ao clicar no X: ' + (prompt ?? 'nenhuma'));
+    note('Escolhendo "Continuar vendendo", janelas abertas: ' + open);
+    if (!prompt) finding(note, 'P2', 'com peça no carrinho, o X não fecha o app e não mostra aviso');
     await snap('depois-do-x');
+    if (prompt && open > 0) {
+      await closeWithAnswer(1).catch(() => {});
+      await sleep(4000);
+      const after = await windowsOpen();
+      note('Escolhendo "Fechar mesmo assim", janelas abertas: ' + after);
+      if (after > 0) finding(note, 'P2', '"Fechar mesmo assim" não fechou o app');
+    }
   });
 
   await scenario('S06', 'Operador que fecha o app', 'App encerrado à força no meio da venda (queda de energia)', async note => {
     if (await windowsOpen() === 0) await relaunch(note, 'o X fechou o app no cenário anterior');
     else if (!win || win.isClosed()) await mainWindow();
-    await addToCart(PRODUCT, 'P').catch(() => {});
+    // Se o X fechou o app, o carrinho voltou vazio: coloca a peça G de novo (sem estoque extra, o catch cobre o caso em que ela ainda está lá).
+    await addToCart(PRODUCT, 'G').catch(() => {});
     const salesBefore = await salesCount();
     const d = await checkoutCash();
     await win.route('**/v1/sales', async route => {

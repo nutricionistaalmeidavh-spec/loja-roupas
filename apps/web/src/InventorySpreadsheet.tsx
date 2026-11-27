@@ -21,7 +21,7 @@ function toRow(row:StockSpreadsheetRow):SheetRow{
  return {...row,barcode:row.barcode??'',price_edit:(row.price_cents/100).toFixed(2).replace('.',',')};
 }
 function safePrice(value:string){
- return reaisToCents(value.trim().replace('.',','));
+ return reaisToCents(value.trim());
 }
 function movementLabel(kind:string){
  return ({receipt:'Recebimento',sale:'Venda',return:'Devolução',adjustment:'Ajuste'} as Record<string,string>)[kind]??kind;

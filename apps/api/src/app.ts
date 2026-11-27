@@ -82,7 +82,7 @@ export function buildApp(db: Pool) {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });
     if (typeof error === 'object' && error !== null && 'validation' in error && error.validation)
-      return reply.code(400).send({code:'BAD_REQUEST',message:'Formato de entrada inválido'});
+      return reply.code(400).send({code:'BAD_REQUEST',message:validationMessage(error.validation)});
     const dbCode = (error as Error & {code?:string}).code;
     if (dbCode === '23505' || dbCode === '23503' || dbCode === '23514')
       return reply.code(409).send({code:'CONSTRAINT_CONFLICT',message:'Conflito de integridade ou duplicidade'});
@@ -91,4 +91,15 @@ export function buildApp(db: Pool) {
   });
   // Pagamentos externos são registro MANUAL, nunca integração silenciosa com TEF/Pix.
   return app;
+}
+
+type ValidationIssue={instancePath?:string;keyword?:string;params?:Record<string,unknown>};
+/** Mensagem em português para os erros de validação mais comuns, sem expor o schema. */
+export function validationMessage(issues:unknown):string{
+  const first=(Array.isArray(issues)?issues[0]:undefined) as ValidationIssue|undefined;
+  const field=(first?.instancePath??'').split('/').filter(Boolean).at(-1)??'';
+  if(/price_cents$/.test(field)&&first?.keyword==='minimum')return 'O preço de venda precisa ser maior que zero.';
+  if(/_cents$/.test(field)&&first?.keyword==='minimum')
+    return first.params?.limit===0?'O valor não pode ser negativo.':'Informe um valor maior que zero.';
+  return 'Formato de entrada inválido';
 }

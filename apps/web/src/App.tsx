@@ -6,7 +6,7 @@ import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
 import { ApiError, headers, jsonRequest, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
 import type { Session } from './api-client.ts';
-import { mapCatalog } from './catalog-model.ts';
+import { mapCatalog, sortSizes } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { FirstRunTour } from './FirstRunTour.tsx';
@@ -24,11 +24,12 @@ import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
 import {OperatorSwitch} from './OperatorSwitch.tsx';
 import { CashPanel } from './CashPanel.tsx';
 import { CheckoutDrawer } from './PosCheckout.tsx';
+import { hasUncertainSale, clearUncertainSale } from './uncertain-sale.ts';
 import { currentCash, receiptText, suspendSale, suspendedSales, resumeSale } from './pos-client.ts';
 import type { CashState, Sale, SuspendedDraft } from './pos-client.ts';
 
 const brl = (cents:number) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
-const sizesFor = (p:Product,color:string) => [...new Set(p.variants.filter(v=>v.color===color).map(v=>v.size))];
+const sizesFor = (p:Product,color:string) => sortSizes([...new Set(p.variants.filter(v=>v.color===color).map(v=>v.size))]);
 function Garment({kind}:{kind:Product['kind']}) {
   return <svg viewBox="0 0 120 120" role="img" aria-label="Ilustração de categoria; fotografia não cadastrada">
     {kind==='pants'?<path d="M37 15h46l-7 93H62L60 60l-3 48H43z" fill="currentColor"/>:
@@ -371,7 +372,7 @@ export function App() {
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
-        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" disabled={recoveryBusy} onClick={()=>void recoverDraft()}>{recoveryBusy?'Recuperando…':'Recuperar carrinho'}</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
+        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong>{hasUncertainSale(cashId)&&<p className="error" role="alert">Atenção: a conexão caiu enquanto esta venda era confirmada e ela pode já ter sido registrada. Confira a última venda em Vendas antes de vender de novo.</p>}<button className="light-button" disabled={recoveryBusy} onClick={()=>void recoverDraft()}>{recoveryBusy?'Recuperando…':'Recuperar carrinho'}</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);clearUncertainSale(cashId);setRecoverable([]);}}>Descartar</button></section>}
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
           <strong>Vendas suspensas ({savedDrafts.length})</strong>
           {savedDrafts.map(item=><button key={item.id} className="light-button"

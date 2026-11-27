@@ -6,10 +6,8 @@ import { randomUUID } from 'node:crypto';
  * Bugs confirmados no teste exploratório com 5 personas (27/11/2026).
  * Relatório: relatorios/qa-personas-2026-11-27 (pasta do projeto).
  *
- * Cada teste descreve o comportamento ESPERADO. Enquanto o bug existir, o teste
- * fica marcado com test.fail(): a suíte continua verde e o Playwright avisa
- * ("expected to fail but passed") assim que a correção chegar. Ao corrigir o
- * bug, remova a linha test.fail() correspondente.
+ * Cada teste descreve o comportamento ESPERADO. Todos os bugs foram corrigidos;
+ * os testes ficam como regressão. Se um voltar a falhar, o bug voltou.
  */
 
 const LOGIN = { login: 'qa-admin', password: 'Senha-QA-Somente-CI-2026' };
@@ -82,15 +80,15 @@ async function adicionarAoCarrinho(page: Page, nome: string, tamanho?: string) {
 }
 
 test.describe('Persona caixa novato', () => {
-  test('P1: valor com ponto na sangria não pode travar o caixa até recarregar a página', async ({ page }) => {
-    test.fail(true, 'Bug P1-01: CashPanel guarda a chave de idempotência quando a validação local falha.');
+  test('P1: valor digitado errado na sangria não pode travar o caixa até recarregar a página', async ({ page }) => {
     await entrar(page);
     await garantirCaixaAberto(page);
     await page.getByRole('button', { name: 'Sangria ou suprimento' }).click();
     const dialogo = page.getByRole('dialog', { name: 'Sangria ou suprimento' });
     await dialogo.getByLabel('Tipo').selectOption('supply');
     await dialogo.getByLabel('Justificativa').fill('Troco para o dia QA');
-    await dialogo.getByLabel('Valor (R$)').fill('5.00');
+    // "5.00" passou a ser aceito; "5,000" (três casas) continua inválido e dispara a validação local.
+    await dialogo.getByLabel('Valor (R$)').fill('5,000');
     await dialogo.getByRole('button', { name: 'Registrar movimento' }).click();
     await expect(dialogo.getByRole('alert')).toBeVisible();
     // A caixa corrige o valor para o formato aceito: deve funcionar.
@@ -101,7 +99,6 @@ test.describe('Persona caixa novato', () => {
   });
 
   test('P2: caixa aberto por outro operador explica o que fazer, sem erro técnico', async ({ page, request }) => {
-    test.fail(true, 'Bug P2-06: mostra o formulário de abertura e responde "Conflito de integridade ou duplicidade".');
     const { headers } = await api(request);
     const login = 'qa.caixa.' + randomUUID().slice(0, 6);
     const password = 'Caixa-' + randomUUID(); // senha descartável por execução
@@ -126,7 +123,6 @@ test.describe('Persona caixa novato', () => {
 });
 
 test('P3: divergência no fechamento do caixa mostra o aviso uma vez só', async ({ page }) => {
-  test.fail(true, 'Bug P3-11: o alerta aparece no diálogo e também na página.');
   await entrar(page);
   await garantirCaixaAberto(page);
   await page.getByRole('button', { name: 'Fechar caixa' }).click();
@@ -138,14 +134,12 @@ test('P3: divergência no fechamento do caixa mostra o aviso uma vez só', async
 });
 
 test('P3: o app tem ícone (favicon) e não gera erro 404 no console', async ({ request }) => {
-  test.fail(true, 'Bug P3-12: /favicon.ico responde 404.');
   const icone = await request.get('/favicon.ico');
   expect(icone.status()).toBe(200);
 });
 
 test.describe('Persona operador que fecha o app no meio da venda', () => {
   test('P1: depois de queda de rede e reabertura, o carrinho já vendido não volta como venda nova', async ({ page, request }) => {
-    test.fail(true, 'Bug P1-02: "Recuperar carrinho" aparece sem aviso e permite vender de novo o mesmo carrinho.');
     const produto = await produtoComEstoque(request, 'Blusa Queda QA', [{ size: 'M', quantity: 4 }]);
     await entrar(page);
     await garantirCaixaAberto(page);
@@ -178,7 +172,6 @@ test.describe('Persona operador que fecha o app no meio da venda', () => {
 
 test.describe('Persona gerente que mexe em tudo', () => {
   test('P2: preço com separador de milhar (1.234,56) é aceito no cadastro', async ({ page }) => {
-    test.fail(true, 'Bug P2-05: reaisToCents só aceita dígitos com vírgula, sem ponto de milhar.');
     const sku = 'QA5P-MIL-' + randomUUID().slice(0, 6).toUpperCase();
     await entrar(page);
     await page.getByRole('button', { name: 'Cadastrar produtos' }).click();
@@ -193,7 +186,6 @@ test.describe('Persona gerente que mexe em tudo', () => {
   });
 
   test('P3: preço zero explica o motivo em vez de "Formato de entrada inválido"', async ({ page }) => {
-    test.fail(true, 'Bug P3-08: a API recusa price_cents 0 com mensagem genérica.');
     const sku = 'QA5P-ZERO-' + randomUUID().slice(0, 6).toUpperCase();
     await entrar(page);
     await page.getByRole('button', { name: 'Cadastrar produtos' }).click();
@@ -211,7 +203,6 @@ test.describe('Persona gerente que mexe em tudo', () => {
   });
 
   test('P3: tamanhos aparecem na ordem da grade (P antes de G)', async ({ page, request }) => {
-    test.fail(true, 'Bug P3-10: tamanhos ordenados alfabeticamente.');
     const produto = await produtoComEstoque(request, 'Vestido Grade QA', [{ size: 'G', quantity: 1 }, { size: 'P', quantity: 1 }]);
     await entrar(page);
     await page.getByLabel('Buscar nome, SKU ou código').fill(produto.name);
@@ -220,7 +211,6 @@ test.describe('Persona gerente que mexe em tudo', () => {
   });
 
   test('P2: backup em terminal sem banco local mostra orientação, não erro técnico do Electron', async ({ page }) => {
-    test.fail(true, 'Bug P2-04: em terminal LAN (ou fora do Windows) o preload expõe lojaBackups sem handlers registrados.');
     await page.addInitScript(() => {
       const falha = (canal: string) => () => Promise.reject(new Error(
         `Error invoking remote method '${canal}': Error: No handler registered for '${canal}'`));
@@ -240,7 +230,6 @@ test.describe('Persona gerente que mexe em tudo', () => {
 
 test.describe('Persona vendedora apressada', () => {
   test('P3: erro de desconto inválido aparece perto do campo, sem precisar rolar', async ({ page, request }) => {
-    test.fail(true, 'Bug P3-07: o alerta fica no fim do diálogo, fora da área visível.');
     const produto = await produtoComEstoque(request, 'Saia Desconto QA', [{ size: 'M', quantity: 2 }]);
     await entrar(page);
     await garantirCaixaAberto(page);
@@ -255,7 +244,6 @@ test.describe('Persona vendedora apressada', () => {
   });
 
   test('P3: Pix acima do total não mostra troco', async ({ page, request }) => {
-    test.fail(true, 'Bug P3-09: o resumo calcula troco para qualquer forma de pagamento.');
     const produto = await produtoComEstoque(request, 'Calça Pix QA', [{ size: 'M', quantity: 2 }]);
     await entrar(page);
     await garantirCaixaAberto(page);
