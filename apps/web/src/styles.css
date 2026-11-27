@@ -71,6 +71,7 @@
  border:1px solid var(--retail-border);padding:13px;border-radius:11px;margin:12px 0}
 .suspended-bar strong{font-size:13px}
 .suspended-bar .light-button{font-size:12px}
+.suspended-bar .error{flex-basis:100%;margin:0}
 .cart-footer>.light-button{display:block;width:100%;margin-bottom:9px;text-align:center}
 .operation-panel{padding:clamp(16px,4vw,40px);display:grid;gap:24px;align-content:start}
 .operation-panel section,.storefront li{padding:16px;background:var(--retail-surface);border:1px solid var(--retail-border);border-radius:12px}
@@ -82,9 +83,13 @@
 .storefront ul{padding:0;list-style:none;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
 @media print{
  .receipt-print{box-sizing:border-box;padding:2mm;font-size:9pt;overflow-wrap:anywhere}
- [data-receipt-paper="58"] .receipt-print{width:54mm}
- [data-receipt-paper="80"] .receipt-print{width:76mm}
+ [data-receipt-paper="58"] .receipt-print{width:54mm;font-size:7.8pt;white-space:pre}
+ [data-receipt-paper="80"] .receipt-print{width:76mm;font-size:8.4pt;white-space:pre}
+ [data-receipt-paper="210"] .receipt-print{width:190mm;max-height:138mm;font-size:10pt;white-space:pre;overflow:hidden}
 }
+.receipt-panel{display:grid;gap:12px}
+.receipt-auto{display:flex;align-items:center;gap:6px;font-size:13px}
+.receipt-reprint{display:grid;gap:12px}
 .barcode-label{overflow:auto}
 @media print{
  [data-print-label] .barcode-label,[data-print-label] .barcode-label *{visibility:visible!important}

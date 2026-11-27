@@ -1,4 +1,4 @@
-const {app,BrowserWindow,dialog,shell,ipcMain,Menu}=require('electron');
+const {app,BrowserWindow,dialog,shell,ipcMain,Menu,net}=require('electron');
 const {readFileSync} =require('node:fs');
 const fs=require('node:fs/promises');
 const path=require('node:path');
@@ -23,6 +23,9 @@ if(physicalEdition&&!process.argv.some(arg=>arg.startsWith('--user-data-dir=')))
 let commercialLicense=null;
 let autoBackup=null;
 let quitting=false;
+// A loja é brasileira: mensagens nativas do Chromium (validação de formulário, menus de contexto)
+// em português mesmo quando o Windows está em outro idioma.
+app.commandLine.appendSwitch('lang','pt-BR');
 const single=app.requestSingleInstanceLock();
 const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition,commercialEdition});
 if(!single)app.quit();
@@ -68,6 +71,15 @@ function openWindow(url){
    catch{event.preventDefault();}
   });
  }
+ // A interface pede confirmação (beforeunload) quando há peças no carrinho. Sem este
+ // tratamento o Electron cancela o fechamento em silêncio e o X parece travado.
+ window.webContents.on('will-prevent-unload',event=>{
+  const choice=dialog.showMessageBoxSync(window,{type:'warning',title:'Venda em andamento',
+   message:'Há peças no carrinho desta venda.',
+   detail:'Se fechar agora, as peças saem do carrinho e nenhuma venda é registrada.',
+   buttons:['Continuar vendendo','Fechar mesmo assim'],defaultId:0,cancelId:0,noLink:true});
+  if(choice===1)event.preventDefault();
+ });
  desktopUpdater.registerWindow(window,url.href);
  // Conservar a janela de preparação até a interface ficar pronta para ser mostrada.
  const reveal=()=>{
@@ -77,13 +89,24 @@ function openWindow(url){
   setupWindow=null;
  };
  window.once('ready-to-show',reveal);
- let connectionErrorShown=false;
+ let connectionErrorShown=false,retryTimer=null;
+ const retryConnection=()=>{
+  if(window.isDestroyed()){clearInterval(retryTimer);return;}
+  void net.fetch(new URL('/v1/ready',url).href,{cache:'no-store'}).then(response=>{
+   if(!response.ok||window.isDestroyed())return;
+   clearInterval(retryTimer);retryTimer=null;connectionErrorShown=false;
+   void window.loadURL(url.href).catch(showConnectionError);
+  }).catch(()=>{});
+ };
  const showConnectionError=()=>{
   if(connectionErrorShown||window.isDestroyed())return;
   connectionErrorShown=true;
   void window.loadFile(path.join(__dirname,'connection-error.html')).catch(error=>
    dialog.showErrorBox('Conexão com a loja',error.message));
+  // Volta sozinho quando o servidor responder: o operador não precisa fechar o app.
+  if(!retryTimer)retryTimer=setInterval(retryConnection,5000);
  };
+ window.on('closed',()=>{if(retryTimer)clearInterval(retryTimer);});
  window.webContents.on('did-fail-load',(_event,code,_description,_url,isMainFrame)=>{
   if(code!==-3&&isMainFrame!==false)showConnectionError();
  });
@@ -127,7 +150,7 @@ function registerPrinterHandlers(){
   const devices=await event.sender.getPrintersAsync();
   const chosen=validatePrinterSelection(request,devices.map(p=>p.name));
   return new Promise((resolve,reject)=>{
-   event.sender.print({silent:true,deviceName:chosen.deviceName,printBackground:true},(success,reason)=>{
+   event.sender.print({silent:true,deviceName:chosen.deviceName,printBackground:true,...(chosen.paperMm===210?{pageSize:'A4'}:{})},(success,reason)=>{
     if(success)resolve({submitted:true});else reject(new Error(reason||'Falha ao enviar impressão ao Windows.'));
    });
   });

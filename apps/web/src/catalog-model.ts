@@ -40,11 +40,35 @@ export function mapCatalog(page: CatalogPage): Product[] {
     };
   });
 }
+/**
+ * Aceita o jeito como as pessoas digitam dinheiro no Brasil: 149,90 · 1.234,56 ·
+ * R$ 1.234 · e também o ponto como decimal vindo de teclado numérico (100.00, 12.5).
+ * Ponto seguido de exatamente 3 dígitos é milhar; seguido de 1 ou 2 dígitos no fim é decimal.
+ */
 export function reaisToCents(raw: string): number {
-  const normalized = raw.trim();
+  let normalized = raw.trim().replace(/^R\$\s*/i, '');
+  if (/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(normalized)) normalized = normalized.replaceAll('.', '');
+  else if (/^\d{1,8}\.\d{1,2}$/.test(normalized)) normalized = normalized.replace('.', ',');
   if (!/^\d{1,8}(,\d{1,2})?$/.test(normalized)) throw new Error('Informe preço em reais, como 149,90');
   const [reais, fraction = ''] = normalized.split(',');
   const cents = Number(reais) * 100 + Number(fraction.padEnd(2, '0'));
   if (!Number.isSafeInteger(cents)) throw new Error('Preço inválido');
   return cents;
+}
+
+const SIZE_ORDER = ['RN', 'BB', 'PP', 'XP', 'P', 'M', 'G', 'GG', 'XG', 'XGG', 'EG', 'EGG', 'EXG', 'G1', 'G2', 'G3', 'G4', 'G5'];
+/** Ordena tamanhos como na grade da loja: PP, P, M, G, GG… e numeração em ordem crescente. */
+export function sortSizes(sizes: readonly string[]): string[] {
+  const rank = (size: string) => {
+    const s = size.trim().toUpperCase();
+    const known = SIZE_ORDER.indexOf(s);
+    if (known >= 0) return [0, known] as const;
+    const n = Number(s.replace(',', '.'));
+    if (s && Number.isFinite(n)) return [1, n] as const;
+    if (/^(U|UN|UNICO|ÚNICO|TAMANHO ÚNICO|TAMANHO UNICO)$/.test(s)) return [3, 0] as const;
+    return [2, 0] as const;
+  };
+  return sizes.map((size, i) => ({ size, i, r: rank(size) }))
+    .sort((a, b) => a.r[0] - b.r[0] || a.r[1] - b.r[1] || a.i - b.i)
+    .map(x => x.size);
 }

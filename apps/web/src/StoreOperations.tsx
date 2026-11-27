@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 declare global{interface Window{lojaPrinter?:{
  list():Promise<Array<{name:string;displayName:string;isDefault:boolean}>>;
- print(request:{deviceName:string;paperMm:58|80}):Promise<{submitted:boolean}>;
+ print(request:{deviceName:string;paperMm:58|80|210}):Promise<{submitted:boolean}>;
 }}}
 import type { FormEvent } from 'react';
 import { ApiError, headers, jsonRequest } from './api-client.ts';
@@ -12,6 +12,9 @@ import { OperationsActionCenter } from './OperationsActionCenter.tsx';
 import { CommercialIntelligence } from './CommercialIntelligence.tsx';
 import { PickupSettings, PickupTracking, usePickupSubmission } from './PickupOrders.tsx';
 import { requestId } from './request-id.ts';
+import { receiptText } from './pos-client.ts';
+import { loadReceiptSettings, saveReceiptSettings, receiptColumns, paperLabel } from './receipt-settings.ts';
+import type { ReceiptPaper, ReceiptSettings } from './receipt-settings.ts';
 import { TaskDialog } from './TaskDialog.tsx';
 import {SalesBars,RetailEmpty} from './RetailUI.tsx';
 import {MarketplaceSyncPanel} from './MarketplaceSyncPanel.tsx';
@@ -297,33 +300,46 @@ export function Storefront({storeId}:{storeId:string}) {
   </main>;
 }
 
-export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready:boolean}) {
-  const [paper,setPaper] = useState<58|80>(80);
-  const [printer,setPrinter]=useState('');
+/** Notinha (cupom não fiscal): pré-visualização, papel, impressora, impressão automática e segunda via. */
+export function ReceiptPanel({session,saleId,allowAutoPrint=false}:{session:Session;saleId:string;allowAutoPrint?:boolean}) {
+  const [settings,setSettings]=useState<ReceiptSettings>(()=>loadReceiptSettings(session.storeId));
   const [devices,setDevices]=useState<Array<{name:string;displayName:string;isDefault:boolean}>>([]);
+  const [text,setText]=useState('');
+  const [error,setError] = useState('');
+  const [busy,setBusy] = useState(false);
+  const pending = useRef<{paper:ReceiptPaper;key:string} | null>(null);
+  const autoPrinted = useRef(false);
   useEffect(()=>{
    let alive=true;
    void window.lojaPrinter?.list().then(found=>{if(alive)setDevices(found);}).catch(()=>{});
    return ()=>{alive=false;};
   },[]);
-  const [error,setError] = useState('');
-  const [busy,setBusy] = useState(false);
-  const pending = useRef<{paper:58|80;key:string} | null>(null);
+  useEffect(()=>{
+   let alive=true;setText('');
+   void receiptText(session,saleId,fetch,receiptColumns(settings.paper)).then(value=>{if(alive)setText(value);})
+    .catch(err=>{if(alive)setError(err instanceof Error?err.message:'Não foi possível obter o comprovante');});
+   return ()=>{alive=false;};
+  },[session,saleId,settings.paper]);
+  function update(change:Partial<ReceiptSettings>){
+   setSettings(current=>{const next={...current,...change};saveReceiptSettings(session.storeId,next);return next;});
+  }
+  const printerKnown=!settings.printer||devices.some(device=>device.name===settings.printer);
   async function print() {
-    if (busy || !ready) return;
+    if (busy || !text) return;
     setBusy(true);
     setError('');
+    const paper=settings.paper;
     const key = pending.current?.paper === paper ? pending.current.key : requestId();
     pending.current = {paper,key};
     try {
-      await jsonRequest('/v1/sales/' + id + '/print-requests', {
+      await jsonRequest('/v1/sales/' + saleId + '/print-requests', {
         method:'POST', headers:{...headers(session,key),'content-type':'application/json'},
         body:JSON.stringify({paper_mm:paper}),
       }, fetch);
       pending.current = null;
       document.documentElement.dataset.receiptPaper = String(paper);
       try {
-        if(printer&&window.lojaPrinter)await window.lojaPrinter.print({deviceName:printer,paperMm:paper});
+        if(settings.printer&&printerKnown&&window.lojaPrinter)await window.lojaPrinter.print({deviceName:settings.printer,paperMm:paper});
         else window.print();
       } finally { delete document.documentElement.dataset.receiptPaper; }
     } catch (error) {
@@ -332,17 +348,53 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
       setBusy(false);
     }
   }
-  return <div className="publication-actions">
-    <label>Papel <select value={paper} disabled={busy} onChange={event => setPaper(event.target.value==='58'?58:80)}>
-      <option value={58}>58 mm</option><option value={80}>80 mm</option>
-    </select></label>
-    {window.lojaPrinter&&<label>Impressora
-      <select aria-label="Impressora do comprovante" value={printer} disabled={busy} onChange={event=>setPrinter(event.target.value)}>
-       <option value="">Escolher na janela do Windows</option>
-       {devices.map(device=><option key={device.name} value={device.name}>{device.displayName}{device.isDefault?' (padrão)':''}</option>)}
-      </select></label>}
-    <button className="light-button" disabled={!ready || busy} onClick={() => void print()}>Imprimir comprovante não fiscal</button>
+  useEffect(()=>{
+   if(allowAutoPrint&&settings.autoPrint&&text&&!autoPrinted.current){autoPrinted.current=true;void print();}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[text,settings.autoPrint]);
+  return <div className="receipt-panel">
+    {text?<pre className="receipt-print">{text}</pre>:!error&&<p className="muted small" role="status">Preparando a notinha…</p>}
+    <div className="publication-actions">
+      <label>Papel <select value={settings.paper} disabled={busy} onChange={event => update({paper:Number(event.target.value) as ReceiptPaper})}>
+        <option value={58}>{paperLabel(58)}</option><option value={80}>{paperLabel(80)}</option><option value={210}>{paperLabel(210)}</option>
+      </select></label>
+      {window.lojaPrinter&&<label>Impressora
+        <select aria-label="Impressora do comprovante" value={printerKnown?settings.printer:''} disabled={busy} onChange={event=>update({printer:event.target.value})}>
+         <option value="">Escolher na janela do Windows</option>
+         {devices.map(device=><option key={device.name} value={device.name}>{device.displayName}{device.isDefault?' (padrão)':''}</option>)}
+        </select></label>}
+      <label className="receipt-auto"><input type="checkbox" checked={settings.autoPrint} onChange={event=>update({autoPrint:event.target.checked})}/> Imprimir automaticamente ao finalizar</label>
+      <button className="light-button" disabled={!text || busy} onClick={() => void print()}>Imprimir comprovante não fiscal</button>
+    </div>
     {error && <p role="alert" className="error">{error}</p>}
+  </div>;
+}
+
+/** Segunda via: localizar a venda pelo número do cupom e imprimir de novo. */
+export function ReprintReceipt({session}:{session:Session}) {
+  const [number,setNumber]=useState('');
+  const [found,setFound]=useState<{id:string;sale_number:number;total_cents:number;created_at:string;status:string}|null>(null);
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  async function search(event:FormEvent){
+    event.preventDefault();
+    const value=number.trim().replace(/^#/,'');
+    if(!/^\d{1,12}$/.test(value)){setError('Digite o número da venda, como aparece no cupom.');return;}
+    setBusy(true);setError('');setFound(null);
+    try{setFound(await jsonRequest('/v1/sales/by-number/'+value,{headers:headers(session)},fetch));}
+    catch(err){setError(message(err));}
+    finally{setBusy(false);}
+  }
+  return <div className="receipt-reprint">
+    <form className="publication-actions" onSubmit={event=>void search(event)}>
+      <label>Número da venda<input inputMode="numeric" value={number} placeholder="Ex.: 12" onChange={event=>setNumber(event.target.value)}/></label>
+      <button className="light-button" disabled={busy}>{busy?'Buscando…':'Buscar venda'}</button>
+    </form>
+    {error&&<p role="alert" className="error">{error}</p>}
+    {found&&<>
+      <p>Venda nº {found.sale_number} · {new Date(found.created_at).toLocaleString('pt-BR')} · {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(found.total_cents/100)}</p>
+      <ReceiptPanel key={found.id} session={session} saleId={found.id}/>
+    </>}
   </div>;
 }
 

@@ -49,9 +49,9 @@ export function saleDetail(session:Session,id:string,fetchImpl:typeof fetch=fetc
   method:'GET',headers:headers(session)
  },fetchImpl);
 }
-export async function receiptText(session:Session,id:string,fetchImpl:typeof fetch=fetch){
+export async function receiptText(session:Session,id:string,fetchImpl:typeof fetch=fetch,cols?:32|42|90){
  let res:Response;
- try{res=await fetchImpl('/v1/sales/'+encodeURIComponent(id)+'/receipt',{
+ try{res=await fetchImpl('/v1/sales/'+encodeURIComponent(id)+'/receipt'+(cols?'?cols='+cols:''),{
   method:'GET',headers:headers(session),cache:'no-store'
  });}catch{throw new ApiError(0,'NETWORK_ERROR','Servidor LAN indisponível');}
  if(!res.ok)throw new ApiError(res.status,'RECEIPT_FAILED','Não foi possível obter o comprovante');

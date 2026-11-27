@@ -6,7 +6,7 @@ import { addToDraft, draftTotalCents, resolveVariant } from '@loja/domain';
 import type { DraftLine, Variant } from '@loja/domain';
 import { ApiError, headers, jsonRequest, listCatalog, listCategories, lookupDraftVariants, scanCatalog, revokeSession } from './api-client.ts';
 import type { Session } from './api-client.ts';
-import { mapCatalog } from './catalog-model.ts';
+import { mapCatalog, sortSizes } from './catalog-model.ts';
 import type { Product } from './catalog-model.ts';
 import { LoginScreen } from './LoginScreen.tsx';
 import { FirstRunTour } from './FirstRunTour.tsx';
@@ -20,15 +20,16 @@ import { UiIcon } from './UiIcon.tsx';
 import { M2StockAdjustment } from './M2Admin.tsx';
 import { PickupLookup } from './PickupOrders.tsx';
 import type { PickupOrder } from './PickupOrders.tsx';
-import { PrintReceipt, StoreOperations } from './StoreOperations.tsx';
+import { ReceiptPanel, StoreOperations } from './StoreOperations.tsx';
 import {OperatorSwitch} from './OperatorSwitch.tsx';
 import { CashPanel } from './CashPanel.tsx';
 import { CheckoutDrawer } from './PosCheckout.tsx';
-import { currentCash, receiptText, suspendSale, suspendedSales, resumeSale } from './pos-client.ts';
+import { hasUncertainSale, clearUncertainSale } from './uncertain-sale.ts';
+import { currentCash, suspendSale, suspendedSales, resumeSale } from './pos-client.ts';
 import type { CashState, Sale, SuspendedDraft } from './pos-client.ts';
 
 const brl = (cents:number) => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
-const sizesFor = (p:Product,color:string) => [...new Set(p.variants.filter(v=>v.color===color).map(v=>v.size))];
+const sizesFor = (p:Product,color:string) => sortSizes([...new Set(p.variants.filter(v=>v.color===color).map(v=>v.size))]);
 function Garment({kind}:{kind:Product['kind']}) {
   return <svg viewBox="0 0 120 120" role="img" aria-label="Ilustração de categoria; fotografia não cadastrada">
     {kind==='pants'?<path d="M37 15h46l-7 93H62L60 60l-3 48H43z" fill="currentColor"/>:
@@ -58,8 +59,6 @@ export function App() {
   const [pickup,setPickup] = useState<PickupOrder>();
   const [checkoutOpen,setCheckoutOpen] = useState(false);
   const [lastSale,setLastSale] = useState<Sale|null>(null);
-  const [receipt,setReceipt] = useState('');
-  const [receiptError,setReceiptError] = useState('');
   const [savedDrafts,setSavedDrafts] = useState<SuspendedDraft[]>([]);
   const [draftRefresh,setDraftRefresh] = useState(0);
   const [suspendPending,setSuspendPending] = useState<{key:string;body:string}|null>(null);
@@ -127,6 +126,35 @@ export function App() {
     window.addEventListener('beforeunload',warn);
     return ()=>window.removeEventListener('beforeunload',warn);
   },[draft.length]);
+  // Atalhos do caixa, como no PDV Nexus: F2 nova venda, F3 buscar, F6 pagar, F8 finalizar, Delete tira o último item.
+  useEffect(()=>{
+    if(!session)return;
+    const focusSearch=()=>setTimeout(()=>{const input=document.getElementById('search') as HTMLInputElement|null;input?.focus();input?.select();},0);
+    const onKey=(event:globalThis.KeyboardEvent)=>{
+      if(event.ctrlKey||event.altKey||event.metaKey)return;
+      const target=event.target as HTMLElement|null;
+      const typing=Boolean(target&&(target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)));
+      if(event.key==='F2'){event.preventDefault();if(checkoutOpen)return;setLastSale(null);setCurrentPage('pdv');focusSearch();return;}
+      if(event.key==='F3'){event.preventDefault();if(checkoutOpen||lastSale)return;setCurrentPage('pdv');focusSearch();return;}
+      if(event.key==='F6'||event.key==='F8'){
+        event.preventDefault();
+        if(checkoutOpen){
+          if(event.key==='F8')document.querySelector<HTMLButtonElement>('.checkout-modal form button[type="submit"]:not(:disabled)')?.click();
+          return;
+        }
+        if(page==='pdv'&&!lastSale&&draft.length&&cashId){setCartOpen(false);setCheckoutOpen(true);}
+        return;
+      }
+      if(event.key==='Delete'&&!typing&&page==='pdv'&&!checkoutOpen&&!lastSale&&draft.length){
+        event.preventDefault();
+        const last=draft[draft.length-1];
+        setDraft(draft.flatMap(x=>x.variant.id!==last.variant.id?[x]:x.quantity===1?[]:[{...x,quantity:x.quantity-1}]));
+      }
+    };
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[session,checkoutOpen,lastSale,page,draft,cashId]);
   async function recoverDraft(){
     if(!session||!draftKey||draft.length||!recoverable.length||recoveryBusy)return;
     setRecoveryBusy(true);setMessage('');
@@ -272,17 +300,14 @@ export function App() {
   function saleConfirmed(sale:Sale){
     if(!pickup){setDraft([]);setSelected({});}
     setPickup(undefined);setCheckoutOpen(false);setCartOpen(false);
-    setLastSale(sale);setReceipt('');setReceiptError('');setRefetch(n=>n+1);
-    if(session)void receiptText(session,sale.id).then(setReceipt).catch(error=>{
-      setReceiptError(error instanceof Error?error.message:'Não foi possível obter o comprovante');
-    });
+    setLastSale(sale);setRefetch(n=>n+1);
   }
   function authenticated(value:Session){
     setSession(value);setDraft([]);setPage('pdv');setSearch('');setSelected({});setCategory('Todos');setCatalogError('');setMessage('');
   }
   function logout(){
     const active=session;
-    setPickup(undefined);setCheckoutOpen(false);setSession(null);setDraft([]);setSelected({});setProducts([]);setAllProducts([]);setSearch('');setPage('pdv');setCashState(null);setLastSale(null);setReceipt('');setSavedDrafts([]);setSuspendPending(null);
+    setPickup(undefined);setCheckoutOpen(false);setSession(null);setDraft([]);setSelected({});setProducts([]);setAllProducts([]);setSearch('');setPage('pdv');setCashState(null);setLastSale(null);setSavedDrafts([]);setSuspendPending(null);
     if(active)void revokeSession(active).catch(()=>{/* logout local é imediato; sessão remota expira conforme servidor */});
   }
   function selectVariant(product:Product,color:string,size:string){
@@ -330,7 +355,8 @@ export function App() {
       </div><strong>{brl(line.quantity*line.variant.priceCents)}</strong>
     </div>):<p className="empty-cart">Seu carrinho ainda está vazio. Escolha produtos do catálogo.</p>}</div>
     <div className="cart-footer"><div className="total-row"><span>Subtotal estimado</span><strong>{brl(total)}</strong></div>
-    <p className="muted small">Rascunho local, sem reserva de estoque. Preço e disponibilidade precisam ser confirmados no servidor.</p>
+    <p className="muted small">O estoque e o preço são conferidos na hora de pagar.</p>
+    <p className="muted small shortcut-hint" aria-label="Atalhos do teclado">F2 nova venda · F3 buscar · F6 pagar · F8 finalizar · Delete tira o último item</p>
     <button className="light-button" disabled={!draft.length||!cashId||suspendBusy}
        onClick={()=>void suspendCurrent()}>{suspendBusy?'Salvando…':'Suspender venda'}</button>
     <button className="checkout-button" disabled={!draft.length||!cashId}
@@ -371,7 +397,7 @@ export function App() {
       </nav>
       {page==='pdv'&&<div className="work-area"><section className="products-area">
         <div className="heading"><h2>Selecionar produtos</h2><p>Dados reais por loja. Busca por nome, SKU ou código de barras.</p></div>
-        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong><button className="light-button" disabled={recoveryBusy} onClick={()=>void recoverDraft()}>{recoveryBusy?'Recuperando…':'Recuperar carrinho'}</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);setRecoverable([]);}}>Descartar</button></section>}
+        {recoverable.length>0&&!draft.length&&<section className="suspended-bar" aria-label="Recuperação de carrinho"><strong>Há um carrinho interrompido ({recoverable.length} itens)</strong>{hasUncertainSale(cashId)&&<p className="error" role="alert">Atenção: a conexão caiu enquanto esta venda era confirmada e ela pode já ter sido registrada. Confira a última venda em Vendas antes de vender de novo.</p>}<button className="light-button" disabled={recoveryBusy} onClick={()=>void recoverDraft()}>{recoveryBusy?'Recuperando…':'Recuperar carrinho'}</button><button className="text-btn" onClick={()=>{if(draftKey)sessionStorage.removeItem(draftKey);clearUncertainSale(cashId);setRecoverable([]);}}>Descartar</button></section>}
         {savedDrafts.length>0&&<section className="suspended-bar" aria-label="Vendas suspensas">
           <strong>Vendas suspensas ({savedDrafts.length})</strong>
           {savedDrafts.map(item=><button key={item.id} className="light-button"
@@ -475,11 +501,9 @@ export function App() {
         <h2>Venda #{lastSale.sale_number} confirmada</h2>
         <p className="notice" role="status">Venda registrada e estoque atualizado.</p>
         <p>Total: {brl(lastSale.total_cents)} · Troco: {brl(lastSale.change_cents)}</p>
-        {receipt&&<pre className="receipt-print">{receipt}</pre>}
-        {receiptError&&<p role="alert" className="error">{receiptError}</p>}
+        <ReceiptPanel key={lastSale.id} session={session} saleId={lastSale.id} allowAutoPrint/>
         <div className="checkout-buttons">
-          <PrintReceipt key={lastSale.id} id={lastSale.id} session={session} ready={Boolean(receipt)}/>
-          <button className="primary-action" onClick={()=>{setLastSale(null);setReceipt('');}}>Nova venda</button>
+          <button className="primary-action" onClick={()=>setLastSale(null)}>Nova venda</button>
         </div>
       </section>
     </div>}

@@ -8,9 +8,9 @@ const photoParams = {type:'object', required:['id','productId'], properties:{id:
 const idParams = {type:'object', required:['id'], properties:{id:uuid}};
 
 export function registerStoreOperations(app: FastifyInstance, db: Pool) {
-  app.post<{Params:{id:string};Body:{paper_mm:58|80}}>('/v1/sales/:id/print-requests', {
+  app.post<{Params:{id:string};Body:{paper_mm:58|80|210}}>('/v1/sales/:id/print-requests', {
     schema:{params:idParams, body:{type:'object', additionalProperties:false, required:['paper_mm'],
-      properties:{paper_mm:{type:'integer', enum:[58,80]}}}},
+      properties:{paper_mm:{type:'integer', enum:[58,80,210]}}}},
   }, async (request, reply) => {
     if (requirePermission(request, reply, 'sale.read')) return reply;
     const auth = request.authContext!;
