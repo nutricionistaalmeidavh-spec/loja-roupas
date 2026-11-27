@@ -1,3 +1,5 @@
+import { formatReceipt, RECEIPT_COLUMNS } from './receipt-format.ts';
+import type { ReceiptRow } from './receipt-format.ts';
 import type { FastifyInstance } from 'fastify';
 import type { Pool,PoolClient } from 'pg';
 import { requirePermission } from './auth.ts';
@@ -342,8 +344,23 @@ export function registerSales(app:FastifyInstance,db:Pool){
   if(requirePermission(request,reply,'sale.read'))return reply;
   return readSale(db,request.authContext!.storeId,request.params.id);
  });
- app.get<{Params:{id:string}}>('/v1/sales/:id/receipt',{
-  schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uid}}}}
+ // Segunda via do cupom: localizar a venda pelo número impresso. O caixa só encontra as próprias vendas.
+ app.get<{Params:{number:string}}>('/v1/sales/by-number/:number',{
+  schema:{params:{type:'object',required:['number'],properties:{number:{type:'string',pattern:'^[0-9]{1,12}$'}}}}
+ },async(request,reply)=>{
+  if(requirePermission(request,reply,'sale.read'))return reply;
+  const auth=request.authContext!;
+  const found=await db.query<{id:string;sale_number:string;total_cents:string;created_at:Date;status:string;cashier_id:string}>(
+   `SELECT id::text,sale_number::text,total_cents::text,created_at,status,cashier_id::text FROM sales
+    WHERE store_id=$1 AND sale_number=$2`,[auth.storeId,request.params.number]);
+  const row=found.rows[0];
+  if(!row||(!auth.roles.includes('manager')&&row.cashier_id!==auth.userId))
+   throw new DomainError(404,'SALE_NOT_FOUND','Venda não encontrada');
+  return {id:row.id,sale_number:Number(row.sale_number),total_cents:Number(row.total_cents),created_at:row.created_at,status:row.status};
+ });
+ app.get<{Params:{id:string};Querystring:{cols?:number}}>('/v1/sales/:id/receipt',{
+  schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uid}}},
+   querystring:{type:'object',additionalProperties:false,properties:{cols:{type:'integer',enum:[...RECEIPT_COLUMNS]}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'sale.read'))return reply;
   const storeId=request.authContext!.storeId;
@@ -363,6 +380,46 @@ export function registerSales(app:FastifyInstance,db:Pool){
   const money=(n:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
   const date=(iso:string)=>iso.split('-').reverse().join('/');
   const discount=Number(info.discount_cents);
+  const cols=request.query.cols;
+  if(cols){
+   // Cupom em colunas para bobina 58/80 mm ou A4 meia folha: valores alinhados à direita.
+   const rows:ReceiptRow[]=[
+    {kind:'center',text:info.store_name.toUpperCase()},
+    ...(info.legal_name?[{kind:'center',text:info.legal_name} as const]:[]),
+    ...(info.document?[{kind:'center',text:'CNPJ/CPF: '+info.document} as const]:[]),
+    ...(info.address?[{kind:'center',text:info.address} as const]:[]),
+    ...(info.phone?[{kind:'center',text:'Tel.: '+info.phone} as const]:[]),
+    {kind:'rule'},
+    {kind:'center',text:'COMPROVANTE NÃO FISCAL'},
+    {kind:'center',text:'Não substitui documento fiscal quando exigido.'},
+    {kind:'rule'},
+    {kind:'text',text:'Venda Nº '+sale.sale_number},
+    ...(sale.status==='returned'?[{kind:'text',text:'VENDA DEVOLVIDA'} as const]:sale.status==='partially_returned'?[{kind:'text',text:'VENDA COM DEVOLUÇÃO PARCIAL'} as const]:[]),
+    {kind:'text',text:'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:info.timezone||'America/Sao_Paulo'})},
+    ...(info.customer?[{kind:'text',text:'Cliente: '+info.customer} as const]:[]),
+    ...(info.seller?[{kind:'text',text:'Vendedor: '+info.seller} as const]:[]),
+    {kind:'rule'},
+    ...sale.lines.flatMap((l,i):ReceiptRow[]=>{
+      const d=Number(lineDiscounts.rows[i]?.discount_cents??0);
+      return [{kind:'text',text:l.product_name+' ('+l.color+'/'+l.size+')'},
+        {kind:'pair',label:'  '+l.quantity+' × '+money(l.unit_price_cents),value:money(l.line_total_cents)},
+        ...(d?[{kind:'pair',label:'  desconto',value:'-'+money(d)} as const]:[])];
+    }),
+    {kind:'rule'},
+    ...(discount?[{kind:'pair',label:'SUBTOTAL',value:money(Number(info.subtotal_cents??sale.total_cents+discount))} as const,
+      {kind:'pair',label:'DESCONTO'+(info.discount_reason?' ('+info.discount_reason+')':''),value:'-'+money(discount)} as const]:[]),
+    {kind:'pair',label:'TOTAL',value:money(sale.total_cents)},
+    ...sale.payments.map(p=>({kind:'pair',label:PAYMENT_LABELS[p.method]??p.method,value:money(p.amount_cents)} as const)),
+    {kind:'pair',label:'TROCO',value:money(sale.change_cents)},
+    ...(installments.rowCount?[{kind:'rule'} as const,{kind:'text',text:'PARCELAS DO CREDIÁRIO'} as const,...installments.rows.map((x,i)=>
+      ({kind:'pair',label:(i+1)+'ª '+date(x.due_on),value:money(Number(x.amount_cents))} as const))]:[]),
+    ...(info.receipt_footer?[{kind:'rule'} as const,{kind:'center',text:info.receipt_footer} as const]:[]),
+    {kind:'rule'},
+    {kind:'center',text:'Obrigado pela preferência!'},
+    {kind:'center',text:'Código '+sale.id.slice(0,8).toUpperCase()},
+   ];
+   return reply.header('cache-control','private,no-store').type('text/plain; charset=utf-8').send(formatReceipt(rows,cols));
+  }
   const body=[
     info.store_name.toUpperCase(),
     ...(info.legal_name?[info.legal_name]:[]),

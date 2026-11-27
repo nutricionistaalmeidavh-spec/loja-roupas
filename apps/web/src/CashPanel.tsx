@@ -7,6 +7,7 @@ import { currentCash,openCash,closeCash,moveCash } from './pos-client.ts';
 import type { CashState } from './pos-client.ts';
 import { reaisToCents } from './catalog-model.ts';
 import { TaskDialog } from './TaskDialog.tsx';
+import { ReprintReceipt } from './StoreOperations.tsx';
 
 const currency=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>void}){
@@ -19,6 +20,7 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
  const [refresh,setRefresh]=useState(0);
  const [cashTask,setCashTask]=useState<'movement'|'close'|null>(null);
  const [ownedByOther,setOwnedByOther]=useState('');
+ const [reprintOpen,setReprintOpen]=useState(false);
  const active=cash?.active?cash:null;
  useEffect(()=>{
   setLoading(true);
@@ -104,6 +106,12 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
     </form>
    </TaskDialog>}
   </>}
+  <div className="cash-quick-actions">
+   <button type="button" className="light-button" onClick={()=>setReprintOpen(true)}>Segunda via do cupom</button>
+  </div>
+  {reprintOpen&&<TaskDialog title="Segunda via do cupom" onClose={()=>setReprintOpen(false)}>
+   <ReprintReceipt session={session}/>
+  </TaskDialog>}
   {error&&!cashTask&&<p className="error" role="alert">{error}</p>}
   {status&&<p className="notice" role="status">{status}</p>}
  </section>;

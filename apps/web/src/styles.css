@@ -83,9 +83,13 @@
 .storefront ul{padding:0;list-style:none;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
 @media print{
  .receipt-print{box-sizing:border-box;padding:2mm;font-size:9pt;overflow-wrap:anywhere}
- [data-receipt-paper="58"] .receipt-print{width:54mm}
- [data-receipt-paper="80"] .receipt-print{width:76mm}
+ [data-receipt-paper="58"] .receipt-print{width:54mm;font-size:7.8pt;white-space:pre}
+ [data-receipt-paper="80"] .receipt-print{width:76mm;font-size:8.4pt;white-space:pre}
+ [data-receipt-paper="210"] .receipt-print{width:190mm;max-height:138mm;font-size:10pt;white-space:pre;overflow:hidden}
 }
+.receipt-panel{display:grid;gap:12px}
+.receipt-auto{display:flex;align-items:center;gap:6px;font-size:13px}
+.receipt-reprint{display:grid;gap:12px}
 .barcode-label{overflow:auto}
 @media print{
  [data-print-label] .barcode-label,[data-print-label] .barcode-label *{visibility:visible!important}

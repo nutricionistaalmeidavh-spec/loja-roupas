@@ -150,7 +150,7 @@ function registerPrinterHandlers(){
   const devices=await event.sender.getPrintersAsync();
   const chosen=validatePrinterSelection(request,devices.map(p=>p.name));
   return new Promise((resolve,reject)=>{
-   event.sender.print({silent:true,deviceName:chosen.deviceName,printBackground:true},(success,reason)=>{
+   event.sender.print({silent:true,deviceName:chosen.deviceName,printBackground:true,...(chosen.paperMm===210?{pageSize:'A4'}:{})},(success,reason)=>{
     if(success)resolve({submitted:true});else reject(new Error(reason||'Falha ao enviar impressão ao Windows.'));
    });
   });
