@@ -1,0 +1,136 @@
+name: Loja Comercial - instalador com ativação (Windows)
+# Gera e testa o instalador da edição comercial. NÃO publica release:
+# o instalador fica como artefato do workflow, para entrega controlada ao comprador.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão da edição comercial (x.y.z)'
+        required: true
+        default: '1.0.0'
+  pull_request:
+    paths:
+      - 'apps/desktop/src/commercial-license.cjs'
+      - 'apps/desktop/src/main.cjs'
+      - 'apps/desktop/src/updates.cjs'
+      - 'apps/desktop/src/setup.html'
+      - 'infra/desktop/loja-roupas-comercial.nsi'
+      - 'docs/comercial/termos-de-uso.txt'
+      - 'scripts/package-desktop.mjs'
+      - 'scripts/smoke-commercial-activation.mjs'
+      - '.github/workflows/build-loja-comercial.yml'
+permissions:
+  contents: read
+concurrency:
+  group: loja-comercial-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    env:
+      LOJA_COMMERCIAL_EDITION: 'true'
+      LOJA_COMMERCIAL_VERSION: ${{ github.event.inputs.version || '1.0.0' }}
+      SIGN_PFX: ${{ secrets.WINDOWS_SIGN_PFX_BASE64 }}
+      SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependências OSS fixadas
+        shell: pwsh
+        run: |
+          if($env:LOJA_COMMERCIAL_VERSION -notmatch '^\d+\.\d+\.\d+$'){throw 'Versão inválida'}
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+          if($LASTEXITCODE -ne 0){throw 'Dependências falharam'}
+          pnpm --filter @loja/web exec playwright --version
+      - name: Testes e build da edição comercial
+        shell: pwsh
+        run: |
+          pnpm --filter @loja/api typecheck
+          if($LASTEXITCODE -ne 0){throw 'Typecheck API falhou'}
+          pnpm --filter @loja/desktop test
+          if($LASTEXITCODE -ne 0){throw 'Desktop tests falharam'}
+          pnpm --filter @loja/web build
+          if($LASTEXITCODE -ne 0){throw 'Web build falhou'}
+          pnpm --filter @loja/desktop build
+          if($LASTEXITCODE -ne 0){throw 'Desktop build falhou'}
+          $app='dist/desktop-win32-x64/resources/app'
+          foreach($marker in @('physical-edition.json','commercial-edition.json')){
+            if(!(Test-Path "$app/$marker")){throw "Marcador ausente: $marker"}
+          }
+          $commercial=Get-Content "$app/commercial-edition.json" -Raw | ConvertFrom-Json
+          if(!$commercial.required -or $commercial.product -ne 'LOJA_ROUPAS'){throw 'Marcador comercial inválido'}
+          $version=(Get-Content "$app/package.json" -Raw | ConvertFrom-Json).version
+          if($version -ne $env:LOJA_COMMERCIAL_VERSION){throw 'Versão comercial incorreta'}
+          pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
+          if($LASTEXITCODE -ne 0){throw 'Empacotamento da API/Postgres falhou'}
+      - name: Localizar signtool (assinatura opcional)
+        id: signtool
+        if: env.SIGN_PFX != ''
+        shell: pwsh
+        run: |
+          $tool=Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if(!$tool){throw 'signtool não encontrado'}
+          $pfx=Join-Path $env:RUNNER_TEMP 'assinatura.pfx'
+          [IO.File]::WriteAllBytes($pfx,[Convert]::FromBase64String($env:SIGN_PFX))
+          "tool=$($tool.FullName)" >> $env:GITHUB_OUTPUT
+          "pfx=$pfx" >> $env:GITHUB_OUTPUT
+      - name: Assinar executável do aplicativo
+        if: env.SIGN_PFX != ''
+        shell: pwsh
+        run: |
+          & '${{ steps.signtool.outputs.tool }}' sign /f '${{ steps.signtool.outputs.pfx }}' /p $env:SIGN_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 'dist/desktop-win32-x64/electron.exe'
+          if($LASTEXITCODE -ne 0){throw 'Assinatura do aplicativo falhou'}
+      - name: Criar instalador NSIS comercial
+        shell: pwsh
+        run: |
+          $compiler="${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if(!(Test-Path $compiler)){
+            choco install nsis --yes --no-progress
+            if($LASTEXITCODE -ne 0){throw 'NSIS indisponível'}
+          }
+          & $compiler /V2 infra/desktop/loja-roupas-comercial.nsi
+          if($LASTEXITCODE -ne 0){throw 'NSIS falhou'}
+      - name: Assinar instalador
+        if: env.SIGN_PFX != ''
+        shell: pwsh
+        run: |
+          & '${{ steps.signtool.outputs.tool }}' sign /f '${{ steps.signtool.outputs.pfx }}' /p $env:SIGN_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 'dist/Loja-de-Roupas-Comercial-Setup-x64.exe'
+          if($LASTEXITCODE -ne 0){throw 'Assinatura do instalador falhou'}
+          & '${{ steps.signtool.outputs.tool }}' verify /pa 'dist/Loja-de-Roupas-Comercial-Setup-x64.exe'
+          if($LASTEXITCODE -ne 0){throw 'Assinatura inválida'}
+          Remove-Item '${{ steps.signtool.outputs.pfx }}' -Force
+      - name: Instalar, exigir ativação e desinstalar
+        shell: pwsh
+        run: |
+          $installer=(Resolve-Path 'dist/Loja-de-Roupas-Comercial-Setup-x64.exe').Path
+          $install=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Comercial'
+          $process=Start-Process $installer -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Instalação falhou'}
+          foreach($shortcut in @(
+            (Join-Path ([Environment]::GetFolderPath('Programs')) 'Loja de Roupas Comercial.lnk'),
+            (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Loja de Roupas Comercial.lnk')
+          )){ if(!(Test-Path $shortcut -PathType Leaf)){throw "Atalho ausente: $shortcut"} }
+          if(!(Test-Path "$install/app/resources/app/commercial-edition.json")){throw 'Edição comercial não instalada'}
+          if(Test-Path (Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Fisica\app')){throw 'Instalou sobre a edição física'}
+          node scripts/smoke-commercial-activation.mjs "$install/app/electron.exe"
+          if($LASTEXITCODE -ne 0){throw 'A edição comercial não exigiu ativação'}
+          $process=Start-Process "$install/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Desinstalação falhou'}
+          $hash=(Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Loja-de-Roupas-Comercial-Setup-x64.exe" | Out-File -FilePath 'dist/SHA256SUMS' -Encoding ascii
+          $signed=(Get-AuthenticodeSignature $installer).Status
+          Write-Host "Assinatura Authenticode: $signed"
+      - name: Arquivar instalador comercial (sem publicar release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: loja-comercial-v${{ env.LOJA_COMMERCIAL_VERSION }}-windows
+          path: |
+            dist/Loja-de-Roupas-Comercial-Setup-x64.exe
+            dist/SHA256SUMS
+          retention-days: 30
+          if-no-files-found: error

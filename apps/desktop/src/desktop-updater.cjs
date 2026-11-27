@@ -5,7 +5,7 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const {checkForUpdate,downloadVerified,backupBeforeUpdate,sha256}=require('./updates.cjs');
 
-function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=false}){
+function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=false,commercialEdition=false}){
  let available=null,busy=false,lastProgress={phase:'idle'};
  const installedRoot=path.dirname(path.dirname(process.execPath));
  const installSupported=process.platform==='win32'&&
@@ -37,7 +37,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
   if(!installSupported)return {supported:false,currentVersion:app.getVersion(),available:null,
    message:'Atualizador disponível no instalador Windows. No navegador e na edição portátil, consulte o administrador.'};
   try{
-   available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition});
+   available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition,commercialEdition});
    return {supported:true,currentVersion:app.getVersion(),available};
   }catch(error){
    available=null;
@@ -70,7 +70,7 @@ function createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition=
   let helperLaunched=false;
   try{
    // Revalidate release at the actual moment of user consent.
-   available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition});
+   available=await checkForUpdate({currentVersion:app.getVersion(),physicalEdition,commercialEdition});
    if(!available)throw new Error('Não há nova versão estável disponível com checksum SHA256');
    const userData=app.getPath('userData');
    const dir=path.join(userData,'updates');

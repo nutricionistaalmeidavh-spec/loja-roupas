@@ -11,6 +11,7 @@ const path=require('node:path');
 const API='https://api.github.com/repos/nutricionistaalmeidavh-spec/loja-roupas/releases/latest';
 const ASSET='Loja-de-Roupas-Setup-x64.exe';
 const PHYSICAL_ASSET='Loja-de-Roupas-Fisica-Setup-x64.exe';
+const COMMERCIAL_ASSET='Loja-de-Roupas-Comercial-Setup-x64.exe';
 const PHYSICAL_API='https://api.github.com/repos/nutricionistaalmeidavh-spec/loja-roupas/releases?per_page=40';
 const MAX_INSTALLER=1_500_000_000;
 const MAX_NOTES=4000;
@@ -30,15 +31,20 @@ function safeAssetUrl(url,tag,name){
  if(url!==expected)throw new Error('URL de atualização não pertence ao repositório oficial');
  return url;
 }
-function selectRelease(release,currentVersion,{physicalEdition=false}={}){
+function selectRelease(release,currentVersion,{physicalEdition=false,commercialEdition=false}={}){
  const tag=String(release?.tag_name||'');
  if(!release||release.draft)return null;
- if(physicalEdition){
+ // A edição comercial tem canal próprio: nunca recebe o instalador livre,
+ // que não exige ativação e usaria outra pasta de dados.
+ if(commercialEdition){
+  if(!/^loja-comercial-v\d+\.\d+\.\d+$/.test(tag))return null;
+ }else if(physicalEdition){
   if(!release.prerelease||!/^loja-fisica-v\d+\.\d+\.\d+$/.test(tag))return null;
  }else if(release.prerelease||!/^v?\d+\.\d+\.\d+$/.test(tag))return null;
- const version=physicalEdition?tag.slice('loja-fisica-v'.length):tag.replace(/^v/,'');
+ const version=commercialEdition?tag.slice('loja-comercial-v'.length):
+  physicalEdition?tag.slice('loja-fisica-v'.length):tag.replace(/^v/,'');
  if(compareVersions(version,currentVersion)<=0)return null;
- const assetName=physicalEdition?PHYSICAL_ASSET:ASSET;
+ const assetName=commercialEdition?COMMERCIAL_ASSET:physicalEdition?PHYSICAL_ASSET:ASSET;
  const exe=release.assets?.find(a=>a.name===assetName);
  const checksums=release.assets?.find(a=>a.name==='SHA256SUMS');
  if(!exe||!checksums)return null;
@@ -51,27 +57,28 @@ function selectRelease(release,currentVersion,{physicalEdition=false}={}){
   checksumUrl:safeAssetUrl(checksums.browser_download_url,release.tag_name,'SHA256SUMS')
  };
 }
-function selectPhysicalRelease(releases,currentVersion){
+function selectPhysicalRelease(releases,currentVersion,{commercialEdition=false}={}){
  if(!Array.isArray(releases))throw new Error('Lista de releases físicas inválida');
  const candidates=[];
  for(const release of releases){
-  const item=selectRelease(release,currentVersion,{physicalEdition:true});
+  const item=selectRelease(release,currentVersion,{physicalEdition:true,commercialEdition});
   if(item)candidates.push(item);
  }
  candidates.sort((a,b)=>compareVersions(b.version,a.version));
  return candidates[0]||null;
 }
-async function checkForUpdate({currentVersion,fetchImpl=fetch,physicalEdition=false}){
+async function checkForUpdate({currentVersion,fetchImpl=fetch,physicalEdition=false,commercialEdition=false}){
+ if(commercialEdition)physicalEdition=true;
  const response=await fetchImpl(physicalEdition?PHYSICAL_API:API,{signal:AbortSignal.timeout(8000),headers:{
   Accept:'application/vnd.github+json','User-Agent':'Loja-de-Roupas-Desktop-Updater'
  }});
  if(response.status===404)return null; // Sem release oficial, sem atualização.
  if(!response.ok)throw new Error('GitHub indisponível (HTTP '+response.status+')');
  const release=await response.json();
- return physicalEdition?selectPhysicalRelease(release,currentVersion):selectRelease(release,currentVersion);
+ return physicalEdition?selectPhysicalRelease(release,currentVersion,{commercialEdition}):selectRelease(release,currentVersion);
 }
 function parseSha256(manifest,assetName=ASSET){
- if(assetName!==ASSET&&assetName!==PHYSICAL_ASSET)throw new Error('Instalador desconhecido');
+ if(assetName!==ASSET&&assetName!==PHYSICAL_ASSET&&assetName!==COMMERCIAL_ASSET)throw new Error('Instalador desconhecido');
  if(typeof manifest!=='string'||manifest.length>256*1024)throw new Error('Manifesto SHA256 inválido');
  const records=manifest.split(/\r?\n/).map(l=>l.match(/^([a-fA-F0-9]{64}) [ *](.+)$/))
   .filter(Boolean).filter(m=>m[2]===assetName);

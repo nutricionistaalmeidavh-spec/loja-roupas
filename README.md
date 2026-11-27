@@ -2,13 +2,13 @@
 
 Sistema para boutique física inicialmente única, com **desktop Electron, Web/PWA e servidor PostgreSQL canônico em rede local**. Core obrigatório **R$ 0, open source (AGPLv3) e self-hosted**. Serviços pagos são opcionais explícitos, nunca dependências silenciosas.
 
-## Situação e validação em 22/11/2026
+## Situação e validação em 27/11/2026
 
 - **M0–M3 incorporados à main:** documentação D0–D6, fundação, catálogo/estoque e PDV/caixa transacional.
 - **M4–M8 têm implementações parciais integradas**, mas a homologação em hardware e operação real ainda está pendente. Consulte [status de execução](docs/06-roadmap/status-execucao.md).
 - O pagamento por Pix e cartão é **registrado manualmente após conferência externa**; não há cobrança automática, TEF, PSP ou emissão fiscal integrada.
-- **Instalador Windows físico v0.2.3 já publicado como pré-release:** [download](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.3). PR #41 incorporada; a edição física mantém banco/instalação separados. O pacote passou pelos testes automatizados de instalação, mas permanece sem homologação de periféricos reais.
-- **P1 em desenvolvimento:** [PR #42](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/42) (draft; não integrado) acrescenta pós-venda, crediário, financeiro, comissões, fidelidade, inventário colaborativo, PIN, backup LAN cifrado e atualizador da edição física. Não está disponível na release v0.2.3.
+- **Edição física Windows v0.2.7** publicada como pré-release: [download](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.7). Inclui P1 (PR #42 incorporada), atualizador próprio, ícone e atalhos. Sem homologação de periféricos reais.
+- **Edição comercial (com ativação)** preparada para venda: instalador, dados e atualizações separados da edição livre. Veja [docs/comercial](docs/comercial/README.md).
 
 **Comece pelo [status de execução M0–M8](docs/06-roadmap/status-execucao.md), [roadmap final](docs/06-roadmap/roadmap-final.md) e [status técnico](IMPLEMENTATION_STATUS.md).**
 
@@ -24,13 +24,13 @@ Sistema para boutique física inicialmente única, com **desktop Electron, Web/P
 
 | Marco | Situação | Acompanhamento |
 |---|---|---|
-| M4 — Instalador, impressão, LAN e backup/restore (P0) | Parcial; instalador Windows físico publicado | [#7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
-| M5 — Pós-venda, finanças, compras, CRM e equipes (P1) | Parcial; extensões em PR #42 | [#8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
+| M4 — Instalador, impressão, LAN e backup/restore (P0) | Parcial; edição física v0.2.7 publicada; edição comercial em build | [#7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
+| M5 — Pós-venda, finanças, compras, CRM e equipes (P1) | Parcial; PR #42 incorporada | [#8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
 | M6 — Provador, online, entrega, presentes e serviços (P2) | Planejado | [#9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
 | M7 — Previsões, coleções, planejamento e personalização (P2) | Planejado | [#10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
 | M8 — QA global e release candidate | Planejado | [#11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
-**Governança:** branch e PR, migrações versionadas, testes e documentação. A PR #42 permanece em rascunho; não haverá merge nem publicação sem validação e autorização. A release v0.2.3 foi explicitamente autorizada no projeto.
+**Governança:** branch e PR, migrações versionadas, testes e documentação. Não haverá publicação de release sem validação e autorização explícita do proprietário.
 
 ## Instalação Windows autônoma e primeiro acesso
 

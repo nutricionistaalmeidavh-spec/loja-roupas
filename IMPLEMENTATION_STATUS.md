@@ -1,6 +1,6 @@
 # Estado da implementação — Loja de Roupas
 
-**Snapshot:** 22/11/2026. M0–M3 integrados; M4/M5 parcialmente integrados; a edição física v0.2.3 foi publicada como pré-release após PR #41. Rastreio detalhado em [status M0–M8](docs/06-roadmap/status-execucao.md).
+**Snapshot:** 27/11/2026. M0–M3 integrados; M4/M5 parcialmente integrados (PR #42 incorporada); edição física v0.2.7 publicada como pré-release; edição comercial com ativação em [docs/comercial](docs/comercial/README.md). Rastreio detalhado em [status M0–M8](docs/06-roadmap/status-execucao.md).
 
 | Marco | Implementado no repositório | Limites |
 |---|---|---|
@@ -40,7 +40,7 @@ Abrir http://127.0.0.1:5173 no computador de desenvolvimento. O Vite proxy atend
 
 ## Restrições antes de uso comercial
 
-- Electron ainda é **casca de desenvolvimento**, sem instalador GUI e sem binário distribuível testado.
+- O instalador Windows (NSIS) é gerado e testado em CI (instalação, atualização e desinstalação), mas **sem assinatura digital** e sem teste em computadores de loja reais.
 - Sem internet pública, a operação LAN é objetivo; exige teste WAN-off real. Sem PostgreSQL acessível não se confirma venda.
 - Pix e cartão são **confirmados manualmente pelo operador**, após conferência em banco/maquininha fora do sistema. Não há cobrança automática, guarda de cartão, PSP ou TEF.
 - Comprovante **NÃO FISCAL** não substitui NFC-e/NF-e ou obrigação fiscal aplicável.
@@ -53,5 +53,5 @@ Abrir http://127.0.0.1:5173 no computador de desenvolvimento. O Vite proxy atend
 
 [Instalação LAN, impressão, backup, gestão e vitrine](docs/07-implementacao/m4-m6-operacao-gestao-vitrine.md) descreve o escopo entregue e os gates pendentes de cada marco.
 
-## Atualização pós-PR #41
-O instalador Windows físico v0.2.3 está [publicado com checksum](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.3), sem homologação de hardware real. Recursos P1 estendidos e scripts LAN de backup cifrado estão em [PR #42](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/42) **draft, ainda não integrado**, com atualização física em canal exclusivo, sem OSV-Scanner nem serviço pago no core.
+## Atualização em 27/11/2026
+A edição física chegou à v0.2.7 (pré-release) com a PR #42 incorporada: pós-venda, crediário, financeiro, comissões, fidelidade, inventário colaborativo, PIN, backup e atualizador próprio. A edição comercial reutiliza essa base com ativação obrigatória e canal `loja-comercial-v*`.

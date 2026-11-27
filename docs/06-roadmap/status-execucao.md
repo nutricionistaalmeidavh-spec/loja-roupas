@@ -1,6 +1,6 @@
 # Acompanhamento de execução — Loja de Roupas
 
-**Atualizado em:** 2026-11-22 · **Fonte de verdade:** `main` + [roadmap final](roadmap-final.md) + [backlog EP-01..EP-30](backlog.md) + [decisões D01–D65](../00-visao-geral/decisoes-001-065.md).
+**Atualizado em:** 2026-11-27 · **Fonte de verdade:** `main` + [roadmap final](roadmap-final.md) + [backlog EP-01..EP-30](backlog.md) + [decisões D01–D65](../00-visao-geral/decisoes-001-065.md).
 
 ## Estado por marco
 
@@ -10,13 +10,13 @@
 | M1 — Fundação | Incorporada à `main`; monorepo, PostgreSQL, migrações, autenticação inicial e RBAC | PIN, dispositivos, hardening e empacotamento pendentes | [PR #2](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/2) |
 | M2 — Catálogo/estoque | Incorporada à `main`; grades/SKUs, preços, fotos + thumbnails, estoque, edição, auditoria, paginação | Operação em hardware, cenários de carga e inventário colaborativo pendentes | [PRs #3–#5](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/5) |
 | M3 — PDV/caixa | Incorporada à `main`; cotação, venda transacional, carrinho suspenso, caixa e recebimentos manuais mistos | Impressão periférica e autorização de descontos avançados pendentes | [PR #6](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/pull/6) |
-| M4 — P0 operacional | Parcial na `main` via PRs #13 e #41 · instalador Windows físico v0.2.3, LAN, impressão, backup | Homologação física, modos de rede, PWA em aparelhos, spool e hardening pendentes | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
-| M5 — Gestão P1 | Parcial na `main` via PRs #13 e #41 · compras, inventário, despesas e clientes; extensões em PR #42 draft | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
+| M4 — P0 operacional | Parcial na `main` via PRs #13, #41–#46 · edição física v0.2.7, LAN, impressão, backup, atualizador; edição comercial com ativação | Homologação física, modos de rede, PWA em aparelhos, spool e hardening pendentes | [Issue #7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/7) |
+| M5 — Gestão P1 | Parcial na `main` via PRs #13, #41 e #42 · compras, inventário, despesas, clientes, pós-venda, crediário, comissões | Integração financeira, pós-venda, compras, equipes, CRM e LGPD | [Issue #8](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/8) |
 | M6 — Experiências P2 | Parcial na `main` via PR #13 · vitrine, reserva interna e retirada paga no caixa | Provador, pagamento online, entregas, kits/gift cards e serviços | [Issue #9](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/9) |
 | M7 — Inteligência P2 | Painel, metas, coleções, previsão, regras, score de fornecedores, 36 meses e campos de produto em PR | Validação comercial com histórico da loja pendente | [Issue #10](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/10) |
 | M8 — QA e RC | Esteira de QA, instaladores Debian e Windows e testes de periféricos em PR | Homologação física, compatibilidade de campo e revisão geral de segurança pendentes | [Issue #11](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/issues/11) |
 
-**Atenção:** código integrado e CI verde não significam homologação em loja real. A [pré-release física v0.2.3](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.3) foi publicada após a PR #41. A PR #42 de P1/backup/updater está em rascunho e **não compõe a v0.2.3**.
+**Atenção:** código integrado e CI verde não significam homologação em loja real. A [pré-release física v0.2.7](https://github.com/nutricionistaalmeidavh-spec/loja-roupas/releases/tag/loja-fisica-v0.2.7) é a mais recente e já inclui a PR #42. A edição comercial está descrita em [docs/comercial](../comercial/README.md).
 
 [Detalhes da entrega parcial, instalação e pendências](../07-implementacao/m4-m6-operacao-gestao-vitrine.md).
 
