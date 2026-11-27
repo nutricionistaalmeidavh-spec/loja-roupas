@@ -9,9 +9,9 @@ export type StockAdjustPayload = {variant_id:string;reference_id:string;counted_
 export type StockMovement = {id:string;movement_kind:string;qty_delta:number;occurred_at:string;source_type:string};
 export type ProductPayload = {
   name: string; category: string;
-  variants: Array<{sku:string;color:string;size:string;price_cents:number;barcode?:string|null}>;
+  variants: Array<{sku:string;color:string;size:string;price_cents:number;barcode?:string|null;cost_cents?:number|null}>;
 };
-export type StockReceiptPayload = { variant_id: string; reference_id: string; quantity: number; note?: string };
+export type StockReceiptPayload = { variant_id: string; reference_id: string; quantity: number; note?: string; unit_cost_cents?: number };
 export type StockReceiptResult = { movement_id: string; variant_id: string; on_hand: number; reserved: number; revision: number };
 export class ApiError extends Error {
   readonly status: number;

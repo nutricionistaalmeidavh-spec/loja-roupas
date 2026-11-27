@@ -83,6 +83,11 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     assert.equal(pickup.statusCode,200,pickup.body);
     assert.deepEqual(pickup.json().lines,submission.lines);
     assert.equal((await app.inject({url:'/v1/pickup-orders/'+idOrder})).statusCode,401);
+    // A cotação do próprio pedido enxerga a peça separada para ele; a de outra venda, não.
+    const quote = (extra:object) => app.inject({method:'POST',url:'/v1/sales/quotes',headers,
+      payload:{lines:submission.lines,...extra}});
+    assert.equal((await quote({})).json().can_commit,false);
+    assert.equal((await quote({pickup_order_id:idOrder})).json().can_commit,true);
     const opened = await app.inject({method:'POST',url:'/v1/cash-sessions',headers:write(),
       payload:{terminal_code:'RETIRADA-01',opening_cents:0}});
     assert.equal(opened.statusCode,201,opened.body);

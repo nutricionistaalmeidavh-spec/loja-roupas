@@ -5,7 +5,8 @@ export type CashState = CashSession | {active:false;terminal_code:string};
 export type SaleLineInput = {variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number};
 export type PaymentInput={method:'cash'|'pix_manual'|'card_external'|'store_credit'|'customer_credit';amount_cents:number;confirmed:boolean;external_reference?:string};
 export type QuoteLine={variant_id:string;quantity:number;sku:string;product_name:string;price_cents:number;price_revision:number;available:number};
-export type SaleQuote={total_cents:number;can_commit:boolean;lines:QuoteLine[]};
+export type SaleQuote={total_cents:number;can_commit:boolean;lines:QuoteLine[];subtotal_cents?:number;discount_cents?:number;
+ discount_requires_manager?:boolean;cashier_discount_limit_bps?:number};
 export type Sale={id:string;sale_number:number;status:string;total_cents:number;tendered_cents:number;
  change_cents:number;created_at:string;cash_session_id:string};
 export type SaleDetail=Sale&{lines:Array<{product_name:string;sku:string;color:string;size:string;quantity:number;
@@ -31,11 +32,12 @@ export function moveCash(session:Session,id:string,kind:'supply'|'withdrawal',am
  '/v1/cash-sessions/'+encodeURIComponent(id)+'/movements',{method:'POST',headers:write(session,key),
   body:JSON.stringify({kind,amount_cents,reason:reason.trim()})},fetchImpl);
 }
-export function quoteSale(session:Session,lines:Array<{variant_id:string;quantity:number}>,fetchImpl:typeof fetch=fetch){
+export function quoteSale(session:Session,lines:Array<{variant_id:string;quantity:number}>,fetchImpl:typeof fetch=fetch,discount_cents=0,pickup_order_id?:string){
  return jsonRequest<SaleQuote>('/v1/sales/quotes',{method:'POST',
-  headers:{...headers(session),'content-type':'application/json'},body:JSON.stringify({lines})},fetchImpl);
+  headers:{...headers(session),'content-type':'application/json'},
+  body:JSON.stringify({lines,...(discount_cents>0?{discount_cents}:{}),...(pickup_order_id?{pickup_order_id}:{})})},fetchImpl);
 }
-export type RetailCheckoutOptions={customer_id?:string;seller_id?:string;
+export type RetailCheckoutOptions={customer_id?:string;seller_id?:string;discount_cents?:number;discount_reason?:string;
  credit_installments?:Array<{amount_cents:number;due_on:string}>};
 export function commitSale(session:Session,cash_session_id:string,lines:SaleLineInput[],
  payments:PaymentInput[],key:string,fetchImpl:typeof fetch=fetch,pickupOrderId?:string,options:RetailCheckoutOptions={}){

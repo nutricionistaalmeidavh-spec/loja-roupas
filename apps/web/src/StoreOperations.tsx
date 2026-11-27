@@ -20,6 +20,10 @@ import {ManagementCustomers} from './ManagementCustomers.tsx';
 import {ManagementInventory} from './ManagementInventory.tsx';
 import {RetailLedger} from './RetailLedger.tsx';
 import {RetailAfterSales} from './RetailAfterSales.tsx';
+import {ManagementUsers} from './ManagementUsers.tsx';
+import {BatchPurchaseForm} from './BatchPurchaseForm.tsx';
+import {CashHistory} from './CashHistory.tsx';
+import {QuarantinePanel} from './QuarantinePanel.tsx';
 
 const currency = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
 const money = (cents:string) => currency.format(Number(cents)/100);
@@ -30,7 +34,7 @@ type Item = {id:string; name:string; color:string; size:string; price_cents:stri
 
 export function StoreOperations({session,cashId,onReturned}:{session:Session;cashId:string|null;onReturned:()=>void}) {
   const [refresh,setRefresh] = useState(0);
-  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'|'inventario'>('vendas');
+  const [section,setSection] = useState<'vendas'|'fornecedores'|'posvenda'|'operacoes'|'inteligencia'|'vitrine'|'financeiro'|'clientes'|'inventario'|'caixas'|'pessoas'>('vendas');
   const [supplierOpen,setSupplierOpen] = useState(false);
   const [returnOpen,setReturnOpen] = useState(false);
   const [returnLocked,setReturnLocked] = useState(false);
@@ -103,10 +107,12 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     {key:'posvenda',label:'Pós-venda'},
     {key:'operacoes',label:'Operações'},
     {key:'inteligencia',label:'Inteligência'},
-    {key:'financeiro',label:'Despesas'},
+    {key:'financeiro',label:'Financeiro'},
+    {key:'caixas',label:'Caixas'},
     {key:'clientes',label:'Clientes'},
     {key:'inventario',label:'Inventário'},
     ...(!physical?[{key:'vitrine' as const,label:'Vitrine'}]:[]),
+    ...(session.roles.includes('manager')?[{key:'pessoas' as const,label:'Pessoas e loja'}]:[]),
   ] as const;
   return <div className="operation-panel">
     <nav className="management-jump" aria-label="Atalhos da gestão">
@@ -156,13 +162,17 @@ export function StoreOperations({session,cashId,onReturned}:{session:Session;cas
     </div>}
     {section==='operacoes'&&<div id="gestao-operacoes" className="management-section">
       <OperationalPanels session={session} suppliers={suppliers} onStockChanged={()=>{setRefresh(n=>n+1);onReturned();}}/>
+      <BatchPurchaseForm session={session} suppliers={suppliers} onSaved={()=>setRefresh(n=>n+1)}/>
     </div>}
     {section==='inteligencia'&&<div id="gestao-inteligencia" data-tour="intelligence" className="management-section">
       <CommercialIntelligence session={session}/>
     </div>}
     {section==='financeiro'&&<><ManagementFinance session={session}/><RetailLedger session={session} cashId={cashId}/></>}
     {section==='clientes'&&<ManagementCustomers session={session}/>}
-    {section==='inventario'&&<ManagementInventory session={session} onSaved={()=>{setRefresh(n=>n+1);onReturned();}}/>}
+    {section==='inventario'&&<><ManagementInventory session={session} onSaved={()=>{setRefresh(n=>n+1);onReturned();}}/>
+      <QuarantinePanel session={session} onChanged={()=>{setRefresh(n=>n+1);onReturned();}}/></>}
+    {section==='caixas'&&<CashHistory session={session}/>}
+    {section==='pessoas'&&<ManagementUsers session={session}/>}
     {section==='vitrine'&&!physical&&<section id="gestao-vitrine" data-tour="storefront" className="management-section">
       <h2>Vitrine online</h2><p>Abra a vitrine pública e confira como as peças aparecem para clientes.</p>
       <a href={storefront} target="_blank" rel="noreferrer">Abrir vitrine da loja</a>
@@ -276,7 +286,7 @@ export function Storefront({storeId}:{storeId:string}) {
       <h2>Pedido recebido</h2>
       <p>Apresente este código em até 48 horas para consultar o pedido na loja.</p>
       <code className="pickup-code">{pickup.order.id}</code>
-      <p>Total cotado {money(pickup.order.quoted_total_cents)}. O envio não separa as peças.</p>
+      <p>Total cotado {money(pickup.order.quoted_total_cents)}. As peças ficam separadas para você por 48 horas.</p>
     </section>}
     <PickupTracking key={pickup.order?.id ?? storeId} storeId={storeId} orderId={pickup.order?.id}/>
     {busy && <p role="status">Carregando vitrine…</p>}
@@ -336,12 +346,13 @@ export function PrintReceipt({session,id,ready}:{session:Session;id:string;ready
   </div>;
 }
 
-type Hold = {id:string; sku:string; quantity:number; stale:boolean; state:'active'|'released'};
+type Hold = {id:string; sku:string; quantity:number; stale:boolean; state:'active'|'released'; expires_at?:string};
 export function StockHolds({session,variant,onChanged}:{
   session:Session; variant?:{id:string;sku:string}; onChanged?:()=>void;
 }) {
   const [holds,setHolds] = useState<Hold[]>([]);
   const [quantity,setQuantity] = useState('1');
+  const [hours,setHours] = useState('24');
   const [error,setError] = useState('');
   const [status,setStatus] = useState('');
   const [busy,setBusy] = useState(false);
@@ -362,7 +373,7 @@ export function StockHolds({session,variant,onChanged}:{
     setError('');
     setStatus('');
     const url = id ? '/v1/stock/holds/' + id + '/release' : '/v1/stock/holds';
-    const body = id ? undefined : JSON.stringify({variant_id:variant!.id, quantity:Number(quantity)});
+    const body = id ? undefined : JSON.stringify({variant_id:variant!.id, quantity:Number(quantity), hours:Number(hours)});
     const signature = url + (body ?? '');
     const key = pending.current.get(signature) ?? requestId();
     pending.current.set(signature,key);
@@ -386,9 +397,13 @@ export function StockHolds({session,variant,onChanged}:{
     {variant ? <form onSubmit={event => {event.preventDefault();void change();}}>
       <label>Quantidade de {variant.sku} <input type="number" min={1} max={999} required
         value={quantity} disabled={busy} onChange={event=>setQuantity(event.target.value)}/></label>
+      <label>Validade <select value={hours} disabled={busy} onChange={event=>setHours(event.target.value)}>
+        {[['4','4 horas'],['24','1 dia'],['48','2 dias'],['72','3 dias'],['168','7 dias']].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+      </select></label>
       <button className="light-button" disabled={busy}>Reservar</button>
     </form> : <ul>{holds.map(hold => <li key={hold.id}>
-      {hold.sku} · {hold.quantity} un. · {hold.stale&&<strong>Reserva com mais de 24 horas: revisar</strong>}{' '}<button className="light-button" disabled={busy}
+      {hold.sku} · {hold.quantity} un. · {hold.expires_at&&<>vence {new Date(hold.expires_at).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})} · </>}
+      {hold.stale&&<strong>Vence em breve ou está parada há mais de 1 dia: revisar</strong>}{' '}<button className="light-button" disabled={busy}
         onClick={() => void change(hold.id)}>Liberar reserva</button>
     </li>)}</ul>}
     {status && <p role="status">{status}</p>}

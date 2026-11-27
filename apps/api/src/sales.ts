@@ -108,19 +108,29 @@ export async function applySaleDiscounts(db:Pick<PoolClient,'query'>,auth:AuthCo
  return {perLine,subtotal,discount,total,needsManager,limit_bps:limit};
 }
 export function registerSales(app:FastifyInstance,db:Pool){
- app.post<{Body:{lines:QuoteLine[];discount_cents?:number}}>('/v1/sales/quotes',{
+ app.post<{Body:{lines:QuoteLine[];discount_cents?:number;pickup_order_id?:string}}>('/v1/sales/quotes',{
   schema:{body:{type:'object',additionalProperties:false,required:['lines'],properties:{lines:quoteLines,
-   discount_cents:{type:'integer',minimum:0}}}}
+   discount_cents:{type:'integer',minimum:0},pickup_order_id:{type:'string',pattern:uid}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'sale.commit'))return reply;
   validateLines(request.body.lines);
   const auth=request.authContext!;
   await sweepExpiredReservationsTx(db,auth.storeId);
+  // Peças já separadas para este pedido de retirada contam como disponíveis para a própria venda.
+  const ownReserved=new Map<string,number>();
+  if(request.body.pickup_order_id){
+   const r=await db.query<{variant_id:string;quantity:string}>(`SELECT l.variant_id::text,sum(l.quantity)::text AS quantity
+    FROM pickup_order_lines l JOIN pickup_orders o ON o.id=l.order_id AND o.store_id=l.store_id
+    WHERE o.store_id=$1 AND o.id=$2 AND o.reservation_released_at IS NULL AND o.sale_id IS NULL GROUP BY l.variant_id`,
+    [auth.storeId,request.body.pickup_order_id]);
+   for(const row of r.rows)ownReserved.set(row.variant_id.toLowerCase(),Number(row.quantity));
+  }
   let gross=0;
   const lines=[];
   for(const line of request.body.lines){
    const item=await variantData(db,auth.storeId,line.variant_id,false);
-   const price=toMoney(item.price_cents),available=toMoney(item.available),priceRevision=Number(item.revision);
+   const price=toMoney(item.price_cents),priceRevision=Number(item.revision);
+   const available=toMoney(item.available)+(ownReserved.get(line.variant_id.toLowerCase())??0);
    const subtotal=line.quantity*price;
    if(!Number.isSafeInteger(subtotal)||!Number.isSafeInteger(gross+subtotal))
     throw new DomainError(422,'TOTAL_OVERFLOW','Total excede limite permitido');

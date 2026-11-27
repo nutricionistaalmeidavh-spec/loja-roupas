@@ -14,7 +14,13 @@ type Bridge={
  onProgress(callback:(value:Progress)=>void):()=>void;
 };
 declare global{interface Window{lojaUpdates?:Bridge;lojaBackups?:{create(auth:{token:string;storeId:string}):Promise<{cancelled:boolean;bytes?:number;sha256?:string}>;
- verify(auth:{token:string;storeId:string}):Promise<{cancelled:boolean;verified?:boolean;sales?:number;photos?:number;migrations?:number}>}}}
+ verify(auth:{token:string;storeId:string}):Promise<{cancelled:boolean;verified?:boolean;sales?:number;photos?:number;migrations?:number}>;
+ autoStatus?(auth:{token:string;storeId:string}):Promise<AutoBackupStatus>;
+ autoFolder?(auth:{token:string;storeId:string}):Promise<{cancelled:boolean;folder?:string}>;
+ autoRun?(auth:{token:string;storeId:string}):Promise<{ok:boolean;error?:string;skipped?:boolean;file?:string}>;
+ restore?(auth:{token:string;storeId:string}):Promise<{cancelled:boolean}>}}}
+type AutoBackupStatus={enabled:boolean;folder?:string;last_success_at?:string|null;last_file?:string|null;
+ last_error?:string|null;age_hours?:number|null;overdue?:boolean};
 
 function messageFor(progress:Progress|null){
  if(!progress)return '';
@@ -148,7 +154,20 @@ export function UpdateStartupDialog(){
 }
 export function LocalBackupSettings({session}:{session:Session}){
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[error,setError]=useState('');
+ const [auto,setAuto]=useState<AutoBackupStatus|null>(null),[autoRevision,setAutoRevision]=useState(0);
  const bridge=window.lojaBackups;
+ const auth={token:session.token,storeId:session.storeId};
+ useEffect(()=>{
+  let alive=true;
+  void bridge?.autoStatus?.(auth).then(value=>{if(alive)setAuto(value);}).catch(()=>{});
+  return ()=>{alive=false;};
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ },[bridge,session.token,session.storeId,autoRevision]);
+ function act(task:()=>Promise<string|null>){
+  setBusy(true);setError('');setNotice('');
+  void task().then(text=>{if(text)setNotice(text);setAutoRevision(n=>n+1);})
+   .catch(e=>setError(e instanceof Error?e.message:'Falha na operação de backup')).finally(()=>setBusy(false));
+ }
  if(!bridge)return <section className="update-settings"><h2>Backup da loja</h2><p>Faça o backup no computador principal. Terminais de rede não possuem o banco de dados.</p></section>;
  return <section className="update-settings" aria-label="Backup local da loja">
   <h2>Exportar backup completo</h2>
@@ -161,6 +180,26 @@ export function LocalBackupSettings({session}:{session:Session}){
    void bridge.verify({token:session.token,storeId:session.storeId}).then(result=>{if(!result.cancelled)setNotice('Restauração testada com sucesso em banco isolado: '+result.sales+' vendas, '+result.photos+' fotos. Nenhum dado atual foi substituído.');})
     .catch(e=>setError(e instanceof Error?e.message:'Falha ao validar restauração')).finally(()=>setBusy(false));
   }}>Verificar arquivo e testar restauração</button>
+  {bridge.autoStatus&&<>
+   <h2>Backup automático</h2>
+   <p>O programa grava uma cópia por dia, sozinho, e guarda as 14 mais recentes. Para proteger contra defeito no computador, escolha uma pasta em pen drive, HD externo ou pasta sincronizada (OneDrive, Google Drive).</p>
+   {auto&&<p role="status" className={auto.overdue?'update-error':''}>
+    {auto.last_success_at?`Último backup: ${new Date(auto.last_success_at).toLocaleString('pt-BR')} (há ${auto.age_hours} h).`:'Nenhum backup automático feito ainda.'}
+    {auto.overdue?' Atenção: faz mais de 2 dias sem backup.':''}
+    {auto.last_error?` Última tentativa falhou: ${auto.last_error}`:''}
+    <br/>Pasta: {auto.folder??'—'}</p>}
+   <button className="update-secondary" disabled={busy} onClick={()=>act(async()=>{
+    const r=await bridge.autoFolder!(auth);return r.cancelled?null:'Pasta dos backups automáticos: '+r.folder;})}>Escolher pasta dos backups</button>
+   <button className="update-secondary" disabled={busy} onClick={()=>act(async()=>{
+    const r=await bridge.autoRun!(auth);if(!r.ok)throw new Error(r.error||'Backup falhou');return 'Backup feito agora: '+(r.file??'');})}>
+    {busy?'Aguarde…':'Fazer backup agora'}</button>
+  </>}
+  {bridge.restore&&<>
+   <h2>Restaurar um backup</h2>
+   <p>Use quando trocar de computador ou se os dados se perderem. Todos os dados atuais serão substituídos pelo arquivo escolhido; antes disso o sistema guarda uma cópia de segurança do estado atual. O programa reinicia ao final.</p>
+   <button className="update-secondary" disabled={busy} onClick={()=>act(async()=>{
+    const r=await bridge.restore!(auth);return r.cancelled?null:'Backup restaurado. O programa vai reiniciar.';})}>Escolher backup e restaurar</button>
+  </>}
   {notice&&<p role="status">{notice}</p>}{error&&<p role="alert" className="update-error">{error}</p>}
  </section>;
 }
