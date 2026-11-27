@@ -1,0 +1,79 @@
+name: QA personas - app desktop instalado (Windows)
+# Teste exploratório das 5 personas no instalador comercial instalado de verdade.
+# Não publica release, não assina e não fala com a Central ArtiSys (host bloqueado;
+# licença pré-gravada como ativa, simulando computador licenciado sem internet).
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/qa-personas-desktop.mjs'
+      - '.github/workflows/qa-personas-desktop.yml'
+permissions:
+  contents: read
+concurrency:
+  group: qa-personas-desktop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  personas:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      LOJA_COMMERCIAL_EDITION: 'true'
+      LOJA_COMMERCIAL_VERSION: '1.0.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependências
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.12.1 --activate
+          pnpm install --frozen-lockfile
+          if($LASTEXITCODE -ne 0){throw 'Dependências falharam'}
+      - name: Build da edição comercial
+        shell: pwsh
+        run: |
+          pnpm --filter @loja/web build
+          if($LASTEXITCODE -ne 0){throw 'Web build falhou'}
+          pnpm --filter @loja/desktop build
+          if($LASTEXITCODE -ne 0){throw 'Desktop build falhou'}
+          pwsh -NoProfile -File scripts/prepare-windows-runtime.ps1
+          if($LASTEXITCODE -ne 0){throw 'Empacotamento da API/Postgres falhou'}
+      - name: Criar instalador NSIS comercial
+        shell: pwsh
+        run: |
+          $compiler="${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          if(!(Test-Path $compiler)){
+            choco install nsis --yes --no-progress
+            if($LASTEXITCODE -ne 0){throw 'NSIS indisponível'}
+          }
+          & $compiler /V2 infra/desktop/loja-roupas-comercial.nsi
+          if($LASTEXITCODE -ne 0){throw 'NSIS falhou'}
+      - name: Instalar como o comprador
+        shell: pwsh
+        run: |
+          $process=Start-Process (Resolve-Path 'dist/Loja-de-Roupas-Comercial-Setup-x64.exe').Path -ArgumentList '/S' -Wait -PassThru
+          if($process.ExitCode -ne 0){throw 'Instalação falhou'}
+      - name: Bloquear a Central ArtiSys neste runner
+        shell: pwsh
+        run: |
+          Add-Content -Path "$env:windir\System32\drivers\etc\hosts" -Value "`n0.0.0.0 pdv-artisys.sistema-artisys.workers.dev"
+          try{ Invoke-WebRequest 'https://pdv-artisys.sistema-artisys.workers.dev' -TimeoutSec 5 | Out-Null; throw 'Central ainda acessível' }catch{ if($_.Exception.Message -eq 'Central ainda acessível'){throw} ; Write-Host 'Central bloqueada' }
+      - name: Personas no app instalado
+        shell: pwsh
+        env:
+          LOJA_QA_OUT: ${{ runner.temp }}/qa-personas-desktop
+        run: |
+          $install=Join-Path $env:LOCALAPPDATA 'Programs\Loja de Roupas Comercial'
+          node scripts/qa-personas-desktop.mjs "$install/app/electron.exe"
+          if($LASTEXITCODE -ne 0){throw 'Roteiro das personas terminou com erro'}
+      - name: Screenshots e resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-personas-desktop
+          path: ${{ runner.temp }}/qa-personas-desktop
+          retention-days: 14
+          if-no-files-found: warn
