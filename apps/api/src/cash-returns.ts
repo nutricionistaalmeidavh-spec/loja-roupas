@@ -5,17 +5,18 @@ import type {ReturnItem,CashReturnRequest} from '@loja/domain/operations';
 import { requirePermission } from './auth.ts';
 import { expectedCash } from './cash.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
-import {commissionCents,loyaltyPoints} from './retail-rules.ts';
+import {commissionCents,lineRefundCents,loyaltyPoints} from './retail-rules.ts';
+import {refundableByMethod,returnToStock} from './refunds.ts';
 
 const uuid={type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const numberParams={type:'object',required:['number'],properties:{number:{type:'string',pattern:'^[1-9][0-9]{0,15}$'}}};
 type SaleInfo={id:string;sale_number:string;status:string;total_cents:string;cash_only:boolean;customer_id:string|null};
-type SaleLine={id:string;variant_id:string;quantity:string;unit_price_cents:string;returned_quantity:string};
+type SaleLine={id:string;variant_id:string;quantity:string;unit_price_cents:string;line_total_cents:string;returned_quantity:string};
 const saleInfo=`SELECT s.id,s.sale_number,s.status,s.total_cents,s.customer_id::text,
   NOT EXISTS(SELECT 1 FROM sale_payments p WHERE p.store_id=s.store_id AND p.sale_id=s.id AND p.method<>'cash') AS cash_only
   FROM sales s WHERE s.store_id=$1 AND s.sale_number=$2`;
 const linesQuery=`SELECT l.id,l.variant_id,l.product_name,l.sku,l.color,l.size,l.quantity::text,
- l.unit_price_cents::text,
+ l.unit_price_cents::text,l.line_total_cents::text,
  (coalesce((SELECT sum(rl.quantity) FROM cash_return_lines rl
     JOIN cash_sale_returns r ON r.id=rl.return_id AND r.store_id=rl.store_id
     WHERE rl.store_id=l.store_id AND rl.sale_line_id=l.id AND r.sale_id=l.sale_id),0)
@@ -38,6 +39,7 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
     size:(line as SaleLine & {size:string}).size,
     quantity:Number(line.quantity),unit_price_cents:Number(line.unit_price_cents),
     returned_quantity:Number(line.returned_quantity),
+    line_total_cents:Number(line.line_total_cents),
     available_to_return:Number(line.quantity)-Number(line.returned_quantity)
    }))};
   });
@@ -76,8 +78,6 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
     if(!sale)throw new DomainError(404,'SALE_NOT_FOUND','Venda não encontrada');
     if(!['confirmed','partially_returned'].includes(sale.status))
       throw new DomainError(409,'RETURN_INELIGIBLE','Esta venda não possui peças disponíveis para devolução');
-    if(!sale.cash_only)
-      throw new DomainError(422,'RETURN_METHOD','Devolução em dinheiro exige venda originalmente paga só em dinheiro');
     const saleLines=await client.query<SaleLine>(linesQuery,[auth.storeId,sale.id]);
     const available=new Map(saleLines.rows.map(line=>[line.id,line]));
     let amount=0;
@@ -85,11 +85,15 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
       const line=available.get(item.sale_line_id);
       if(!line||item.quantity>Number(line.quantity)-Number(line.returned_quantity))
         throw new DomainError(409,'RETURN_QUANTITY','Peça indisponível ou quantidade já devolvida');
-      const portion=item.quantity*Number(line.unit_price_cents);
+      const portion=lineRefundCents(Number(line.line_total_cents),Number(line.quantity),Number(line.returned_quantity),item.quantity);
       if(!Number.isSafeInteger(portion)||!Number.isSafeInteger(amount+portion))
         throw new DomainError(422,'RETURN_TOTAL_OVERFLOW','Valor da devolução fora dos limites');
       amount+=portion;
     }
+    // Venda com pagamento misto: só a parte paga em dinheiro pode sair do caixa.
+    const refundable=await refundableByMethod(client,auth.storeId,sale.id);
+    if(amount>refundable.cash)
+      throw new DomainError(422,'RETURN_METHOD','Valor excede o que foi pago em dinheiro. Use a devolução com reembolso dividido.');
     const cashExpected=await expectedCash(client,auth.storeId,cash_session_id,Number(cash.rows[0].opening_cents));
     if(amount>cashExpected)
       throw new DomainError(409,'INSUFFICIENT_CASH','Saldo insuficiente para a devolução');
@@ -119,23 +123,7 @@ export function registerCashReturns(app:FastifyInstance,db:Pool){
       await client.query(`INSERT INTO cash_return_lines(store_id,return_id,sale_line_id,quantity,disposition,unit_amount_cents)
         VALUES($1,$2,$3,$4,$5,$6)`,
         [auth.storeId,returnId,line.id,item.quantity,item.condition,line.unit_price_cents]);
-      if(item.condition==='resellable'){
-        const balance=await client.query<{revision:string}>(`UPDATE stock_balances
-          SET on_hand=on_hand+$3,revision=revision+1
-          WHERE store_id=$1 AND variant_id=$2 RETURNING revision`,
-          [auth.storeId,line.variant_id,item.quantity]);
-        if(!balance.rowCount)
-          throw new DomainError(409,'INCONSISTENT_STOCK','Saldo não encontrado para peça devolvida');
-        await client.query(`INSERT INTO stock_movements(store_id,variant_id,source_type,source_id,movement_kind,qty_delta)
-          VALUES($1,$2,'sale_return',$3,'return',$4)`,[auth.storeId,line.variant_id,returnId,item.quantity]);
-        await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
-          VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,
-          [auth.storeId,line.variant_id,balance.rows[0].revision,JSON.stringify({return_id:returnId,sale_id:sale.id})]);
-      } else {
-        await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
-          VALUES($1,$2,'inventory.return.quarantine',$3,$4::jsonb)`,
-          [auth.storeId,auth.userId,line.variant_id,JSON.stringify({return_id:returnId,sale_id:sale.id,quantity:item.quantity})]);
-      }
+      await returnToStock(client,auth,line.variant_id,item.quantity,item.condition,'sale_return',returnId);
     }
     if(amount>0)await client.query(`INSERT INTO cash_movements(store_id,cash_session_id,actor_id,kind,amount_cents,reason)
       VALUES($1,$2,$3,'refund',$4,$5)`,[auth.storeId,cash_session_id,auth.userId,amount,reason]);

@@ -4,6 +4,7 @@ import { stableFingerprint } from '@loja/domain/catalog';
 import {pickupState,transition} from '@loja/domain/operations';
 import { requirePermission } from './auth.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
+import { reservePickupOrder } from './reservations.ts';
 
 const uuid = {type:'string',pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 const params = {type:'object',required:['id'],properties:{id:uuid}};
@@ -96,6 +97,7 @@ export function registerPickupOrders(app:FastifyInstance, db:Pool) {
       const order = created.rows[0];
       for (const line of lines) await client.query(`INSERT INTO pickup_order_lines(order_id,store_id,variant_id,quantity)
         VALUES($1,$2,$3,$4)`,[order.id,storeId,line.variant_id,line.quantity]);
+      await reservePickupOrder(client,storeId,order.id,lines);
       await client.query('COMMIT');
       return reply.code(201).send(order);
     } catch (error) {

@@ -38,12 +38,8 @@ export function registerStoreOperations(app: FastifyInstance, db: Pool) {
         SELECT id,timezone,(date_trunc('day',now() AT TIME ZONE timezone)-interval '29 days') AT TIME ZONE timezone AS since
         FROM stores WHERE id=$1
       ), movements AS (
-        SELECT (s.created_at AT TIME ZONE st.timezone)::date AS day,
-          1 AS sale_count,s.total_cents AS gross_cents,0::bigint AS refunded_cents
-        FROM sales s JOIN store st ON st.id=s.store_id WHERE s.created_at>=st.since AND s.status<>'cancelled'
-        UNION ALL
-        SELECT (r.created_at AT TIME ZONE st.timezone)::date,0,0,r.amount_cents
-        FROM cash_sale_returns r JOIN store st ON st.id=r.store_id WHERE r.created_at>=st.since
+        SELECT (r.occurred_at AT TIME ZONE st.timezone)::date AS day,r.sale_count,r.gross_cents,r.refund_cents AS refunded_cents
+        FROM retail_revenue_events r JOIN store st ON st.id=r.store_id WHERE r.occurred_at>=st.since
       )
       SELECT day::text,sum(sale_count)::integer AS sale_count,sum(gross_cents)::text AS gross_cents,
         sum(refunded_cents)::text AS refunded_cents

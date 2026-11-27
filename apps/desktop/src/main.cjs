@@ -7,6 +7,7 @@ const {existsSync}=require('node:fs');
 const {createCommercialLicense}=require('./commercial-license.cjs');
 const {createDesktopUpdater}=require('./desktop-updater.cjs');
 const {backupFilename}=require('./local-backup.cjs');
+const {createAutoBackup}=require('./auto-backup.cjs');
 const {validatePrinterSelection}=require('./native-print.cjs');
 
 const desktopIcon=process.platform==='win32'?path.join(__dirname,'assets','loja-roupas.ico'):undefined;
@@ -20,6 +21,7 @@ if(physicalEdition&&!process.argv.some(arg=>arg.startsWith('--user-data-dir=')))
  app.setPath('userData',physicalData);
 }
 let commercialLicense=null;
+let autoBackup=null;
 let quitting=false;
 const single=app.requestSingleInstanceLock();
 const desktopUpdater=createDesktopUpdater({app,ipcMain,BrowserWindow,dialog,physicalEdition,commercialEdition});
@@ -156,6 +158,38 @@ function registerBackupHandlers(){
   if(choice.canceled||!choice.filePaths?.length)return {cancelled:true};
   return {cancelled:false,...await runtime.verifyBackup(choice.filePaths[0])};
  });
+ ipcMain.handle('loja:backup:auto-status',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
+  return autoBackup?autoBackup.status():{enabled:false};
+ });
+ ipcMain.handle('loja:backup:auto-folder',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
+  const window=BrowserWindow.fromWebContents(event.sender);
+  const choice=await dialog.showOpenDialog(window,{title:'Pasta para os backups automáticos',
+   properties:['openDirectory','createDirectory']});
+  if(choice.canceled||!choice.filePaths?.length)return {cancelled:true};
+  return {cancelled:false,...await autoBackup.setFolder(choice.filePaths[0])};
+ });
+ ipcMain.handle('loja:backup:auto-run',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
+  return autoBackup.runNow();
+ });
+ ipcMain.handle('loja:backup:restore',async(event,authorization)=>{
+  await verifyManagerForBackup(event,authorization);
+  const window=BrowserWindow.fromWebContents(event.sender);
+  const choice=await dialog.showOpenDialog(window,{title:'Restaurar backup da loja',
+   defaultPath:autoBackup?.status().folder,properties:['openFile'],filters:[{name:'Backup PostgreSQL',extensions:['dump']}]});
+  if(choice.canceled||!choice.filePaths?.length)return {cancelled:true};
+  const confirm=await dialog.showMessageBox(window,{type:'warning',buttons:['Cancelar','Restaurar e reiniciar'],
+   defaultId:0,cancelId:0,title:'Restaurar backup',
+   message:'Todos os dados atuais da loja serão substituídos pelo backup escolhido.',
+   detail:'Antes de trocar, o sistema confere o arquivo e grava uma cópia de segurança dos dados atuais. O programa será reiniciado ao final.'});
+  if(confirm.response!==1)return {cancelled:true};
+  autoBackup?.stop();
+  const result=await runtime.restoreBackup(choice.filePaths[0]);
+  setTimeout(()=>{app.relaunch();app.quit();},800);
+  return {cancelled:false,...result};
+ });
  ipcMain.handle('loja:backup:create',async(event,authorization)=>{
   await verifyManagerForBackup(event,authorization);
   const window=BrowserWindow.fromWebContents(event.sender);
@@ -222,6 +256,10 @@ async function startLocal(){
  try{
   runtime=await launchLocalRuntime({resources:process.resourcesPath,
    userData:app.getPath('userData'),exe:process.execPath,physicalEdition,progress:status});
+  autoBackup?.stop();
+  autoBackup=createAutoBackup({runtime,userData:app.getPath('userData'),
+   defaultFolder:path.join(app.getPath('documents'),'Loja de Roupas - Backups')});
+  autoBackup.start();
   if(!runtime.firstRun){transition(validateOrigin(runtime.url));return;}
   setupState={status:'Banco e API prontos. Cadastre o administrador.',ready:true,error:''};
   status(setupState.status);
@@ -263,6 +301,7 @@ function registerSetupHandlers(){
   if(!response.ok)throw new Error('A loja indicada não respondeu. Verifique endereço e rede LAN.');
   const target=path.join(app.getPath('userData'),'server-url.txt');
   await fs.writeFile(target,url.href,{encoding:'utf8',mode:0o600});
+  autoBackup?.stop();autoBackup=null;
   if(runtime){await runtime.stop();runtime=null;}
   transition(url);
   return {ok:true};

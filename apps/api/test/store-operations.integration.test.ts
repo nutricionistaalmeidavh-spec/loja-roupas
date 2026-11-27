@@ -76,12 +76,18 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const requested = await submit();
     assert.equal(requested.statusCode,201,requested.body);
     assert.deepEqual((await submit()).json(),requested.json());
-    assert.equal((await storefront()).json().items[0].available,true);
+    // O pedido de retirada reserva a peça: some da vitrine e do balcão até ser vendido, cancelado ou expirar.
+    assert.equal((await storefront()).json().items[0].available,false);
     const idOrder = requested.json().id;
     const pickup = await app.inject({url:'/v1/pickup-orders/'+idOrder,headers});
     assert.equal(pickup.statusCode,200,pickup.body);
     assert.deepEqual(pickup.json().lines,submission.lines);
     assert.equal((await app.inject({url:'/v1/pickup-orders/'+idOrder})).statusCode,401);
+    // A cotação do próprio pedido enxerga a peça separada para ele; a de outra venda, não.
+    const quote = (extra:object) => app.inject({method:'POST',url:'/v1/sales/quotes',headers,
+      payload:{lines:submission.lines,...extra}});
+    assert.equal((await quote({})).json().can_commit,false);
+    assert.equal((await quote({pickup_order_id:idOrder})).json().can_commit,true);
     const opened = await app.inject({method:'POST',url:'/v1/cash-sessions',headers:write(),
       payload:{terminal_code:'RETIRADA-01',opening_cents:0}});
     assert.equal(opened.statusCode,201,opened.body);
@@ -142,6 +148,8 @@ test('vitrine opt-in, gestão isolada e reservas concorrentes no estoque canôni
     const cancelled = await app.inject({method:'POST',url:'/v1/management/pickup-orders/'+cancelledId+'/cancel',headers:write()});
     assert.equal(cancelled.statusCode,200,cancelled.body);
     assert.deepEqual((await publicStatus()).json(),{status:'cancelled'});
+    const afterCancel=await db.query('SELECT reserved FROM stock_balances WHERE store_id=$1 AND variant_id=$2',[store.id,variantId]);
+    assert.equal(afterCancel.rows[0].reserved,'0');
     assert.deepEqual((await listOrders()).json().orders,[]);
     const blockedSale = await app.inject({method:'POST',url:'/v1/sales',headers:write(),
       payload:{...saleBody,pickup_order_id:cancelledId}});

@@ -6,7 +6,7 @@ import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from '.
 
 type VariantInput = {
   sku:string; color:string; size:string; price_cents:number;
-  barcode?:string|null; initial_stock:number;
+  barcode?:string|null; initial_stock:number; cost_cents?:number|null;
 };
 type ImportProduct = {name:string;category:string;variants:VariantInput[]};
 type ImportBody = {products:ImportProduct[]};
@@ -19,7 +19,8 @@ export function registerProductImport(app:FastifyInstance,db:Pool){
       sku:{type:'string',minLength:1,maxLength:64},
       color:{type:'string',minLength:1,maxLength:100},
       size:{type:'string',minLength:1,maxLength:32},
-      price_cents:{type:'integer',minimum:0,maximum:9999999999},
+      price_cents:{type:'integer',minimum:1,maximum:9999999999},
+      cost_cents:{type:['integer','null'],minimum:0,maximum:9999999999},
       barcode:{type:['string','null'],maxLength:128},
       initial_stock:{type:'integer',minimum:0,maximum:1000000}
     }
@@ -50,9 +51,9 @@ export function registerProductImport(app:FastifyInstance,db:Pool){
     const normalized = request.body.products.map((raw,index)=>{
       try {
         const draft=normalizeProductDraft({name:raw.name,category:raw.category,
-          variants:raw.variants.map(({initial_stock:_,...variant})=>variant)});
+          variants:raw.variants.map(({initial_stock:_,cost_cents:__,...variant})=>variant)});
         return {...draft,variants:draft.variants.map((variant,i)=>({
-          ...variant,initial_stock:raw.variants[i].initial_stock
+          ...variant,initial_stock:raw.variants[i].initial_stock,cost_cents:raw.variants[i].cost_cents??null
         }))};
       } catch(error) {
         throw new DomainError(422,'INVALID_IMPORT_PRODUCT',
@@ -89,9 +90,9 @@ export function registerProductImport(app:FastifyInstance,db:Pool){
         const productId=created.rows[0].id;
         for(const variant of product.variants){
           const row=await client.query<{id:string}>(
-            'INSERT INTO product_variants(store_id,product_id,sku,barcode,color,size,price_cents) '+
-            'VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text',
-            [auth.storeId,productId,variant.sku,variant.barcode,variant.color,variant.size,variant.price_cents]);
+            'INSERT INTO product_variants(store_id,product_id,sku,barcode,color,size,price_cents,cost_cents) '+
+            'VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text',
+            [auth.storeId,productId,variant.sku,variant.barcode,variant.color,variant.size,variant.price_cents,variant.cost_cents]);
           const variantId=row.rows[0].id;
           if(variant.initial_stock>0){
             await client.query(

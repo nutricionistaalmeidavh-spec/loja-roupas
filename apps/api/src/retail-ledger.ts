@@ -9,6 +9,19 @@ const params={type:'object',required:['id'],properties:{id:{type:'string',patter
 const money={type:'integer',minimum:1,maximum:999999999999};
 const key=(h:unknown)=>requireIdempotencyKey(h);
 const can=(v:number)=>Number.isSafeInteger(v)&&v>0&&v<=999999999999;
+
+/**
+ * Comissão retida: com a regra "depois do pagamento", a parte da comissão proporcional ao
+ * crediário ainda em aberto da venda só pode ser paga ao vendedor quando a cliente pagar.
+ */
+const heldCommissionSql=(seller:string)=>`(SELECT coalesce(sum(LEAST(e.amount_cents,
+   ceil(e.amount_cents*o.cents::numeric/NULLIF(e.base_cents,0)))),0)
+  FROM retail_commission_entries e
+  JOIN (SELECT source_id,sum(amount_cents-settled_cents) AS cents FROM retail_accounts
+   WHERE store_id=$1 AND kind='receivable' AND source_type='sale_credit' AND cancelled_at IS NULL
+   GROUP BY source_id) o ON o.source_id=e.sale_id
+  WHERE e.store_id=$1 AND e.seller_id=${seller}
+   AND (SELECT commission_timing FROM stores WHERE id=$1)='on_payment')`;
 export function registerRetailLedger(app:FastifyInstance,db:Pool){
  app.get<{Querystring:{kind?:'payable'|'receivable'}}>('/v1/management/accounts',{
   schema:{querystring:{type:'object',additionalProperties:false,properties:{kind:{type:'string',enum:['payable','receivable']}}}}
@@ -73,8 +86,9 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    Boolean(body.cash_session_id)||!body.external_reference||body.external_reference.trim().length<6)
    throw new DomainError(422,'SETTLEMENT_PROOF','Pagamento em dinheiro exige caixa; pagamento externo exige comprovante');
   const out=await withIdempotentTransaction(db,auth,'retail.account.settle:'+id,key(req.headers['idempotency-key']),body,async client=>{
-   const rows=await client.query<{kind:string;amount_cents:string;settled_cents:string;cancelled_at:Date|null}>(`
-    SELECT kind,amount_cents::text,settled_cents::text,cancelled_at
+   const rows=await client.query<{kind:string;amount_cents:string;settled_cents:string;cancelled_at:Date|null;
+    source_type:string;customer_id:string|null}>(`
+    SELECT kind,amount_cents::text,settled_cents::text,cancelled_at,source_type,customer_id::text
     FROM retail_accounts WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,id]);
    const account=rows.rows[0];
    if(!account||account.cancelled_at)throw new DomainError(409,'ACCOUNT_CLOSED','Conta inexistente ou cancelada');
@@ -103,6 +117,14 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
      body.cash_session_id||null,auth.userId]);
    await client.query(`UPDATE retail_accounts SET settled_cents=settled_cents+$3
     WHERE store_id=$1 AND id=$2`,[auth.storeId,id,body.amount_cents]);
+   // Crediário rende pontos quando o cliente paga, não no dia da venda.
+   if(account.kind==='receivable'&&account.source_type==='sale_credit'&&account.customer_id&&loyaltyPoints(body.amount_cents)>0){
+    const opt=await client.query<{loyalty_opt_in:boolean}>(`SELECT loyalty_opt_in FROM retail_customers
+     WHERE store_id=$1 AND id=$2 AND anonymized_at IS NULL`,[auth.storeId,account.customer_id]);
+    if(opt.rows[0]?.loyalty_opt_in)await client.query(`INSERT INTO retail_loyalty_events
+     (store_id,customer_id,points,kind,note,actor_id) VALUES($1,$2,$3,'earn',$4,$5)`,
+     [auth.storeId,account.customer_id,loyaltyPoints(body.amount_cents),'Pontos do pagamento do crediário',auth.userId]);
+   }
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
     VALUES($1,$2,'accounts.settle',$3,$4::jsonb)`,
     [auth.storeId,auth.userId,id,JSON.stringify({settlement_id:item.rows[0].id,method:body.method,amount_cents:body.amount_cents})]);
@@ -151,6 +173,7 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
     WHERE e.store_id=$1 AND e.seller_id=u.id),0)
     -coalesce((SELECT sum(x.amount_cents) FROM retail_commission_reversals x
      WHERE x.store_id=$1 AND x.seller_id=u.id),0))::text AS accrued_cents,
+   ${heldCommissionSql('u.id')}::text AS held_cents,
    coalesce((SELECT sum(p.amount_cents) FROM retail_commission_payouts p
     WHERE p.store_id=$1 AND p.seller_id=u.id),0)::text AS paid_cents
    FROM users u JOIN user_store_roles ur ON ur.user_id=u.id AND ur.store_id=$1
@@ -197,19 +220,23 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    const rule=await client.query(`SELECT 1 FROM retail_commission_rules
     WHERE store_id=$1 AND seller_id=$2 FOR UPDATE`,[auth.storeId,req.params.id]);
    if(!rule.rowCount)throw new DomainError(404,'COMMISSION_RULE_MISSING','Defina taxa antes de liquidar comissões');
-   const sums=await client.query<{accrued:string;reversed:string;paid:string}>(`SELECT
+   const sums=await client.query<{accrued:string;reversed:string;paid:string;held:string}>(`SELECT
     (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_entries
      WHERE store_id=$1 AND seller_id=$2) AS accrued,
     (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_reversals
      WHERE store_id=$1 AND seller_id=$2) AS reversed,
     (SELECT coalesce(sum(amount_cents),0)::text FROM retail_commission_payouts
-     WHERE store_id=$1 AND seller_id=$2) AS paid`,[auth.storeId,req.params.id]);
-   const due=Number(sums.rows[0].accrued)-Number(sums.rows[0].reversed)-Number(sums.rows[0].paid);
-   if(b.amount_cents>due)throw new DomainError(409,'COMMISSION_DUE','Valor supera comissão devida');
+     WHERE store_id=$1 AND seller_id=$2) AS paid,
+    ${heldCommissionSql('$2')}::text AS held`,[auth.storeId,req.params.id]);
+   const due=Number(sums.rows[0].accrued)-Number(sums.rows[0].reversed)-Number(sums.rows[0].paid)-Number(sums.rows[0].held);
+   if(b.amount_cents>due)throw new DomainError(409,'COMMISSION_DUE',Number(sums.rows[0].held)>0
+    ?'Valor supera a comissão liberada; parte dela aguarda a cliente pagar o crediário':'Valor supera comissão devida');
    if(b.method==='cash'){
-    const cash=await client.query<{opening_cents:string;closed_at:Date|null}>(`SELECT opening_cents::text,closed_at
+    const cash=await client.query<{opening_cents:string;opened_by:string;closed_at:Date|null}>(`SELECT opening_cents::text,opened_by::text,closed_at
      FROM cash_sessions WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,b.cash_session_id]);
     if(!cash.rowCount||cash.rows[0].closed_at)throw new DomainError(409,'CASH_CLOSED','Caixa não aberto');
+    if(!auth.roles.includes('manager')&&cash.rows[0].opened_by!==auth.userId)
+     throw new DomainError(403,'CASH_OWNER','Caixa de outro operador');
     const available=await expectedCash(client,auth.storeId,b.cash_session_id!,Number(cash.rows[0].opening_cents));
     if(b.amount_cents>available)throw new DomainError(409,'INSUFFICIENT_CASH','Dinheiro insuficiente');
     await client.query(`INSERT INTO cash_movements(store_id,cash_session_id,actor_id,kind,amount_cents,reason)
@@ -278,9 +305,9 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    gross:string;cost:string;returned_cost:string;unknown:string;cash_returns:string;external_returns:string;
    expenses:string;tax:string;commissions:string;reversed_commissions:string;
   }>(`SELECT
-   (SELECT coalesce(sum(total_cents),0)::text FROM sales WHERE store_id=$1
-    AND created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
-    AND created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS gross,
+   (SELECT coalesce(sum(gross_cents),0)::text FROM retail_revenue_events WHERE store_id=$1
+    AND occurred_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+    AND occurred_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS gross,
    (SELECT coalesce(sum(l.quantity*l.cost_unit_cents),0)::text FROM sale_lines l
     JOIN sales s ON s.id=l.sale_id AND s.store_id=l.store_id WHERE s.store_id=$1
     AND s.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
@@ -307,9 +334,9 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    (SELECT coalesce(sum(amount_cents),0)::text FROM retail_after_sales WHERE store_id=$1
     AND created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
     AND created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS external_returns,
-   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1
+   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1 AND voided_at IS NULL
     AND lower(category)<>'tributos' AND occurred_on >= $2::date AND occurred_on<($2::date+interval '1 month')) AS expenses,
-   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1
+   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1 AND voided_at IS NULL
     AND lower(category)='tributos' AND occurred_on >= $2::date AND occurred_on<($2::date+interval '1 month')) AS tax,
    (SELECT coalesce(sum(e.amount_cents),0)::text FROM retail_commission_entries e
     WHERE e.store_id=$1 AND e.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)

@@ -7,7 +7,11 @@ contextBridge.exposeInMainWorld('lojaPrinter',{
 });
 contextBridge.exposeInMainWorld('lojaBackups',{
  create:auth=>ipcRenderer.invoke('loja:backup:create',auth),
- verify:auth=>ipcRenderer.invoke('loja:backup:verify',auth)
+ verify:auth=>ipcRenderer.invoke('loja:backup:verify',auth),
+ autoStatus:auth=>ipcRenderer.invoke('loja:backup:auto-status',auth),
+ autoFolder:auth=>ipcRenderer.invoke('loja:backup:auto-folder',auth),
+ autoRun:auth=>ipcRenderer.invoke('loja:backup:auto-run',auth),
+ restore:auth=>ipcRenderer.invoke('loja:backup:restore',auth)
 });
 contextBridge.exposeInMainWorld('lojaUpdates',{
  info:()=>ipcRenderer.invoke('loja:updates:info'),

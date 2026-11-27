@@ -5,7 +5,7 @@ const {existsSync} = require('node:fs');
 const fs = require('node:fs/promises');
 const net = require('node:net');
 const path = require('node:path');
-const {writeBackup,isPgDumpArchive}=require('./local-backup.cjs');
+const {writeBackup,isPgDumpArchive,runAutoBackup,backupFilename}=require('./local-backup.cjs');
 
 const expectedBinaries=resources=>['initdb.exe','pg_ctl.exe','psql.exe','createdb.exe','postgres.exe','pg_dump.exe','pg_restore.exe','dropdb.exe'].map(name=>path.join(resources,'runtime','postgres','bin',name));
 function makeDatabaseUrl(password,port){
@@ -170,6 +170,44 @@ async function launchLocalRuntime({resources,userData,exe,physicalEdition=false,
       throw new Error('Restaurado, mas as tabelas essenciais não puderam ser verificadas.');
      return {verified:true,sales:parts[0],photos:parts[1],migrations:parts[2]};
     }finally{await execute(bin('dropdb'),['--if-exists',restored],{env}).catch(()=>{});}
+   },
+   async autoBackup(folder,force=false){
+    return runAutoBackup({folder,userData,force,executeDump:file=>
+      execute(bin('pg_dump'),['--format=custom','--no-owner','--file',file,'--dbname','loja'],{env})});
+   },
+   /**
+    * Restaura um backup sobre a base da loja. Antes de trocar: confere o arquivo numa base temporária
+    * e grava uma cópia de segurança da base atual. A base anterior fica guardada com outro nome.
+    * Depois de restaurar, o aplicativo precisa ser reiniciado.
+    */
+   async restoreBackup(source){
+    if(!await isPgDumpArchive(source))throw new Error('Selecione um arquivo .dump PostgreSQL válido.');
+    const stamp=Date.now().toString(36);
+    const restored='loja_restore_'+stamp;
+    await execute(bin('createdb'),[restored],{env});
+    let swapped=false;
+    try{
+     await execute(bin('pg_restore'),['--exit-on-error','--no-owner','--no-privileges','--dbname',restored,source],{env});
+     const check=await execute(bin('psql'),['-d',restored,'-At','-c','SELECT count(*) FROM schema_migrations'],{env});
+     if(!Number.isSafeInteger(Number(check.trim())))throw new Error('O arquivo não parece um backup desta loja.');
+     const safety=path.join(userData,'backups','antes-da-restauracao-'+backupFilename().slice('loja-'.length));
+     await writeBackup({destination:safety,userData,executeDump:file=>
+      execute(bin('pg_dump'),['--format=custom','--no-owner','--file',file,'--dbname','loja'],{env})});
+     if(apiChild){apiChild.kill();apiChild=null;}
+     const previous='loja_anterior_'+stamp;
+     await execute(bin('psql'),['-d','postgres','-v','ON_ERROR_STOP=1','-c',
+      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='loja' AND pid<>pg_backend_pid();",
+      '-c','ALTER DATABASE loja RENAME TO '+previous+';','-c','ALTER DATABASE '+restored+' RENAME TO loja;'],{env});
+     swapped=true;
+     // Mantém só a base anterior mais recente, para não encher o disco.
+     const old=await execute(bin('psql'),['-d','postgres','-At','-c',
+      "SELECT datname FROM pg_database WHERE datname LIKE 'loja\\_anterior\\_%' AND datname<>'"+previous+"'"],{env});
+     for(const name of old.split(/\r?\n/).map(x=>x.trim()).filter(x=>/^loja_anterior_[a-z0-9]+$/.test(x)))
+      await execute(bin('dropdb'),['--if-exists',name],{env}).catch(()=>{});
+     return {restored:true,safety_backup:safety,previous_database:previous};
+    }finally{
+     if(!swapped)await execute(bin('dropdb'),['--if-exists',restored],{env}).catch(()=>{});
+    }
    },
    async backup(destination){
     return writeBackup({destination,userData,executeDump:file=>
