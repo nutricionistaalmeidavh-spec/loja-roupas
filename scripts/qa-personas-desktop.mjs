@@ -330,6 +330,11 @@ try {
   await scenario('S09', 'Vendedora apressada', 'Impressão do comprovante', async note => {
     const printers = await win.evaluate(() => window.lojaPrinter?.list()).catch(e => 'erro: ' + e.message);
     note('Impressoras vistas pelo app: ' + JSON.stringify(printers));
+    const pId = (await variants(SKU_P)).find(v => v.sku === SKU_P)?.id;
+    const repo = await api('POST', '/v1/stock/receipts', { variant_id: pId, reference_id: randomUUID(), quantity: 2, note: 'Reposição QA (depois do backup)' });
+    note('Reposição de P x2 depois do backup: HTTP ' + repo.status);
+    await win.getByRole('button', { name: 'PDV', exact: true }).click();
+    await win.getByLabel('Buscar nome, SKU ou código').fill('');
     await addToCart(PRODUCT, 'P');
     const d = await checkoutCash();
     await d.getByRole('button', { name: /Confirmar venda/ }).click();
@@ -360,7 +365,9 @@ try {
     await sleep(4000);
     await relaunch(note, 'depois da restauração');
     note('Vendas antes de restaurar: ' + before);
-    note('Vendas depois de restaurar (deve ser 1 a menos, sem a venda de S09): ' + await salesCount());
+    const after = await salesCount();
+    note('Vendas depois de restaurar (o backup de S07 tinha a contagem anterior à venda de S09): ' + after);
+    note('Estoque P depois de restaurar (no backup era 0; a reposição de S09 deve sumir): ' + await stockOf(SKU_P));
     await snap('apos-restaurar');
   });
 } finally {
