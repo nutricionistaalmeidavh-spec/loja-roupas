@@ -19,7 +19,6 @@ on:
       - 'apps/desktop/src/updates.cjs'
       - 'apps/desktop/src/setup.html'
       - 'infra/desktop/loja-roupas-comercial.nsi'
-      - 'docs/comercial/termos-de-uso.txt'
       - 'scripts/package-desktop.mjs'
       - 'scripts/smoke-commercial-activation.mjs'
       - 'docs/comercial/Manual-Loja-de-Roupas.pdf'

@@ -12,8 +12,6 @@ RequestExecutionLevel user
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_RUN "$INSTDIR\app\electron.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Iniciar Loja de Roupas agora"
-!define MUI_LICENSEPAGE_CHECKBOX
-!insertmacro MUI_PAGE_LICENSE "..\..\docs\comercial\termos-de-uso.txt"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
