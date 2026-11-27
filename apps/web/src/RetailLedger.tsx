@@ -73,7 +73,7 @@ export function RetailLedger({session,cashId}:{session:Session;cashId:string|nul
  }
  return <section className="management-section" aria-label="Gestão financeira completa">
   <h2>Contas, DRE, crediário e comissões</h2>
-  <p>Todos os lançamentos ficam no PostgreSQL local. Pix e cartão são conferidos externamente. Os indicadores não substituem contabilidade ou documentos fiscais.</p>
+  <p>Os lançamentos ficam neste computador. Pix e cartão são conferidos na maquininha ou no banco. Os indicadores não substituem contabilidade ou documentos fiscais.</p>
   {error&&<p role="alert" className="error">{error}</p>}{notice&&<p role="status">{notice}</p>}
   <h3>DRE gerencial</h3>
   <label>Mês <input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
@@ -117,7 +117,7 @@ export function RetailLedger({session,cashId}:{session:Session;cashId:string|nul
     })}</tbody></table>
   </div>
   <h3>Limites do crediário</h3>
-  <p>O gestor define o limite antes de autorizar uma venda a prazo. Não envolve instituição financeira ou API paga.</p>
+  <p>O gestor define o limite antes de autorizar uma venda a prazo.</p>
   <div className="management-table-scroll" role="region" tabIndex={0}>
    <table><thead><tr><th>Cliente</th><th>Limite</th><th>Dívida aberta</th><th>Autorização</th></tr></thead>
    <tbody>{credit.map(c=><tr key={c.id}><td>{c.name}</td><td>{brl(c.credit_limit_cents||0)}</td>

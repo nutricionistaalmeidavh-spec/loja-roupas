@@ -74,7 +74,7 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
     method:'POST',headers:{...headers(session),'content-type':'application/json'},body:JSON.stringify({decision})
    },fetch);
    setNotice(decision==='accepted'
-    ?'Pedido confirmado. Peças reservadas no PostgreSQL; o marketplace receberá a atualização.'
+    ?'Pedido confirmado. Peças reservadas; o marketplace receberá a atualização.'
     :'Pedido recusado. Se havia reserva, ela foi devolvida ao estoque disponível.');
    await refresh();
   }catch(e){setError(describe(e));}finally{setBusy(false);}
@@ -84,7 +84,7 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
   ?new URL('/loja/'+status.connected.slug,status.marketplace_url).href:null;
  return <div className="marketplace-sync-panel">
   <h3>Conectar ao marketplace ArtiSys</h3>
-  <p className="muted">Opcional. Suas vendas e o estoque continuam locais no PostgreSQL. A internet é necessária somente para publicar peças e receber solicitações.</p>
+  <p className="muted">Opcional. Suas vendas e o estoque continuam neste computador. A internet é necessária somente para publicar peças e receber solicitações.</p>
   {(!status?.configured||editingKey)&&<form onSubmit={event=>void connect(event)} className="management-form">
    <label>Identificador da vitrine<input value={slug} required minLength={3} maxLength={48}
     pattern="[a-z0-9-]{3,48}" placeholder="minha-boutique" autoCapitalize="none"
@@ -92,7 +92,7 @@ export function MarketplaceSyncPanel({session}:{session:Session}){
    <label>Chave de sincronização <input type="password" value={key} required minLength={64} maxLength={64}
     autoComplete="off" placeholder="Chave de uso exclusivo desta loja"
     onChange={event=>setKey(event.target.value)} disabled={busy}/></label>
-   <p className="muted">A ArtiSys fornece os dados da vitrine após a liberação da licença. A chave é armazenada apenas no backend local, protegida em disco.</p>
+   <p className="muted">A ArtiSys fornece os dados da vitrine após a liberação da licença. A chave fica guardada só neste computador.</p>
    <button className="primary-action" disabled={busy||key.trim().length!==64}>{busy?'Verificando…':'Conectar vitrine'}</button>
   </form>}
   {status?.configured&&<section aria-label="Estado da sincronização">

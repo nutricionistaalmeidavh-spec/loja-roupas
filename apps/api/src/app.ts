@@ -25,6 +25,7 @@ import { registerStaticUi } from './static-ui.ts';
 import { registerMarketplaceBridge } from './marketplace-bridge.ts';
 import {editionFromEnv,blockedInPhysicalEdition} from './physical-edition.ts';
 import {registerPhysicalManagement} from './physical-management.ts';
+import {registerRetailExtras} from './retail-extras.ts';
 import {registerPhysicalInventory} from './physical-inventory.ts';
 import {registerRetailLedger} from './retail-ledger.ts';
 import {registerRetailAfterSales} from './retail-after-sales.ts';
@@ -72,6 +73,7 @@ export function buildApp(db: Pool) {
   registerStaticUi(app);
   registerMarketplaceBridge(app,db);
   registerPhysicalManagement(app,db);
+  registerRetailExtras(app,db);
   registerPhysicalInventory(app,db);
   registerRetailLedger(app,db);
   registerRetailAfterSales(app,db);

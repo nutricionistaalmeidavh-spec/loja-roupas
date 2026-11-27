@@ -24,7 +24,7 @@ async function entrar(page: Page, login = LOGIN.login, password = LOGIN.password
 
 async function garantirCaixaAberto(page: Page) {
   await page.getByRole('button', { name: 'Caixa', exact: true }).click();
-  await expect(page.getByText('Consultando caixa no servidor…')).toBeHidden();
+  await expect(page.getByText('Consultando caixa…')).toBeHidden();
   if (await page.getByRole('button', { name: 'Abrir caixa', exact: true }).count()) {
     await page.getByLabel('Valor inicial (R$)').fill('100,00');
     await page.getByRole('button', { name: 'Abrir caixa', exact: true }).click();
@@ -155,7 +155,7 @@ test.describe('Persona operador que fecha o app no meio da venda', () => {
       await route.abort('connectionreset');
     });
     await checkout.getByRole('button', { name: /Confirmar venda/ }).click();
-    await expect(checkout.getByText(/A operação pode ter sido gravada/)).toBeVisible();
+    await expect(checkout.getByText(/pode ter sido gravada/)).toBeVisible();
     await page.unroute('**/v1/sales');
     // Operador fecha/recarrega o app.
     page.on('dialog', dialog => void dialog.accept());
@@ -236,6 +236,7 @@ test.describe('Persona vendedora apressada', () => {
     await adicionarAoCarrinho(page, produto.name);
     await page.getByRole('button', { name: 'Revisar e pagar' }).click();
     const checkout = page.getByRole('dialog', { name: 'Revisar e finalizar venda' });
+    await checkout.locator('summary').filter({ hasText: 'Desconto' }).click();
     await checkout.getByRole('textbox', { name: 'Valor do desconto' }).fill('150');
     await checkout.getByRole('combobox', { name: 'Tipo de desconto' }).selectOption('%');
     await checkout.getByRole('textbox', { name: 'Motivo do desconto' }).fill('teste persona');
@@ -250,9 +251,9 @@ test.describe('Persona vendedora apressada', () => {
     await adicionarAoCarrinho(page, produto.name);
     await page.getByRole('button', { name: 'Revisar e pagar' }).click();
     const checkout = page.getByRole('dialog', { name: 'Revisar e finalizar venda' });
-    await checkout.getByRole('combobox', { name: 'Método pagamento 1' }).selectOption({ label: 'Pix conferido manualmente' });
+    await checkout.getByRole('combobox', { name: 'Método pagamento 1' }).selectOption({ label: 'Pix' });
     await checkout.getByRole('textbox', { name: 'Valor pagamento 1' }).fill('500,00');
-    const troco = checkout.locator('.total-row').filter({ hasText: 'Troco' });
+    const troco = checkout.locator('.checkout-totals div').filter({ hasText: 'Troco' });
     await expect(troco).toContainText('R$ 0,00');
   });
 });

@@ -7,6 +7,7 @@ import type { Session } from './api-client.ts';
 import { reaisToCents } from './catalog-model.ts';
 import { markUncertainSale, clearUncertainSale } from './uncertain-sale.ts';
 import { commitSale,quoteSale } from './pos-client.ts';
+import { PixQrCode } from './PixQrCode.tsx';
 import type { PickupOrder } from './PickupOrders.tsx';
 import type { PaymentInput,Sale,SaleQuote } from './pos-client.ts';
 
@@ -81,7 +82,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   const ctrl=new AbortController();
   void jsonRequest<{items:Array<CheckoutOperator&{pin_ready:boolean}>}>('/v1/auth/operators',{headers:headers(session),signal:ctrl.signal},fetch)
    .then(s=>{if(!ctrl.signal.aborted)setOperators(s.items);})
-   .catch(()=>{if(!ctrl.signal.aborted)setError('Não foi possível listar os vendedores. A venda sem vínculo permanece disponível.');});
+   .catch(()=>{if(!ctrl.signal.aborted)setError('Não foi possível listar os vendedores. Dá para vender sem escolher vendedor.');});
   return ()=>ctrl.abort();
  },[session]);
  useEffect(()=>{
@@ -188,7 +189,7 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
    setError(err instanceof Error?err.message:'Falha ao confirmar venda');
    if(err instanceof ApiError && err.status>=400 && err.status<500){
     setPending(null);setUncertain(false);
-    if(err.status===409&&!err.code.startsWith('ORDER_'))setError('O estoque, preço ou caixa mudou. Revise a cotação antes de tentar novamente.');
+    if(err.status===409&&!err.code.startsWith('ORDER_'))setError('O estoque, preço ou caixa mudou. Confira os preços de novo antes de tentar.');
    }else{setUncertain(true);markUncertainSale(cashSessionId);}
   }finally{setBusy(false);}
  }
@@ -198,69 +199,40 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
    <header className="checkout-header"><h2>Revisar e finalizar venda</h2>
     <button type="button" className="light-button" disabled={busy||uncertain} onClick={onClose}>Fechar</button></header>
    {pickup&&<p className="notice">Pedido para retirada · Cotação na vitrine {brl(Number(pickup.quoted_total_cents))}</p>}
-   {loading&&<p role="status">Verificando preços e saldos com PostgreSQL…</p>}
+   {loading&&<p role="status">Conferindo preços e estoque…</p>}
    {quote&&!loading&&<form className="checkout-form" onSubmit={event=>void submit(event)}>
-    <div className="editor-block"><h3>Itens confirmados na cotação</h3>
-      {quote.lines.map(l=><div className="total-row" key={l.variant_id}>
-        <span>{l.quantity} × {l.product_name} · {l.sku}</span><strong>{brl(l.price_cents*l.quantity)}</strong>
-      </div>)}
+    <div className="checkout-summary">
+      <ul className="checkout-items" aria-label="Itens da venda">
+       {quote.lines.map(l=><li className="total-row" key={l.variant_id}>
+        <span>{l.quantity} × {l.product_name} <span className="muted small">{l.sku}</span></span><strong>{brl(l.price_cents*l.quantity)}</strong>
+       </li>)}
+      </ul>
       {(quote.discount_cents??0)>0&&<>
        <div className="total-row"><span>Subtotal</span><span>{brl(quote.subtotal_cents??quote.total_cents)}</span></div>
-       <div className="total-row"><span>Desconto</span><span>− {brl(quote.discount_cents??0)}</span></div></>}
-      <div className="total-row"><strong>Total</strong><strong>{brl(quote.total_cents)}</strong></div>
+       {(quote.promotion_cents??0)>0&&<div className="total-row promo-row"><span>Promoção ({[...new Set(quote.lines.map(l=>l.promotion_name).filter(Boolean))].join(', ')})</span><span>− {brl(quote.promotion_cents??0)}</span></div>}
+       {(quote.discount_cents??0)-(quote.promotion_cents??0)>0&&<div className="total-row"><span>Desconto</span><span>− {brl((quote.discount_cents??0)-(quote.promotion_cents??0))}</span></div>}</>}
+      <div className="total-row checkout-grand-total"><strong>Total</strong><strong>{brl(quote.total_cents)}</strong></div>
       {!quote.can_commit&&<p role="alert" className="error">Estoque insuficiente. Ajuste os itens antes de continuar.</p>}
     </div>
-    <fieldset className="editor-block" disabled={busy||uncertain}><legend>Desconto na venda</legend>
-      <div className="fields-two">
-       <label>Desconto
-        <span style={{display:'flex',gap:'0.5rem'}}>
-         <input aria-label="Valor do desconto" inputMode="decimal" placeholder={discountMode==='percent'?'10':'20,00'}
-          value={discountText} onChange={e=>setDiscountText(e.target.value)}/>
-         <select aria-label="Tipo de desconto" value={discountMode} onChange={e=>setDiscountMode(e.target.value as 'reais'|'percent')}>
-          <option value="reais">R$</option><option value="percent">%</option></select>
-         <button type="button" className="light-button" onClick={applyDiscount}>Aplicar</button>
-        </span></label>
-       <label>Motivo do desconto
-        <input maxLength={160} value={discountReason} placeholder="Ex.: cliente fiel, peça com detalhe" onChange={e=>setDiscountReason(e.target.value)}/></label>
-      </div>
-      {discountError&&<p role="alert" className="error">{discountError}</p>}
-      {quote.discount_requires_manager&&<p role="alert" className="error">Este desconto passa do limite do caixa ({((quote.cashier_discount_limit_bps??0)/100).toLocaleString('pt-BR')}%). Só um gestor pode confirmar.</p>}
-      {discount>0&&<button type="button" className="text-btn" onClick={()=>{setDiscount(0);setDiscountText('');setDiscountError('');}}>Remover desconto</button>}
-    </fieldset>
-    <div className="editor-block"><h3>Cliente e vendedor</h3>
-      <div className="fields-two">
-       <label>Buscar cliente (nome, telefone ou e-mail)
-        <input aria-label="Buscar cliente" value={customerQuery} placeholder="Digite para buscar" onChange={e=>setCustomerQuery(e.target.value)}/></label>
-       <label>Cliente para fidelidade ou crediário
-        <select aria-label="Cliente da venda" value={customerId} onChange={e=>setCustomerId(e.target.value)}>
-         <option value="">Venda sem cliente vinculado</option>
-         {customers.map(c=><option key={c.id} value={c.id}>{c.name}{c.phone?' · '+c.phone:''}</option>)}
-        </select></label>
-       <label>Vendedor responsável
-        <select aria-label="Vendedor da venda" value={sellerId} onChange={e=>setSellerId(e.target.value)}>
-         <option value="">Operador do caixa</option>{operators.map(o=><option key={o.id} value={o.id}>{o.login}</option>)}
-        </select></label>
-      </div>
-      <p className="muted small">Crediário exige cliente e limite previamente autorizado. Crédito da loja será descontado somente após confirmação da venda.</p>
-    </div>
-    <div className="editor-block"><h3>Pagamentos e crédito</h3>
-      <p className="muted small">Pix e cartão são lançamentos manuais. Não existe confirmação automática de banco, adquirente ou TEF.</p>
+    <div className="editor-block"><h3>Pagamento</h3>
+      <p className="muted small">Pix e cartão: confira na maquininha ou no aplicativo do banco antes de confirmar.</p>
       {tenders.map((t,i)=><fieldset className="tender-row" key={t.key} disabled={busy||uncertain}>
         <legend>Pagamento {i+1}</legend>
         <div className="fields-two"><label>Forma de pagamento
          <select aria-label={'Método pagamento '+(i+1)} value={t.method}
           onChange={e=>update(t.key,{method:e.target.value as Tender['method'],confirmed:false,reference:''})}>
-           <option value="cash">Dinheiro</option><option value="pix_manual">Pix conferido manualmente</option>
-           <option value="card_external">Cartão em maquininha externa</option>
+           <option value="cash">Dinheiro</option><option value="pix_manual">Pix</option>
+           <option value="card_external">Cartão (maquininha)</option>
            {session.roles.includes('manager')&&<option value="store_credit">Crediário (valor a receber)</option>}
            <option value="customer_credit">Saldo de crédito do cliente</option>
          </select></label>
          <label>{t.method==='store_credit'?'Valor financiado (R$)':t.method==='customer_credit'?'Crédito resgatado (R$)':'Valor recebido (R$)'}<input aria-label={'Valor pagamento '+(i+1)} required inputMode="decimal"
           value={t.amount} onChange={e=>update(t.key,{amount:e.target.value})}/></label></div>
-        {(t.method==='pix_manual'||t.method==='card_external')&&<label>Referência/comprovante externo
+        {(t.method==='pix_manual'||t.method==='card_external')&&<label>{t.method==='pix_manual'?'Código do comprovante Pix':'Código da autorização (NSU) do cartão'}
          <input required minLength={6} maxLength={128} aria-label={'Referência pagamento '+(i+1)}
-          value={t.reference} placeholder="ID da transação confirmada" onChange={e=>update(t.key,{reference:e.target.value})}/>
+          value={t.reference} placeholder="Veja no comprovante" onChange={e=>update(t.key,{reference:e.target.value})}/>
         </label>}
+        {t.method==='pix_manual'&&<PixQrCode session={session} amountCents={(()=>{try{return reaisToCents(t.amount);}catch{return 0;}})()}/>}
         <label className="confirm-tender"><input type="checkbox" checked={t.confirmed}
          onChange={e=>update(t.key,{confirmed:e.target.checked})}/>
          {t.method==='cash'?'Dinheiro recebido e conferido':
@@ -276,29 +248,71 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
         {[1,2,3,4,5,6,8,10,12].map(n=><option value={n} key={n}>{n} parcela{n>1?'s':''}</option>)}
        </select></label>
        <label>Primeiro vencimento <input type="date" value={creditDue} onChange={e=>setCreditDue(e.target.value)} required/></label>
-       <p>As parcelas constituem contas a receber; não entram no saldo do caixa antes da liquidação.</p>
+       <p className="muted small">As parcelas entram em contas a receber e só contam no caixa quando forem pagas.</p>
       </fieldset>}
       <button type="button" className="light-button" disabled={busy||uncertain||tenders.length>=6}
-       onClick={()=>setTenders(x=>[...x,newTender('pix_manual')])}>+ Adicionar pagamento</button>
+       onClick={()=>setTenders(x=>[...x,newTender('pix_manual')])}>+ Dividir em outra forma de pagamento</button>
     </div>
-    <div className="checkout-totals">
-      <div className="total-row"><span>Total da venda</span><strong>{brl(quote.total_cents)}</strong></div>
-      <div className="total-row"><span>Informado</span><strong>{brl(tendered)}</strong></div>
-      <div className="total-row"><span>Restante</span><strong>{brl(due)}</strong></div>
-      <div className="total-row"><span>Troco (somente em dinheiro)</span><strong>{brl(change)}</strong></div>
-      {nonCashOver&&<p className="error small" role="status">Pix e cartão não geram troco: o valor informado passa do total da venda.</p>}
-    </div>
-    {error&&<p role="alert" className="error">{error}{uncertain&&' A operação pode ter sido gravada. Não crie outra venda; repita usando a mesma chave.'}</p>}
-    <div className="checkout-buttons">
+    <details className="checkout-more" open={discount>0||!!discountText||undefined}>
+     <summary>Desconto{discount>0?' · '+brl(discount):''}</summary>
+     <fieldset className="checkout-more-body" disabled={busy||uncertain}>
+      <div className="fields-two">
+       <div className="discount-field"><span id="discount-label">Desconto</span>
+        <div className="discount-inputs">
+         <input aria-label="Valor do desconto" aria-describedby="discount-label" inputMode="decimal" placeholder={discountMode==='percent'?'10':'20,00'}
+          value={discountText} onChange={e=>setDiscountText(e.target.value)}/>
+         <select aria-label="Tipo de desconto" value={discountMode} onChange={e=>setDiscountMode(e.target.value as 'reais'|'percent')}>
+          <option value="reais">R$</option><option value="percent">%</option></select>
+         <button type="button" className="light-button" onClick={applyDiscount}>Aplicar</button>
+        </div></div>
+       <label>Motivo do desconto
+        <input maxLength={160} value={discountReason} placeholder="Ex.: cliente fiel, peça com detalhe" onChange={e=>setDiscountReason(e.target.value)}/></label>
+      </div>
+      {discountError&&<p role="alert" className="error">{discountError}</p>}
+      {quote.discount_requires_manager&&<p role="alert" className="error">Este desconto passa do limite do caixa ({((quote.cashier_discount_limit_bps??0)/100).toLocaleString('pt-BR')}%). Só um gestor pode confirmar.</p>}
+      {discount>0&&<button type="button" className="text-btn" onClick={()=>{setDiscount(0);setDiscountText('');setDiscountError('');}}>Remover desconto</button>}
+     </fieldset>
+    </details>
+    <details className="checkout-more" open={!!customerId||!!sellerId||tenders.some(t=>t.method==='store_credit'||t.method==='customer_credit')||undefined}>
+     <summary>Cliente e vendedor{customerId?' · '+(customers.find(c=>c.id===customerId)?.name??''):''}</summary>
+     <div className="checkout-more-body">
+      <div className="fields-two">
+       <label>Buscar cliente (nome, telefone ou e-mail)
+        <input aria-label="Buscar cliente" value={customerQuery} placeholder="Digite para buscar" onChange={e=>setCustomerQuery(e.target.value)}/></label>
+       <label>Cliente da venda
+        <select aria-label="Cliente da venda" value={customerId} onChange={e=>setCustomerId(e.target.value)}>
+         <option value="">Venda sem cliente</option>
+         {customers.map(c=><option key={c.id} value={c.id}>{c.name}{c.phone?' · '+c.phone:''}</option>)}
+        </select></label>
+       <label>Vendedor responsável
+        <select aria-label="Vendedor da venda" value={sellerId} onChange={e=>setSellerId(e.target.value)}>
+         <option value="">Quem está no caixa</option>{operators.map(o=><option key={o.id} value={o.id}>{o.login}</option>)}
+        </select></label>
+      </div>
+      <p className="muted small">Para fidelidade, crediário ou crédito da loja, escolha o cliente. O crédito só é descontado quando a venda é confirmada.</p>
+     </div>
+    </details>
+    <div className="checkout-footer">
+     <div className="checkout-totals">
+      <div><span>Total</span><strong>{brl(quote.total_cents)}</strong></div>
+      <div><span>Recebido</span><strong>{brl(tendered)}</strong></div>
+      <div><span>Falta</span><strong>{brl(due)}</strong></div>
+      <div><span>Troco</span><strong>{brl(change)}</strong></div>
+     </div>
+     {nonCashOver&&<p className="error small" role="status">Pix e cartão não geram troco: o valor informado passa do total da venda.</p>}
+     {error&&<p role="alert" className="error">{error}{uncertain&&' A venda pode ter sido gravada. Não crie outra venda; confirme de novo pelo mesmo botão.'}</p>}
+     <div className="checkout-buttons">
       <button type="button" className="light-button" disabled={busy||uncertain}
-        onClick={()=>setRefresh(r=>r+1)}>Atualizar cotação</button>
+        onClick={()=>setRefresh(r=>r+1)}>Conferir preços de novo</button>
       <button type="submit" className="primary-action" disabled={!quote.can_commit||busy}>
         {busy?'Confirmando…':uncertain?'Repetir confirmação sem duplicar':
          tenders.some(t=>t.method==='store_credit')?'Confirmar venda e gerar parcelas':'Confirmar venda e pagamentos'}
+        <span className="key-hint" aria-hidden="true"> F8</span>
       </button>
+     </div>
     </div>
    </form>}
-   {error&&!quote&&<><p role="alert" className="error">{error}</p><button className="light-button" onClick={()=>setRefresh(r=>r+1)}>Tentar nova cotação</button></>}
+   {error&&!quote&&<><p role="alert" className="error">{error}</p><button className="light-button" onClick={()=>setRefresh(r=>r+1)}>Conferir preços de novo</button></>}
   </section>
  </div>;
 }

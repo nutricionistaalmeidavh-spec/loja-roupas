@@ -10,13 +10,21 @@ function validMonth(value:string):string{
  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value))throw new DomainError(422,'BAD_MONTH','Informe o mês no formato AAAA-MM.');
  return value+'-01';
 }
-function validCustomer(body:{name:string;phone?:string|null;email?:string|null;marketing_consent?:boolean;loyalty_opt_in?:boolean}){
+function validBirth(value:string|null|undefined){
+ if(!value)return null;
+ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+ const d=m?new Date(value+'T00:00:00Z'):null;
+ if(!m||!d||d.toISOString().slice(0,10)!==value||Number(m[1])<1900||d.getTime()>Date.now())
+  throw new DomainError(422,'BAD_BIRTH','Data de aniversário inválida.');
+ return value;
+}
+function validCustomer(body:{name:string;phone?:string|null;email?:string|null;marketing_consent?:boolean;loyalty_opt_in?:boolean;birth_date?:string|null}){
  const name=String(body.name||'').trim(),phone=body.phone?String(body.phone).replace(/[\s()\-]/g,''):null;
  const email=body.email?String(body.email).trim().toLowerCase():null;
  if(name.length<2||name.length>120||phone&&!/^\+?[0-9]{10,15}$/.test(phone)||
     email&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254))
    throw new DomainError(422,'BAD_CUSTOMER','Informe nome, telefone e e-mail válidos.');
- return {name,phone,email,marketing_consent:body.marketing_consent===true,loyalty_opt_in:body.loyalty_opt_in===true};
+ return {name,phone,email,marketing_consent:body.marketing_consent===true,loyalty_opt_in:body.loyalty_opt_in===true,birth_date:validBirth(body.birth_date)};
 }
 export function registerPhysicalManagement(app:FastifyInstance,db:Pool){
  app.get('/v1/management/backup/authorization',async(request,reply)=>{
@@ -145,7 +153,7 @@ export function registerPhysicalManagement(app:FastifyInstance,db:Pool){
   if(requirePermission(request,reply,'customer.read'))return reply;
   const term=(request.query.q??'').trim().toLowerCase();
   const digits=term.replace(/\D/g,'');
-  const q=await db.query(`SELECT id::text,name,phone,email,marketing_consent,loyalty_opt_in,created_at,count(*) OVER()::int AS total_count
+  const q=await db.query(`SELECT id::text,name,phone,email,marketing_consent,loyalty_opt_in,to_char(birth_date,'YYYY-MM-DD') AS birth_date,created_at,count(*) OVER()::int AS total_count
    FROM retail_customers
    WHERE store_id=$1 AND anonymized_at IS NULL
     AND ($2='' OR lower(name) LIKE '%'||$2||'%' OR ($3<>'' AND phone LIKE '%'||$3||'%') OR lower(coalesce(email,'')) LIKE '%'||$2||'%')
@@ -153,16 +161,17 @@ export function registerPhysicalManagement(app:FastifyInstance,db:Pool){
    [request.authContext!.storeId,term.replace(/[%_\\]/g,''),digits,request.query.limit??100,request.query.offset??0]);
   return {items:q.rows,total:q.rows[0]?.total_count??0};
  });
- app.post<{Body:{name:string;phone?:string|null;email?:string|null;marketing_consent?:boolean;loyalty_opt_in?:boolean}}>('/v1/management/customers',{
+ app.post<{Body:{name:string;phone?:string|null;email?:string|null;marketing_consent?:boolean;loyalty_opt_in?:boolean;birth_date?:string|null}}>('/v1/management/customers',{
   schema:{body:{type:'object',additionalProperties:false,required:['name'],properties:{
    name:{type:'string',minLength:2,maxLength:120},phone:{type:['string','null'],maxLength:24},
-   email:{type:['string','null'],maxLength:254},marketing_consent:{type:'boolean'},loyalty_opt_in:{type:'boolean'}}}}
+   email:{type:['string','null'],maxLength:254},marketing_consent:{type:'boolean'},loyalty_opt_in:{type:'boolean'},
+   birth_date:{type:['string','null'],maxLength:10}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'customer.write'))return reply;
   const auth=request.authContext!,body=validCustomer(request.body);
   const op=await withIdempotentTransaction(db,auth,'physical.customer',requireIdempotencyKey(request.headers['idempotency-key']),body,async client=>{
-   const q=await client.query<{id:string}>(`INSERT INTO retail_customers(store_id,created_by,name,phone,email,marketing_consent,loyalty_opt_in)
-    VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,[auth.storeId,auth.userId,body.name,body.phone,body.email,body.marketing_consent,body.loyalty_opt_in]);
+   const q=await client.query<{id:string}>(`INSERT INTO retail_customers(store_id,created_by,name,phone,email,marketing_consent,loyalty_opt_in,birth_date)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text`,[auth.storeId,auth.userId,body.name,body.phone,body.email,body.marketing_consent,body.loyalty_opt_in,body.birth_date]);
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id) VALUES($1,$2,'physical.customer.create',$3)`,[auth.storeId,auth.userId,q.rows[0].id]);
    return {id:q.rows[0].id,...body};
   });

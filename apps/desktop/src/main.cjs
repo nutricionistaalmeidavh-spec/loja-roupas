@@ -9,6 +9,7 @@ const {createDesktopUpdater}=require('./desktop-updater.cjs');
 const {backupFilename}=require('./local-backup.cjs');
 const {createAutoBackup}=require('./auto-backup.cjs');
 const {validatePrinterSelection}=require('./native-print.cjs');
+const {createLog,exportDiagnostic}=require('./diagnostic-log.cjs');
 
 const desktopIcon=process.platform==='win32'?path.join(__dirname,'assets','loja-roupas.ico'):undefined;
 let runtime=null,setupWindow=null,recoveryWindow=null,setupState={status:'Preparando sua loja…',ready:false,error:''};
@@ -21,6 +22,7 @@ if(physicalEdition&&!process.argv.some(arg=>arg.startsWith('--user-data-dir=')))
  app.setPath('userData',physicalData);
 }
 let commercialLicense=null;
+let appLog=null;
 let autoBackup=null;
 let quitting=false;
 // A loja é brasileira: mensagens nativas do Chromium (validação de formulário, menus de contexto)
@@ -278,7 +280,8 @@ async function startLocal(){
  status(setupState.status);
  try{
   runtime=await launchLocalRuntime({resources:process.resourcesPath,
-   userData:app.getPath('userData'),exe:process.execPath,physicalEdition,progress:status});
+   userData:app.getPath('userData'),exe:process.execPath,physicalEdition,progress:status,log:appLog});
+  appLog?.info('Aplicativo pronto (versão '+app.getVersion()+')');
   autoBackup?.stop();
   autoBackup=createAutoBackup({runtime,userData:app.getPath('userData'),
    defaultFolder:path.join(app.getPath('documents'),'Loja de Roupas - Backups')});
@@ -286,7 +289,20 @@ async function startLocal(){
   if(!runtime.firstRun){transition(validateOrigin(runtime.url));return;}
   setupState={status:'Banco e API prontos. Cadastre o administrador.',ready:true,error:''};
   status(setupState.status);
- }catch(error){showError(error);}
+ }catch(error){appLog?.error(error);showError(error);}
+}
+function registerDiagnosticHandlers(){
+ // Qualquer janela do próprio aplicativo pode exportar: o arquivo já sai sem senhas nem dados de clientes.
+ ipcMain.handle('loja:diagnostic:export',async event=>{
+  const window=BrowserWindow.fromWebContents(event.sender);
+  if(!window||!appLog)throw new Error('Diagnóstico indisponível nesta janela.');
+  const stamp=new Date().toISOString().slice(0,16).replace(/[-:T]/g,'');
+  const choice=await dialog.showSaveDialog(window,{title:'Salvar diagnóstico para o suporte',
+   defaultPath:path.join(app.getPath('documents'),'diagnostico-loja-'+stamp+'.txt'),filters:[{name:'Texto',extensions:['txt']}]});
+  if(choice.canceled||!choice.filePath)return {saved:false};
+  return exportDiagnostic({dir:appLog.dir,destination:choice.filePath,appVersion:app.getVersion(),
+   extra:{'Modo':configuredUrl()?'Terminal (outro computador)':'Computador principal','Edição':commercialEdition?'Comercial':physicalEdition?'Loja física':'Livre'}});
+ });
 }
 function registerSetupHandlers(){
  ipcMain.handle('loja:setup-state',event=>{setupAllowed(event);return setupState;});
@@ -336,6 +352,11 @@ function registerSetupHandlers(){
 }
 async function start(){
  if(!single)return;
+ appLog=createLog(path.join(app.getPath('userData'),'logs'));
+ appLog.info('Iniciando Loja de Roupas '+app.getVersion()+' em '+process.platform);
+ process.on('uncaughtException',error=>appLog?.error(error));
+ process.on('unhandledRejection',error=>appLog?.error(error instanceof Error?error:String(error)));
+ registerDiagnosticHandlers();
  const url=configuredUrl();
  if(url){openWindow(url);return;}
  if(process.platform!=='win32'){openWindow(validateOrigin('http://127.0.0.1:'+(process.defaultApp?'5173':'8080')));return;}

@@ -8,6 +8,35 @@ import type { CashState } from './pos-client.ts';
 import { reaisToCents } from './catalog-model.ts';
 import { TaskDialog } from './TaskDialog.tsx';
 import { ReprintReceipt } from './StoreOperations.tsx';
+import { headers,jsonRequest } from './api-client.ts';
+
+type CashSummary={expected_cash_cents:number;sales:{count:number;total_cents:number;change_cents:number};
+ payments:Array<{method:string;amount_cents:number;sales:number}>;movements:Array<{kind:string;amount_cents:number;count:number}>;
+ refunds:Array<{method:string;amount_cents:number}>};
+const METHOD_LABEL:Record<string,string>={cash:'Dinheiro',pix_manual:'Pix',card_external:'Cartão',store_credit:'Crediário',customer_credit:'Crédito da cliente'};
+/** O que a operadora mais pergunta: quanto deveria ter na gaveta e quanto vendeu em cada forma. */
+function CashTurnSummary({session,cashId,refresh}:{session:Session;cashId:string;refresh:number}){
+ const [summary,setSummary]=useState<CashSummary|null>(null);
+ useEffect(()=>{
+  const ctrl=new AbortController();
+  void jsonRequest<CashSummary>('/v1/cash-sessions/'+cashId+'/summary',{headers:headers(session),signal:ctrl.signal},fetch)
+   .then(s=>{if(!ctrl.signal.aborted)setSummary(s);}).catch(()=>{});
+  return ()=>ctrl.abort();
+ },[session,cashId,refresh]);
+ if(!summary)return null;
+ const move=(kind:string)=>summary.movements.find(m=>m.kind===kind);
+ const refunded=summary.refunds.reduce((n,r)=>n+r.amount_cents,0);
+ return <div className="cash-turn" aria-label="Resumo do turno" role="group">
+  <div className="cash-drawer-now"><span>Deveria ter na gaveta agora</span><strong>{currency(summary.expected_cash_cents)}</strong></div>
+  <dl className="cash-turn-grid">
+   <div><dt>Vendas no turno</dt><dd>{summary.sales.count} · {currency(summary.sales.total_cents)}</dd></div>
+   {summary.payments.map(p=><div key={p.method}><dt>{METHOD_LABEL[p.method]??p.method}</dt><dd>{currency(p.method==='cash'?p.amount_cents-summary.sales.change_cents:p.amount_cents)}</dd></div>)}
+   <div><dt>Suprimentos</dt><dd>{move('supply')?.count??0} · {currency(move('supply')?.amount_cents??0)}</dd></div>
+   <div><dt>Sangrias</dt><dd>{move('withdrawal')?.count??0} · {currency(move('withdrawal')?.amount_cents??0)}</dd></div>
+   {refunded>0&&<div><dt>Devoluções</dt><dd>{currency(refunded)}</dd></div>}
+  </dl>
+ </div>;
+}
 
 const currency=(c:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(c/100);
 export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>void}){
@@ -63,13 +92,14 @@ export function CashPanel({session,onChanged}:{session:Session;onChanged:()=>voi
    if(err instanceof ApiError&&(err.code==='CASH_OWNER'||err.code==='CASH_ALREADY_OPEN')){setOwnedByOther(err.message);setRefresh(x=>x+1);}
   }finally{setBusy(false);}
  }
- if(loading)return <p className="notice" role="status">Consultando caixa no servidor…</p>;
+ if(loading)return <p className="notice" role="status">Consultando caixa…</p>;
  return <section className="management-form">
-  <div className="form-heading"><h2>Operação de caixa</h2><p>Caixa CAIXA-01 · Sessão local protegida por operador e loja.</p></div>
+  <div className="form-heading"><h2>Operação de caixa</h2><p>Caixa CAIXA-01 · Abra no início do turno e feche no fim.</p></div>
   {ownedByOther?<div className="editor-block" role="status"><strong>{ownedByOther}</strong>
    <p>O CAIXA-01 já está aberto por outra pessoa. Para vender por aqui, peça para quem abriu fechar o caixa, ou peça ao gerente para fechá-lo na conferência.</p>
   </div>:active?<div className="editor-block"><strong>Caixa aberto</strong><p>Saldo inicial: {currency(active.opening_cents)}</p>
    <p className="muted small">Aberto em {new Date(active.opened_at).toLocaleString('pt-BR')}</p>
+   <CashTurnSummary session={session} cashId={active.id} refresh={refresh}/>
   </div>:<form className="editor-block" onSubmit={e=>void perform(e,'open')}>
    <h3>Abrir caixa</h3>
    <label>Valor inicial (R$)<input required inputMode="decimal" value={opening} onChange={e=>setOpening(e.target.value)}/></label>

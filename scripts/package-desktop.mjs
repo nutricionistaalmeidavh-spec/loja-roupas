@@ -21,6 +21,7 @@ await cp(new URL('../apps/desktop/src/local-runtime.cjs',import.meta.url),path.j
 await cp(new URL('../apps/desktop/src/local-backup.cjs',import.meta.url),path.join(application,'local-backup.cjs'));
 await cp(new URL('../apps/desktop/src/auto-backup.cjs',import.meta.url),path.join(application,'auto-backup.cjs'));
 await cp(new URL('../apps/desktop/src/native-print.cjs',import.meta.url),path.join(application,'native-print.cjs'));
+await cp(new URL('../apps/desktop/src/diagnostic-log.cjs',import.meta.url),path.join(application,'diagnostic-log.cjs'));
 await cp(new URL('../apps/desktop/src/updates.cjs',import.meta.url),path.join(application,'updates.cjs'));
 await cp(new URL('../apps/desktop/src/desktop-updater.cjs',import.meta.url),path.join(application,'desktop-updater.cjs'));
 await cp(new URL('../apps/desktop/src/update-preload.cjs',import.meta.url),path.join(application,'update-preload.cjs'));

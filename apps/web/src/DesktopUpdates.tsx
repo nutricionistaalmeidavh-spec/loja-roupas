@@ -29,7 +29,7 @@ function messageFor(progress:Progress|null){
   case 'download':return 'Baixando instalador: '+(progress.total?Math.min(100,Math.round((progress.bytes||0)*100/progress.total))+'%':'em andamento');
   case 'verified':return 'Arquivo recebido e SHA-256 validado.';
   case 'checking-integrity':return 'Conferindo a integridade do instalador…';
-  case 'backup':return 'Criando backup do PostgreSQL local antes de instalar…';
+  case 'backup':return 'Fazendo uma cópia de segurança antes de instalar…';
   case 'backup-complete':return 'Backup do banco concluído.';
   case 'installing':return 'Instalação autorizada. Fechando a loja com segurança…';
   case 'error':return progress.message||'Falha ao preparar a atualização.';
@@ -179,7 +179,7 @@ export function LocalBackupSettings({session}:{session:Session}){
  if(!bridge)return <section className="update-settings"><h2>Backup da loja</h2><p>Faça o backup no computador principal. Terminais de rede não possuem o banco de dados.</p></section>;
  return <section className="update-settings" aria-label="Backup local da loja">
   <h2>Exportar backup completo</h2>
-  <p>Salve o arquivo PostgreSQL em unidade externa. Inclui produtos, fotos, vendas e histórico. Guarde uma cópia fora do computador principal.</p>
+  <p>Salve a cópia de segurança num pendrive ou HD externo. Inclui produtos, fotos, vendas e histórico. Guarde uma cópia fora do computador principal.</p>
   <button className="update-primary" disabled={busy} onClick={()=>{setBusy(true);setError('');setNotice('');
    void bridge.create({token:session.token,storeId:session.storeId}).then(result=>{if(!result.cancelled)setNotice('Backup concluído e conferido · '+result.bytes+' bytes · SHA-256 '+result.sha256);})
     .catch(e=>setError(backupErrorMessage(e,'Falha ao criar backup'))).finally(()=>setBusy(false));

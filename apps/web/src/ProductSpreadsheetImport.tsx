@@ -94,7 +94,7 @@ export function ProductSpreadsheetImport({session,onSaved,onClose}:{
             }}>{downloading?'Gerando XLSX…':'Baixar modelo XLSX'}</button>
           <button type="button" className="light-button" onClick={downloadCsv}>Baixar modelo CSV</button>
         </div>
-        <p className="muted small">Os dois modelos funcionam sem servidor externo. Mantenha o código de barras como texto para preservar zeros à esquerda.</p>
+        <p className="muted small">Mantenha o código de barras como texto para preservar zeros à esquerda.</p>
       </section>
       <section className="import-step">
         <h3>2. Selecione o arquivo preenchido</h3>

@@ -19,22 +19,25 @@ test('M2 concluído: modifica produto/preço, foto no PostgreSQL e ajusta estoqu
  await page.getByRole('button',{name:'Fechar Novo produto'}).click();
 
   await page.getByRole('button',{name:'Editar produto'}).click();
-await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
+ // Banco de teste reaproveitado tem muitos produtos: filtra antes de escolher.
+ await page.getByRole('textbox',{name:'Pesquisar produto para editar'}).fill(sku);
+ await expect(page.getByRole('combobox',{name:'Produto para editar'}).locator('option',{hasText:name})).toBeAttached();
+ await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name});
  await page.getByLabel('Nome do produto').fill(name+' atual');
  await page.getByRole('button',{name:'Salvar informações'}).click();
- await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
+ await expect(page.getByText('Alteração salva.')).toBeVisible();
  await page.getByRole('combobox',{name:'Produto para editar'}).selectOption({label:name+' atual'});
  const variantOption=page.getByRole('combobox',{name:'Variante para preço'}).locator('option',{hasText:sku});
  await expect(variantOption).toBeAttached();
  await page.getByRole('combobox',{name:'Variante para preço'}).selectOption((await variantOption.getAttribute('value'))!);
  await page.getByLabel('Novo preço (R$)').fill('229,90');
  await page.getByRole('button',{name:'Salvar preço'}).click();
- await expect(page.getByText('Atualização confirmada pelo servidor.')).toBeVisible();
+ await expect(page.getByText('Alteração salva.')).toBeVisible();
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAFElEQVR4nGPcMrGYAQaYGJAAbg4AVzUBwNOahA4AAAAASUVORK5CYII=','base64');
  await page.getByLabel('Selecionar fotografia').setInputFiles({name:'peca.png',mimeType:'image/png',buffer:png});
  await page.getByRole('button',{name:'Enviar fotografia local'}).click();
  await expect.poll(async()=>{
-   if(await page.getByText('Atualização confirmada pelo servidor.').count())return 'ok';
+   if(await page.getByText('Alteração salva.').count())return 'ok';
    const errors=await page.locator('.management-form .error').allTextContents();
    return errors.length?'API ERROR: '+errors.join(' | '):'waiting';
  },{timeout:10000}).toBe('ok');

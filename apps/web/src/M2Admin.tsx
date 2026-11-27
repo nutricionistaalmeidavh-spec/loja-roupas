@@ -116,7 +116,7 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
    if(keyType==='product')await patchProduct(session,current.id,JSON.parse(body),key);
    else if(keyType==='price')await patchVariantPrice(session,variant!.id,JSON.parse(body),key);
    else await uploadPhoto(session,current.id,file!,key);
-   setPending(null);setPhoto(null);setNotice('Atualização confirmada pelo servidor.');
+   setPending(null);setPhoto(null);setNotice('Alteração salva.');
    setRefresh(n=>n+1);onSaved();
   }catch(err){
    setError(message(err));
@@ -125,7 +125,7 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
  }
  return <section className="management-form">
   <div className="form-heading"><h2>Editar catálogo, preço e fotos</h2>
-    <p>Operações com revisão de versão e auditoria. Imagens armazenadas no PostgreSQL local.</p></div>
+    <p>Toda alteração fica registrada no histórico. As fotos ficam guardadas neste computador.</p></div>
   <label>Pesquisar produto para editar
     <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome, SKU ou código de barras"/>
   </label>
@@ -192,7 +192,7 @@ export function M2CatalogEditor({session,onSaved,initialProductId,initialProduct
     {photo&&photoPreview&&<div className="photo-upload-preview">
       <img src={photoPreview} alt="Prévia local da fotografia selecionada"/>
       <div><strong>Prévia antes do envio</strong><span>{photo.name} · {(photo.size/1024).toFixed(0)} KiB</span>
-        <p>A fotografia só é enviada quando você confirmar. O original permanece no servidor local.</p></div>
+        <p>A fotografia só é enviada quando você confirmar. A foto original fica guardada neste computador.</p></div>
     </div>}
     <button type="submit" className="light-button" disabled={!photo||busy}>Enviar fotografia local</button>
    </form>
