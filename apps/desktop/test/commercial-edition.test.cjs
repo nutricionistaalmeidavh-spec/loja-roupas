@@ -63,7 +63,7 @@ test('empacotador e instalador comercial são separados da edição física',()=
  const nsi=readFileSync(path.join(repo,'infra/desktop/loja-roupas-comercial.nsi'),'utf8');
  assert.match(nsi,/Loja-de-Roupas-Comercial-Setup-x64\.exe/);
  assert.match(nsi,/Programs\\Loja de Roupas Comercial/);
- assert.match(nsi,/MUI_PAGE_LICENSE .*termos-de-uso\.txt/);
+ assert.doesNotMatch(nsi,/MUI_PAGE_LICENSE/);
  assert.doesNotMatch(nsi,/Loja de Roupas Fisica/);
  const main=readFileSync(path.join(repo,'apps/desktop/src/main.cjs'),'utf8');
  assert.match(main,/commercialEdition\?'loja-roupas-comercial':'loja-roupas-fisica'/);

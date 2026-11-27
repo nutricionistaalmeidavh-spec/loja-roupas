@@ -9,7 +9,7 @@
 1. Baixe `Loja-de-Roupas-Comercial-Setup-x64.exe` pelo link enviado na compra.
 2. Confira o código SHA-256 com o arquivo `SHA256SUMS` (opcional, recomendado).
 3. Dê dois cliques no instalador. Se o Windows mostrar "O Windows protegeu o computador", clique em **Mais informações → Executar assim mesmo** (aparece enquanto o instalador não tiver assinatura digital).
-4. Leia e aceite os Termos de Uso, escolha a pasta e conclua.
+4. Escolha a pasta e conclua.
 
 ## Ativar e criar a loja
 1. Abra **Loja de Roupas Comercial** pelo atalho da Área de Trabalho.
@@ -29,4 +29,4 @@ Faça backup pelo menu de gestão e copie o arquivo para um pendrive ou nuvem. O
 - **Código recusado**: confira o e-mail usado na compra. Se persistir, fale com o suporte informando o "identificador da instalação" mostrado na tela.
 - **Erro 0xC0000135**: o próprio programa oferece instalar o componente Microsoft VC++ incluído.
 
-Suporte: [E-MAIL] · [WHATSAPP] · [HORÁRIO].
+Suporte: responda ao e-mail de liberação da ArtiSys.

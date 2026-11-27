@@ -26,15 +26,12 @@ Sem certificado, o Windows SmartScreen mostra "editor desconhecido". Para assina
 2. Em *Settings → Secrets and variables → Actions*, crie `WINDOWS_SIGN_PFX_BASE64` (o .pfx em Base64) e `WINDOWS_SIGN_PASSWORD`.
 3. O workflow passa a assinar `electron.exe` e o instalador automaticamente. Sem os segredos, gera o instalador sem assinatura.
 
-## Documentos para o comprador (rascunhos — preencher campos entre colchetes)
-- [Termos de uso](termos-de-uso.md) — também exibidos no instalador (`termos-de-uso.txt`; regenerar o .txt ao editar o .md).
-- [Política de privacidade](politica-de-privacidade.md)
+## Documentos para o comprador
 - [Manual de instalação e ativação](manual-instalacao.md)
 - [Texto-base do anúncio](anuncio-mercado-livre.md)
 
 ## Antes da primeira venda (não resolvível só com código)
 - [ ] Decidir licença do código (AGPLv3 atual) e visibilidade do repositório.
-- [ ] Preencher razão social, CNPJ, contatos e prazos nos documentos e revisar com advogado.
 - [ ] Confirmar que a central de licenças está no ar e cadastrar o fluxo de emissão de códigos após cada venda.
 - [ ] Testar em um Windows real: instalação, ativação, impressora de cupom 58/80 mm, leitor de código de barras, backup e restauração.
 - [ ] Comprar e configurar o certificado de assinatura.
