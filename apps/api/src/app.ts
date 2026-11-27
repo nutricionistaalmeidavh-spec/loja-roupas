@@ -29,6 +29,8 @@ import {registerPhysicalInventory} from './physical-inventory.ts';
 import {registerRetailLedger} from './retail-ledger.ts';
 import {registerRetailAfterSales} from './retail-after-sales.ts';
 import {registerOperatorPin} from './operator-pin.ts';
+import {registerUsersAdmin} from './users-admin.ts';
+import {registerRefunds} from './refunds.ts';
 
 export function buildApp(db: Pool) {
   const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, trustProxy: false });
@@ -74,6 +76,8 @@ export function buildApp(db: Pool) {
   registerRetailLedger(app,db);
   registerRetailAfterSales(app,db);
   registerOperatorPin(app,db);
+  registerUsersAdmin(app,db);
+  registerRefunds(app,db);
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof DomainError)
       return reply.code(error.status).send({ code:error.code, message:error.message });

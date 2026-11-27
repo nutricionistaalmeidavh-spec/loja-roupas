@@ -54,3 +54,29 @@ export function dreTotals(input:{gross_cents:number;returns_cents:number;cost_ce
  return {net_revenue_cents,gross_profit_cents,operating_result_cents,
   complete:input.unknown_cost_lines===0,unknown_cost_lines:input.unknown_cost_lines};
 }
+/**
+ * Distribui o desconto da venda entre as linhas. Cada linha recebe seu desconto próprio
+ * e uma fatia do desconto geral proporcional ao valor que sobrou, pelo maior resto.
+ */
+export function allocateDiscounts(lines:ReadonlyArray<{gross_cents:number;discount_cents:number}>,orderDiscount:number){
+ cents(orderDiscount,'Desconto');
+ const net=lines.map(l=>{
+  cents(l.gross_cents,'Linha');cents(l.discount_cents,'Desconto da linha');
+  if(l.discount_cents>l.gross_cents)throw new DomainError(422,'DISCOUNT_TOO_HIGH','Desconto maior que o valor da peça');
+  return l.gross_cents-l.discount_cents;
+ });
+ const base=net.reduce((a,b)=>a+b,0);
+ if(orderDiscount>base)throw new DomainError(422,'DISCOUNT_TOO_HIGH','Desconto maior que o valor da venda');
+ const shares=net.map(n=>base?Math.floor(n*orderDiscount/base):0);
+ let rest=orderDiscount-shares.reduce((a,b)=>a+b,0);
+ const order=net.map((n,i)=>({i,frac:base?(n*orderDiscount)%base:0})).sort((a,b)=>b.frac-a.frac||a.i-b.i);
+ for(const item of order){if(!rest)break;if(shares[item.i]<net[item.i]){shares[item.i]++;rest--;}}
+ return lines.map((l,i)=>l.discount_cents+shares[i]);
+}
+/** Valor líquido a devolver por k unidades de uma linha já parcialmente devolvida. */
+export function lineRefundCents(lineTotal:number,quantity:number,alreadyReturned:number,k:number){
+ cents(lineTotal,'Linha');
+ if(!Number.isSafeInteger(quantity)||quantity<1||alreadyReturned<0||k<1||alreadyReturned+k>quantity)
+  throw new DomainError(409,'RETURN_QUANTITY','Quantidade indisponível para devolução');
+ return Math.floor(lineTotal*(alreadyReturned+k)/quantity)-Math.floor(lineTotal*alreadyReturned/quantity);
+}

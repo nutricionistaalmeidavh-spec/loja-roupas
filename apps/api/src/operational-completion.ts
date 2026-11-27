@@ -4,6 +4,7 @@ import {purchaseState,transition} from '@loja/domain/operations';
 import type {PurchaseReceiptRequest} from '@loja/domain/operations';
 import type { AuthContext } from './auth.ts';
 import { requirePermission } from './auth.ts';
+import { releasePickupReservation } from './reservations.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 const uuid = {type:'string',pattern:'^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'};
@@ -143,6 +144,7 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
         WHERE store_id=$1 AND id=$2 AND sale_id IS NULL AND cancelled_at IS NULL
           AND created_at>now()-interval '48 hours' RETURNING id`,[auth.storeId,id]);
       if(!result.rowCount)throw new DomainError(409,'ORDER_UNAVAILABLE','Pedido indisponível para cancelamento');
+      await releasePickupReservation(client,auth.storeId,id,'cancelled');
       await audit(client,auth,'pickup.cancel',id);
       return {id,cancelled:true};
     });

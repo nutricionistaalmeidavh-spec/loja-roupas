@@ -30,21 +30,21 @@ export function registerPhysicalManagement(app:FastifyInstance,db:Pool){
   const start=validMonth(request.query.month),store=request.authContext!.storeId;
   const result=await db.query<{gross_cents:string;refunds_cents:string;expenses_cents:string}>(`
    SELECT
-    (SELECT coalesce(sum(s.total_cents),0)::text FROM sales s
-     WHERE s.store_id=$1 AND s.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
-     AND s.created_at< (($2::date+interval '1 month') AT TIME ZONE st.timezone)
-     AND s.status<>'cancelled') AS gross_cents,
-    (SELECT coalesce(sum(r.amount_cents),0)::text FROM cash_sale_returns r
-     WHERE r.store_id=$1 AND r.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
-     AND r.created_at< (($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS refunds_cents,
+    (SELECT coalesce(sum(r.gross_cents),0)::text FROM retail_revenue_events r
+     WHERE r.store_id=$1 AND r.occurred_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+     AND r.occurred_at< (($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS gross_cents,
+    (SELECT coalesce(sum(r.refund_cents),0)::text FROM retail_revenue_events r
+     WHERE r.store_id=$1 AND r.occurred_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+     AND r.occurred_at< (($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS refunds_cents,
     (SELECT coalesce(sum(e.amount_cents),0)::text FROM operating_expenses e
-     WHERE e.store_id=$1 AND e.occurred_on >= $2::date AND e.occurred_on < ($2::date+interval '1 month')) AS expenses_cents
+     WHERE e.store_id=$1 AND e.voided_at IS NULL
+     AND e.occurred_on >= $2::date AND e.occurred_on < ($2::date+interval '1 month')) AS expenses_cents
    FROM stores st WHERE st.id=$1`,[store,start]);
   if(!result.rows.length)throw new DomainError(404,'STORE_NOT_FOUND','Loja não encontrada');
   return {month:request.query.month,...calculateOperatingResult({
    gross_cents:Number(result.rows[0].gross_cents),refunds_cents:Number(result.rows[0].refunds_cents),
    expenses_cents:Number(result.rows[0].expenses_cents)
-  }),note:'Resultado gerencial parcial, não equivale à DRE contábil ou emissão fiscal.'};
+  }),note:'Mesma base da DRE gerencial: vendas menos devoluções, trocas e estornos. Não inclui custo das peças.'};
  });
  app.get('/v1/management/expenses',async(request,reply)=>{
   if(requirePermission(request,reply,'finance.read'))return reply;

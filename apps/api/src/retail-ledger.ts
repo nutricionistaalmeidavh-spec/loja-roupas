@@ -278,9 +278,9 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    gross:string;cost:string;returned_cost:string;unknown:string;cash_returns:string;external_returns:string;
    expenses:string;tax:string;commissions:string;reversed_commissions:string;
   }>(`SELECT
-   (SELECT coalesce(sum(total_cents),0)::text FROM sales WHERE store_id=$1
-    AND created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
-    AND created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS gross,
+   (SELECT coalesce(sum(gross_cents),0)::text FROM retail_revenue_events WHERE store_id=$1
+    AND occurred_at>=($2::date::timestamp AT TIME ZONE st.timezone)
+    AND occurred_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS gross,
    (SELECT coalesce(sum(l.quantity*l.cost_unit_cents),0)::text FROM sale_lines l
     JOIN sales s ON s.id=l.sale_id AND s.store_id=l.store_id WHERE s.store_id=$1
     AND s.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
@@ -307,9 +307,9 @@ export function registerRetailLedger(app:FastifyInstance,db:Pool){
    (SELECT coalesce(sum(amount_cents),0)::text FROM retail_after_sales WHERE store_id=$1
     AND created_at>=($2::date::timestamp AT TIME ZONE st.timezone)
     AND created_at<(($2::date+interval '1 month') AT TIME ZONE st.timezone)) AS external_returns,
-   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1
+   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1 AND voided_at IS NULL
     AND lower(category)<>'tributos' AND occurred_on >= $2::date AND occurred_on<($2::date+interval '1 month')) AS expenses,
-   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1
+   (SELECT coalesce(sum(amount_cents),0)::text FROM operating_expenses WHERE store_id=$1 AND voided_at IS NULL
     AND lower(category)='tributos' AND occurred_on >= $2::date AND occurred_on<($2::date+interval '1 month')) AS tax,
    (SELECT coalesce(sum(e.amount_cents),0)::text FROM retail_commission_entries e
     WHERE e.store_id=$1 AND e.created_at>=($2::date::timestamp AT TIME ZONE st.timezone)

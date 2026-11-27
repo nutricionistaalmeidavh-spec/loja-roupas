@@ -3,7 +3,8 @@ import type {Pool,PoolClient} from 'pg';
 import {requirePermission} from './auth.ts';
 import type {AuthContext} from './auth.ts';
 import {DomainError,requireIdempotencyKey,withIdempotentTransaction} from './transactions.ts';
-import {exchangeBalance,commissionCents,loyaltyPoints} from './retail-rules.ts';
+import {exchangeBalance,commissionCents,lineRefundCents,loyaltyPoints} from './retail-rules.ts';
+import {returnToStock} from './refunds.ts';
 import {expectedCash} from './cash.ts';
 const uuid='^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$';
 type ReturnBody={sale_number:number;sale_line_id:string;quantity:number;condition:'resellable'|'quarantine';
@@ -12,9 +13,9 @@ type ExchangeBody={sale_number:number;sale_line_id:string;quantity:number;condit
  replacement_variant_id:string;replacement_quantity:number;cash_session_id:string;reason:string;
  customer_id?:string;payment?:{method:'cash'|'pix_manual'|'card_external';external_reference?:string;confirmed:boolean}};
 const oldLine=async(c:PoolClient,store:string,sale:number,lineId:string)=>{
- const q=await c.query<{sale_id:string;status:string;id:string;quantity:string;unit_price_cents:string;
+ const q=await c.query<{sale_id:string;status:string;id:string;quantity:string;unit_price_cents:string;line_total_cents:string;
   variant_id:string;customer_id:string|null;seller_id:string|null}>(`SELECT s.id::text AS sale_id,s.status,l.id::text,l.quantity::text,
-   l.unit_price_cents::text,l.variant_id::text,s.customer_id::text,s.seller_id::text
+   l.unit_price_cents::text,l.line_total_cents::text,l.variant_id::text,s.customer_id::text,s.seller_id::text
    FROM sales s JOIN sale_lines l ON l.sale_id=s.id AND l.store_id=s.store_id
    WHERE s.store_id=$1 AND s.sale_number=$2 AND l.id=$3 FOR UPDATE OF s,l`,[store,sale,lineId]);
  if(!q.rowCount)throw new DomainError(404,'RETURN_SALE_NOT_FOUND','Venda ou peça não encontrada');
@@ -46,16 +47,7 @@ async function finalizeOldSale(c:PoolClient,store:string,saleId:string){
  return returned===total?'returned':'partially_returned';
 }
 async function applyReturn(c:PoolClient,auth:AuthContext,operationId:string,oldVariant:string,qty:number,condition:string){
- if(condition!=='resellable')return;
- const b=await c.query<{revision:string}>(`UPDATE stock_balances
-  SET on_hand=on_hand+$3,revision=revision+1 WHERE store_id=$1 AND variant_id=$2
-  RETURNING revision::text`,[auth.storeId,oldVariant,qty]);
- if(!b.rowCount)throw new DomainError(409,'STOCK_MISSING','Saldo inexistente para peça devolvida');
- await c.query(`INSERT INTO stock_movements(store_id,variant_id,source_type,source_id,movement_kind,qty_delta)
-  VALUES($1,$2,'retail_after_sale',$3,'return',$4)`,[auth.storeId,oldVariant,operationId,qty]);
- await c.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
-  VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,
-  [auth.storeId,oldVariant,Number(b.rows[0].revision),JSON.stringify({operation_id:operationId})]);
+ await returnToStock(c,auth,oldVariant,qty,condition==='resellable'?'resellable':'quarantine','retail_after_sale',operationId);
 }
 async function reverseCommission(c:PoolClient,auth:AuthContext,saleId:string,operationId:string,amount:number){
  const row=await c.query<{seller_id:string;rate_bps:number}>(`SELECT seller_id::text,rate_bps
@@ -94,7 +86,7 @@ export function registerRetailAfterSales(app:FastifyInstance,db:Pool){
    requireIdempotencyKey(req.headers['idempotency-key']),b,async c=>{
     const {line,remaining}=await oldLine(c,auth.storeId,b.sale_number,b.sale_line_id);
     if(b.quantity>remaining)throw new DomainError(409,'RETURN_QUANTITY','Quantidade já devolvida ou indisponível');
-    const amount=Number(line.unit_price_cents)*b.quantity;
+    const amount=lineRefundCents(Number(line.line_total_cents),Number(line.quantity),Number(line.quantity)-remaining,b.quantity);
     if(!Number.isSafeInteger(amount)||amount<=0)throw new DomainError(422,'REFUND_AMOUNT','Valor de estorno inválido');
     const paid=await c.query<{paid:string}>(`SELECT coalesce(sum(amount_cents),0)::text AS paid
      FROM sale_payments WHERE store_id=$1 AND sale_id=$2 AND method=$3`,
@@ -139,6 +131,8 @@ export function registerRetailAfterSales(app:FastifyInstance,db:Pool){
     const cash=await c.query<{opened_by:string;closed_at:Date|null}>(`SELECT opened_by::text,closed_at
      FROM cash_sessions WHERE store_id=$1 AND id=$2 FOR UPDATE`,[auth.storeId,b.cash_session_id]);
     if(!cash.rowCount||cash.rows[0].closed_at)throw new DomainError(409,'CASH_CLOSED','Caixa não aberto para troca');
+    if(!auth.roles.includes('manager')&&cash.rows[0].opened_by!==auth.userId)
+     throw new DomainError(403,'CASH_OWNER','Este caixa pertence a outro operador');
     const {line,remaining}=await oldLine(c,auth.storeId,b.sale_number,b.sale_line_id);
     if(b.quantity>remaining)throw new DomainError(409,'RETURN_QUANTITY','Quantidade antiga indisponível para troca');
     if(b.replacement_variant_id===line.variant_id)
@@ -152,7 +146,7 @@ export function registerRetailAfterSales(app:FastifyInstance,db:Pool){
      FROM stock_balances WHERE store_id=$1 AND variant_id=$2 FOR UPDATE`,[auth.storeId,b.replacement_variant_id]);
     if(!current.rowCount||Number(current.rows[0].on_hand)-Number(current.rows[0].reserved)<b.replacement_quantity)
      throw new DomainError(409,'REPLACEMENT_STOCK','Peça de troca sem estoque disponível');
-    const returnedValue=Number(line.unit_price_cents)*b.quantity;
+    const returnedValue=lineRefundCents(Number(line.line_total_cents),Number(line.quantity),Number(line.quantity)-remaining,b.quantity);
     const outgoingValue=Number(replacement.rows[0].price_cents)*b.replacement_quantity;
     if(!Number.isSafeInteger(returnedValue)||!Number.isSafeInteger(outgoingValue)||outgoingValue<=0)
      throw new DomainError(422,'EXCHANGE_AMOUNT','Valores da troca inválidos');
@@ -230,16 +224,17 @@ export function registerRetailAfterSales(app:FastifyInstance,db:Pool){
       (store_id,sale_id,seller_id,base_cents,rate_bps,amount_cents)
       VALUES($1,$2,$3,$4,$5,$6)`,
       [auth.storeId,newSaleId,seller,outgoingValue,rate.rows[0].rate_bps,commissionCents(outgoingValue,rate.rows[0].rate_bps)]);
-    await reverseLoyalty(c,auth,line.sale_id,line.customer_id,returnedValue);
+    // Troca não estorna pontos: o valor original continua gasto na loja (nova peça ou crédito).
     await reverseCommission(c,auth,line.sale_id,opId,returnedValue);
     if(customerId){
      const opt=await c.query<{loyalty_opt_in:boolean}>(`SELECT loyalty_opt_in
        FROM retail_customers WHERE store_id=$1 AND id=$2`,[auth.storeId,customerId]);
-     if(opt.rows[0]?.loyalty_opt_in&&loyaltyPoints(outgoingValue)>0)
+     // Pontos só sobre a diferença paga; o valor coberto pela peça devolvida já rendeu pontos.
+     if(opt.rows[0]?.loyalty_opt_in&&loyaltyPoints(balance.extra_due_cents)>0)
       await c.query(`INSERT INTO retail_loyalty_events
        (store_id,customer_id,sale_id,points,kind,note,actor_id)
        VALUES($1,$2,$3,$4,'earn','Pontos da troca presencial',$5)`,
-       [auth.storeId,customerId,newSaleId,loyaltyPoints(outgoingValue),auth.userId]);
+       [auth.storeId,customerId,newSaleId,loyaltyPoints(balance.extra_due_cents),auth.userId]);
     }
     const oldStatus=await finalizeOldSale(c,auth.storeId,line.sale_id);
     await c.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)

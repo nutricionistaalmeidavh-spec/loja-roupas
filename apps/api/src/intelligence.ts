@@ -1,3 +1,4 @@
+import {returnedQuantitySql} from './refunds.ts';
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'pg';
 import { requirePermission } from './auth.ts';
@@ -31,13 +32,9 @@ const seriesSql=`WITH config AS (
   SELECT day::date FROM config,generate_series(
     date_trunc('month', today::timestamp)-interval '35 months',today::timestamp,interval '1 day') AS day
 ), movements AS (
-  SELECT (s.created_at AT TIME ZONE c.timezone)::date AS day,s.total_cents AS gross,0::bigint AS refunded
-  FROM sales s JOIN config c ON c.id=s.store_id
-  WHERE s.status<>'cancelled' AND s.created_at >= (date_trunc('month', c.today::timestamp)-interval '35 months') AT TIME ZONE c.timezone
-  UNION ALL
-  SELECT (r.created_at AT TIME ZONE c.timezone)::date,0,r.amount_cents
-  FROM cash_sale_returns r JOIN config c ON c.id=r.store_id
-  WHERE r.created_at >= (date_trunc('month', c.today::timestamp)-interval '35 months') AT TIME ZONE c.timezone
+  SELECT (r.occurred_at AT TIME ZONE c.timezone)::date AS day,r.gross_cents AS gross,r.refund_cents AS refunded
+  FROM retail_revenue_events r JOIN config c ON c.id=r.store_id
+  WHERE r.occurred_at >= (date_trunc('month', c.today::timestamp)-interval '35 months') AT TIME ZONE c.timezone
 )
 SELECT d.day::text AS period,coalesce(sum(m.gross),0)::text AS gross_cents,coalesce(sum(m.refunded),0)::text AS refunded_cents
 FROM calendar d LEFT JOIN movements m ON m.day=d.day GROUP BY d.day ORDER BY d.day`;
@@ -49,13 +46,14 @@ export function registerIntelligence(app:FastifyInstance,db:Pool) {
     const [settings,series,collections,suppliers]=await Promise.all([
       db.query<Preferences>('SELECT target_cents,low_stock_limit,widgets FROM commercial_preferences WHERE store_id=$1',[id]),
       db.query<Period>(seriesSql,[id]),
-      db.query(`SELECT coalesce(p.collection_name,'Sem coleção') AS name,sum(l.quantity)::text AS units,
-          sum(l.line_total_cents)::text AS revenue_cents
+      db.query(`SELECT coalesce(p.collection_name,'Sem coleção') AS name,
+          sum(l.quantity-${returnedQuantitySql})::text AS units,
+          sum(l.line_total_cents-floor(l.line_total_cents*${returnedQuantitySql}::numeric/l.quantity))::text AS revenue_cents
         FROM sales s JOIN sale_lines l ON l.sale_id=s.id AND l.store_id=s.store_id
         JOIN product_variants v ON v.id=l.variant_id AND v.store_id=l.store_id
         JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id
-        WHERE s.store_id=$1 AND s.status='confirmed' AND s.created_at>=now()-interval '90 days'
-        GROUP BY coalesce(p.collection_name,'Sem coleção') ORDER BY sum(l.line_total_cents) DESC,name LIMIT 20`,[id]),
+        WHERE s.store_id=$1 AND s.status<>'cancelled' AND s.created_at>=now()-interval '90 days'
+        GROUP BY coalesce(p.collection_name,'Sem coleção') ORDER BY 3 DESC,name LIMIT 20`,[id]),
       db.query(`WITH recent AS MATERIALIZED (
         SELECT p.*, (p.received_at AT TIME ZONE st.timezone)::date AS received_on
         FROM purchase_orders p JOIN stores st ON st.id=p.store_id

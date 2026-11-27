@@ -4,6 +4,7 @@ import { requirePermission } from './auth.ts';
 import type { AuthContext } from './auth.ts';
 import {holdState} from '@loja/domain/operations';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
+import { sweepExpiredReservationsTx } from './reservations.ts';
 
 const uuid = {type:'string', pattern:'^[a-fA-F0-9]{8}-(?:[a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$'};
 
@@ -21,33 +22,34 @@ async function recordChange(client:PoolClient, auth:AuthContext, holdId:string, 
 export function registerStockHolds(app:FastifyInstance, db:Pool) {
   app.get('/v1/stock/holds', async (request,reply) => {
     if (requirePermission(request,reply,'reservation.create')) return reply;
-    const holds = await db.query<{id:string;quantity:number;sku:string;created_at:Date;released_at:Date|null;stale:boolean}>(`SELECT h.id,h.quantity,v.sku,h.created_at,h.released_at,
-      h.created_at<=now()-interval '24 hours' AS stale FROM stock_holds h
+    await sweepExpiredReservationsTx(db,request.authContext!.storeId);
+    const holds = await db.query<{id:string;quantity:number;sku:string;created_at:Date;released_at:Date|null;stale:boolean;expires_at:Date;variant_id:string}>(`SELECT h.id,h.quantity,v.sku,h.created_at,h.released_at,
+      h.expires_at,h.variant_id::text,(h.created_at<=now()-interval '24 hours' OR h.expires_at<=now()+interval '2 hours') AS stale FROM stock_holds h
       JOIN product_variants v ON v.store_id=h.store_id AND v.id=h.variant_id
       WHERE h.store_id=$1 AND h.released_at IS NULL ORDER BY h.created_at,h.id LIMIT 100`,
       [request.authContext!.storeId]);
     return {holds:holds.rows.map(hold=>({id:hold.id,quantity:hold.quantity,sku:hold.sku,
-      created_at:hold.created_at,stale:hold.stale,
+      created_at:hold.created_at,expires_at:hold.expires_at,variant_id:hold.variant_id,stale:hold.stale,
       state:holdState({released_at:hold.released_at?.toISOString()??null})}))};
   });
 
-  app.post<{Body:{variant_id:string;quantity:number}}>('/v1/stock/holds', {
+  app.post<{Body:{variant_id:string;quantity:number;hours?:number}}>('/v1/stock/holds', {
     schema:{body:{type:'object',additionalProperties:false,required:['variant_id','quantity'],properties:{
-      variant_id:uuid,quantity:{type:'integer',minimum:1,maximum:999},
+      variant_id:uuid,quantity:{type:'integer',minimum:1,maximum:999},hours:{type:'integer',minimum:1,maximum:168},
     }}},
   }, async (request,reply) => {
     if (requirePermission(request,reply,'reservation.create')) return reply;
     const auth = request.authContext!;
     const key = requireIdempotencyKey(request.headers['idempotency-key']);
-    const {variant_id,quantity} = request.body;
+    const {variant_id,quantity} = request.body,hours=request.body.hours??24;
     const out = await withIdempotentTransaction(db,auth,'stock.hold',key,request.body,async client => {
       const balance = await client.query<{revision:string}>(`UPDATE stock_balances
         SET reserved=reserved+$3,revision=revision+1
         WHERE store_id=$1 AND variant_id=$2 AND on_hand-reserved >= $3 RETURNING revision`,
         [auth.storeId,variant_id,quantity]);
       if (!balance.rowCount) throw new DomainError(409,'INSUFFICIENT_STOCK','Estoque disponível insuficiente');
-      const result = await client.query<{id:string}>(`INSERT INTO stock_holds(store_id,variant_id,actor_id,quantity)
-        VALUES($1,$2,$3,$4) RETURNING id`, [auth.storeId,variant_id,auth.userId,quantity]);
+      const result = await client.query<{id:string;expires_at:Date}>(`INSERT INTO stock_holds(store_id,variant_id,actor_id,quantity,expires_at)
+        VALUES($1,$2,$3,$4,now()+make_interval(hours=>$5::int)) RETURNING id,expires_at`, [auth.storeId,variant_id,auth.userId,quantity,hours]);
       await recordChange(client,auth,result.rows[0].id,variant_id,balance.rows[0].revision,quantity);
       return result.rows[0];
     });
@@ -63,7 +65,7 @@ export function registerStockHolds(app:FastifyInstance, db:Pool) {
     const key = requireIdempotencyKey(request.headers['idempotency-key']);
     const out = await withIdempotentTransaction(db,auth,'stock.hold.release:'+id,key,{},async client => {
       const result = await client.query<{variant_id:string;quantity:number}>(`UPDATE stock_holds
-        SET released_at=now() WHERE store_id=$1 AND id=$2 AND released_at IS NULL RETURNING variant_id,quantity`,
+        SET released_at=now(),release_reason='manual' WHERE store_id=$1 AND id=$2 AND released_at IS NULL RETURNING variant_id,quantity`,
         [auth.storeId,id]);
       if (!result.rowCount) throw new DomainError(404,'HOLD_NOT_FOUND','Reserva ativa não encontrada');
       const {variant_id,quantity} = result.rows[0];
