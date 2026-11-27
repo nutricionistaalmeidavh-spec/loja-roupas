@@ -6,8 +6,8 @@ import type { Session, ProductPayload, StockReceiptPayload } from './api-client.
 import type { Product } from './catalog-model.ts';
 import { reaisToCents } from './catalog-model.ts';
 
-type VariantRow = { sku: string; color: string; size: string; price: string; barcode: string };
-const blankVariant = (): VariantRow => ({ sku: '', color: '', size: '', price: '', barcode: '' });
+type VariantRow = { sku: string; color: string; size: string; price: string; cost: string; barcode: string };
+const blankVariant = (): VariantRow => ({ sku: '', color: '', size: '', price: '', cost: '', barcode: '' });
 function mutationError(error: unknown): string {
   return error instanceof Error ? error.message : 'Não foi possível concluir a operação.';
 }
@@ -42,6 +42,7 @@ export function CreateProductForm({ session, onSaved, onLockChange }: { session:
         variants: rows.map(row => ({
           sku: row.sku.trim(), color: row.color.trim(), size: row.size.trim(),
           price_cents: reaisToCents(row.price), ...(row.barcode.trim() ? {barcode:row.barcode.trim()} : {}),
+          ...(row.cost.trim() ? {cost_cents:reaisToCents(row.cost)} : {}),
         })),
       };
       if (!payload.name || !payload.category || payload.variants.some(v => !v.sku || !v.color || !v.size))
@@ -85,6 +86,7 @@ export function CreateProductForm({ session, onSaved, onLockChange }: { session:
         <label>Cor<input required maxLength={100} placeholder="Azul" value={row.color} onChange={e=>updateRow(index,'color',e.target.value)}/></label>
         <label>Tamanho<input required maxLength={32} placeholder="M" value={row.size} onChange={e=>updateRow(index,'size',e.target.value)}/></label>
         <label>Preço (R$)<input required inputMode="decimal" placeholder="149,90" value={row.price} onChange={e=>updateRow(index,'price',e.target.value)}/></label>
+        <label>Custo (R$, opcional)<input inputMode="decimal" placeholder="60,00" value={row.cost} onChange={e=>updateRow(index,'cost',e.target.value)}/></label>
         <label>Código de barras (opcional)<input maxLength={128} placeholder="EAN" value={row.barcode} onChange={e=>updateRow(index,'barcode',e.target.value)}/></label>
       </div>
       {rows.length>1&&<button type="button" className="light-button" onClick={()=>setRows(x=>x.filter((_,i)=>i!==index))}>Remover variante</button>}
@@ -100,6 +102,7 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
   const [variantId, setVariantId] = useState(initialVariantId);
   const [quantity, setQuantity] = useState('1');
   const [note, setNote] = useState('');
+  const [cost, setCost] = useState('');
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
@@ -118,8 +121,10 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
       return;
     }
     if(note.trim().length<8){setError('Justifique a entrada direta com pelo menos 8 caracteres.');return;}
+    let unitCost:number|undefined;
+    try{unitCost=cost.trim()?reaisToCents(cost):undefined;}catch(err){setError(mutationError(err));return;}
     const payload:StockReceiptPayload={variant_id:variantId,reference_id:referenceId,quantity:amount,
-      ...(note.trim()?{note:note.trim()}:{})};
+      ...(note.trim()?{note:note.trim()}:{}),...(unitCost!==undefined?{unit_cost_cents:unitCost}:{})};
     const body=JSON.stringify(payload);
     if (pending && pending.body!==body && uncertain) {
       setError('Há uma entrada pendente. Repita sem alterar os dados.');
@@ -132,7 +137,7 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
       const result=await receiveStock(session,payload,key);
       setNotice(`Entrada registrada. Novo saldo em mãos: ${result.on_hand} unidades.`);
       setPending(null);setUncertain(false);setReferenceId(requestId());
-      setNote('');setQuantity('1');onSaved();
+      setNote('');setCost('');setQuantity('1');onSaved();
     } catch(err) {
       setError(mutationError(err));
       if(uncertainResult(err)) setUncertain(true);
@@ -147,6 +152,7 @@ export function ReceiveStockForm({ session, products, onSaved, initialVariantId 
         {variants.map(v=><option key={v.id} value={v.id}>{v.label}</option>)}
       </select></label>
       <label>Quantidade recebida<input required type="number" min="1" step="1" value={quantity} disabled={busy||uncertain} onChange={e=>setQuantity(e.target.value)}/></label>
+      <label>Custo por peça (R$, opcional)<input inputMode="decimal" placeholder="Atualiza o custo da variante" value={cost} disabled={busy||uncertain} onChange={e=>setCost(e.target.value)}/></label>
     </div>
     <label>Justificativa obrigatória<input required minLength={8} maxLength={250} value={note} disabled={busy||uncertain} placeholder="Descreva a origem e por que a entrada é excepcional" onChange={e=>setNote(e.target.value)}/></label>
     <p className="muted small">Referência da entrada: {referenceId}. Será usada para impedir duplicidade após reenvio.</p>

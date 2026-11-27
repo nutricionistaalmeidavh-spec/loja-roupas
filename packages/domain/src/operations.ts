@@ -93,7 +93,7 @@ export type CashReturnRequest={
 };
 export type SaleReturnLine={
   id:string;variant_id:string;product_name:string;sku:string;color:string;size:string;
-  quantity:number;unit_price_cents:number;returned_quantity:number;available_to_return:number;
+  quantity:number;unit_price_cents:number;line_total_cents:number;returned_quantity:number;available_to_return:number;
 };
 export type SaleReturnLookup={
   id:string;sale_number:string;status:SaleReturnState;total_cents:string;cash_only:boolean;

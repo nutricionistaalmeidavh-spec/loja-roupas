@@ -49,7 +49,7 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
  });
  app.patch<{Params:{id:string};Body:PricePatch}>('/v1/catalog/variants/:id',{
   schema:{params:uuidParams,body:{type:'object',additionalProperties:false,required:['price_cents','expected_revision'],
-   properties:{price_cents:{type:'integer',minimum:0},expected_revision:{type:'integer',minimum:1}}}}
+   properties:{price_cents:{type:'integer',minimum:1},expected_revision:{type:'integer',minimum:1}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'pricing.write'))return reply;
   const auth=request.authContext!,key=keyOf(request.headers['idempotency-key']);
@@ -174,13 +174,14 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
   if(request.headers['if-none-match']===etag)return reply.code(304).send();
   return reply.type(row.rows[0].mime).send(row.rows[0].bytes);
  });
- app.post<{Params:{id:string};Body:{sku:string;color:string;size:string;price_cents:number;barcode?:string|null;expected_product_revision:number}}>(
+ app.post<{Params:{id:string};Body:{sku:string;color:string;size:string;price_cents:number;barcode?:string|null;expected_product_revision:number;cost_cents?:number|null}}>(
  '/v1/catalog/products/:id/variants',{
   schema:{params:uuidParams,body:{type:'object',additionalProperties:false,
    required:['sku','color','size','price_cents','expected_product_revision'],properties:{
     sku:{type:'string',minLength:1,maxLength:64},color:{type:'string',minLength:1,maxLength:100},
-    size:{type:'string',minLength:1,maxLength:32},price_cents:{type:'integer',minimum:0},
-    barcode:{type:['string','null'],maxLength:128},expected_product_revision:{type:'integer',minimum:1}
+    size:{type:'string',minLength:1,maxLength:32},price_cents:{type:'integer',minimum:1},
+    barcode:{type:['string','null'],maxLength:128},expected_product_revision:{type:'integer',minimum:1},
+    cost_cents:{type:['integer','null'],minimum:0,maximum:9999999999}
    }}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'catalog.write'))return reply;
@@ -188,7 +189,7 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
   const sku=body.sku.trim().toUpperCase(),color=body.color.trim(),size=body.size.trim();
   if(!/^[A-Z0-9_-]{1,64}$/.test(sku)||!color||!size)
    throw new DomainError(422,'INVALID_VARIANT','SKU, cor ou tamanho inválidos');
-  const input={sku,color,size,price_cents:body.price_cents,
+  const input={sku,color,size,price_cents:body.price_cents,cost_cents:body.cost_cents??null,
    barcode:body.barcode?.trim()||null,expected_product_revision:body.expected_product_revision};
   const key=requireIdempotencyKey(request.headers['idempotency-key']);
   const out=await withIdempotentTransaction(db,auth,'catalog.variant.add:'+request.params.id,key,input,async client=>{
@@ -197,9 +198,9 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
      [request.params.id,auth.storeId,input.expected_product_revision]);
    if(!product.rowCount)throw new DomainError(409,'REVISION_CONFLICT','Produto alterado por outro operador');
    const variant=await client.query<{id:string}>(`INSERT INTO product_variants
-    (store_id,product_id,sku,barcode,color,size,price_cents)
-    VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,
-    [auth.storeId,request.params.id,sku,input.barcode,color,size,input.price_cents]);
+    (store_id,product_id,sku,barcode,color,size,price_cents,cost_cents)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id::text`,
+    [auth.storeId,request.params.id,sku,input.barcode,color,size,input.price_cents,input.cost_cents]);
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
     VALUES($1,$2,'catalog.variant.add',$3,$4::jsonb)`,
     [auth.storeId,auth.userId,variant.rows[0].id,JSON.stringify({product_id:request.params.id,sku})]);
@@ -241,6 +242,24 @@ export function registerCatalogAdmin(app:FastifyInstance,db:Pool) {
     VALUES($1,'catalog.variant.updated.v1',$2,$3,$4::jsonb)`,
     [auth.storeId,request.params.id,rev,JSON.stringify({revision:rev})]);
    return {id:request.params.id,revision:rev,...normalized};
+  });
+  return out.result;
+ });
+
+ app.put<{Params:{id:string};Body:{cost_cents:number|null}}>('/v1/catalog/variants/:id/cost',{
+  schema:{params:uuidParams,body:{type:'object',additionalProperties:false,required:['cost_cents'],
+   properties:{cost_cents:{type:['integer','null'],minimum:0,maximum:9999999999}}}}
+ },async(request,reply)=>{
+  if(requirePermission(request,reply,'catalog.write'))return reply;
+  const auth=request.authContext!,body=request.body;
+  const out=await withIdempotentTransaction(db,auth,'catalog.variant.cost:'+request.params.id,
+   requireIdempotencyKey(request.headers['idempotency-key']),body,async client=>{
+   const q=await client.query('UPDATE product_variants SET cost_cents=$3 WHERE id=$1 AND store_id=$2 RETURNING id',
+    [request.params.id,auth.storeId,body.cost_cents]);
+   if(!q.rowCount)throw new DomainError(404,'VARIANT_NOT_FOUND','Variante não encontrada');
+   await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
+    VALUES($1,$2,'catalog.variant.cost',$3,$4::jsonb)`,[auth.storeId,auth.userId,request.params.id,JSON.stringify(body)]);
+   return {id:request.params.id,cost_cents:body.cost_cents};
   });
   return out.result;
  });

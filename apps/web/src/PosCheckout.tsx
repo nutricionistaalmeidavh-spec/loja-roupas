@@ -42,6 +42,9 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   const d=new Date();return new Date(Date.UTC(d.getFullYear(),d.getMonth()+1,Math.min(28,d.getDate()))).toISOString().slice(0,10);
  });
  const [refresh,setRefresh]=useState(0);
+ const [discountText,setDiscountText]=useState(''),[discountMode,setDiscountMode]=useState<'reais'|'percent'>('reais');
+ const [discount,setDiscount]=useState(0),[discountReason,setDiscountReason]=useState('');
+ const [customerQuery,setCustomerQuery]=useState('');
  const [busy,setBusy]=useState(false);
  const [pending,setPending]=useState<{key:string;body:string}|null>(null);
  const [uncertain,setUncertain]=useState(false);
@@ -74,24 +77,51 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
 
  useEffect(()=>{
   const ctrl=new AbortController();
-  void Promise.all([
-   jsonRequest<{items:CheckoutCustomer[]}>('/v1/management/customers',{headers:headers(session),signal:ctrl.signal},fetch),
-   jsonRequest<{items:Array<CheckoutOperator&{pin_ready:boolean}>}>('/v1/auth/operators',{headers:headers(session),signal:ctrl.signal},fetch)
-  ]).then(([c,s])=>{if(!ctrl.signal.aborted){setCustomers(c.items);setOperators(s.items);}})
-   .catch(()=>{if(!ctrl.signal.aborted)setError('Não foi possível listar clientes e vendedores. A venda sem vínculo permanece disponível.');});
+  void jsonRequest<{items:Array<CheckoutOperator&{pin_ready:boolean}>}>('/v1/auth/operators',{headers:headers(session),signal:ctrl.signal},fetch)
+   .then(s=>{if(!ctrl.signal.aborted)setOperators(s.items);})
+   .catch(()=>{if(!ctrl.signal.aborted)setError('Não foi possível listar os vendedores. A venda sem vínculo permanece disponível.');});
   return ()=>ctrl.abort();
  },[session]);
  useEffect(()=>{
+  // Busca de cliente por nome, telefone ou e-mail, sem carregar a base inteira.
+  const ctrl=new AbortController();
+  const term=customerQuery.trim();
+  const timer=setTimeout(()=>{
+   const query=new URLSearchParams({limit:'20',...(term?{q:term}:{})});
+   void jsonRequest<{items:CheckoutCustomer[]}>('/v1/management/customers?'+query,{headers:headers(session),signal:ctrl.signal},fetch)
+    .then(c=>{if(!ctrl.signal.aborted)setCustomers(current=>{
+     const chosen=current.find(x=>x.id===customerId);
+     return chosen&&!c.items.some(x=>x.id===chosen.id)?[chosen,...c.items]:c.items;});})
+    .catch(()=>{});
+  },term?300:0);
+  return ()=>{clearTimeout(timer);ctrl.abort();};
+ },[session,customerQuery]);
+ useEffect(()=>{
   let cancelled=false;
   setLoading(true);setError('');
-  void quoteSale(session,pickup?.lines ?? draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity}))).then(result=>{
+  void quoteSale(session,pickup?.lines ?? draft.map(x=>({variant_id:x.variant.id,quantity:x.quantity})),fetch,discount,pickup?.id).then(result=>{
    if(cancelled)return;
    setQuote(result);setTenders([newTender('cash',editMoney(result.total_cents))]);
    setPending(null);setUncertain(false);
   }).catch(err=>{if(!cancelled){setQuote(null);setError(err instanceof Error?err.message:'Não foi possível cotar a venda');}})
    .finally(()=>{if(!cancelled)setLoading(false);});
   return ()=>{cancelled=true;};
- },[session,draft,pickup,refresh]);
+ },[session,draft,pickup,refresh,discount]);
+ function applyDiscount(){
+  setError('');
+  if(!discountText.trim()){setDiscount(0);return;}
+  try{
+   const gross=quote?.subtotal_cents??quote?.total_cents??0;
+   let cents:number;
+   if(discountMode==='percent'){
+    const pct=Number(discountText.trim().replace(',','.'));
+    if(!Number.isFinite(pct)||pct<0||pct>=100)throw new Error('Percentual de desconto inválido.');
+    cents=Math.round(gross*pct/100);
+   }else cents=reaisToCents(discountText);
+   if(cents>=gross)throw new Error('O desconto precisa ser menor que o total da venda.');
+   setDiscount(cents);
+  }catch(e){setError(e instanceof Error?e.message:'Desconto inválido');}
+ }
  const tendered=useMemo(()=>{
   try{return tenders.reduce((sum,x)=>sum+reaisToCents(x.amount),0);}
   catch{return 0;}
@@ -132,7 +162,9 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
   let creditInstallments:Array<{amount_cents:number;due_on:string}>|undefined;
   try{if(creditAmount>0)creditInstallments=splitInstallments(creditAmount,creditParts,creditDue);}
   catch(e){setError(e instanceof Error?e.message:'Parcelas inválidas');return;}
+  if(discount>0&&discountReason.trim().length<3){setError('Informe o motivo do desconto.');return;}
   const extras={...(customerId?{customer_id:customerId}:{}),...(sellerId?{seller_id:sellerId}:{}),
+   ...(discount>0?{discount_cents:discount,discount_reason:discountReason.trim()}:{}),
    ...(creditInstallments?{credit_installments:creditInstallments}:{})};
   const body=JSON.stringify({cashSessionId,lines,payments,pickupOrderId:pickup?.id,...extras});
   if(pending&&pending.body!==body){
@@ -164,11 +196,32 @@ export function CheckoutDrawer({session,cashSessionId,draft,pickup,onClose,onCon
       {quote.lines.map(l=><div className="total-row" key={l.variant_id}>
         <span>{l.quantity} × {l.product_name} · {l.sku}</span><strong>{brl(l.price_cents*l.quantity)}</strong>
       </div>)}
+      {(quote.discount_cents??0)>0&&<>
+       <div className="total-row"><span>Subtotal</span><span>{brl(quote.subtotal_cents??quote.total_cents)}</span></div>
+       <div className="total-row"><span>Desconto</span><span>− {brl(quote.discount_cents??0)}</span></div></>}
       <div className="total-row"><strong>Total</strong><strong>{brl(quote.total_cents)}</strong></div>
       {!quote.can_commit&&<p role="alert" className="error">Estoque insuficiente. Ajuste os itens antes de continuar.</p>}
     </div>
+    <fieldset className="editor-block" disabled={busy||uncertain}><legend>Desconto na venda</legend>
+      <div className="fields-two">
+       <label>Desconto
+        <span style={{display:'flex',gap:'0.5rem'}}>
+         <input aria-label="Valor do desconto" inputMode="decimal" placeholder={discountMode==='percent'?'10':'20,00'}
+          value={discountText} onChange={e=>setDiscountText(e.target.value)}/>
+         <select aria-label="Tipo de desconto" value={discountMode} onChange={e=>setDiscountMode(e.target.value as 'reais'|'percent')}>
+          <option value="reais">R$</option><option value="percent">%</option></select>
+         <button type="button" className="light-button" onClick={applyDiscount}>Aplicar</button>
+        </span></label>
+       <label>Motivo do desconto
+        <input maxLength={160} value={discountReason} placeholder="Ex.: cliente fiel, peça com detalhe" onChange={e=>setDiscountReason(e.target.value)}/></label>
+      </div>
+      {quote.discount_requires_manager&&<p role="alert" className="error">Este desconto passa do limite do caixa ({((quote.cashier_discount_limit_bps??0)/100).toLocaleString('pt-BR')}%). Só um gestor pode confirmar.</p>}
+      {discount>0&&<button type="button" className="text-btn" onClick={()=>{setDiscount(0);setDiscountText('');}}>Remover desconto</button>}
+    </fieldset>
     <div className="editor-block"><h3>Cliente e vendedor</h3>
       <div className="fields-two">
+       <label>Buscar cliente (nome, telefone ou e-mail)
+        <input aria-label="Buscar cliente" value={customerQuery} placeholder="Digite para buscar" onChange={e=>setCustomerQuery(e.target.value)}/></label>
        <label>Cliente para fidelidade ou crediário
         <select aria-label="Cliente da venda" value={customerId} onChange={e=>setCustomerId(e.target.value)}>
          <option value="">Venda sem cliente vinculado</option>

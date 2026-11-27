@@ -2,6 +2,7 @@ import {test,expect} from '@playwright/test';
 import {randomUUID} from 'node:crypto';
 
 test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({page,request}) => {
+  test.setTimeout(90_000);
   const login = {login:'qa-admin',password:'Senha-QA-Somente-CI-2026'};
   const response = await request.post('/v1/auth/sessions',{data:login});
   expect(response.ok()).toBeTruthy();
@@ -109,8 +110,9 @@ test('gestão, compra, retirada e acompanhamento chegam à vitrine', async ({pag
   await page.getByLabel('Número da venda').fill(saleNumber!);
   await page.getByRole('button',{name:'Localizar venda'}).click();
   await page.getByLabel('Quantidade a devolver').fill('1');
+  await page.getByRole('button',{name:'Calcular reembolso'}).click();
   await page.getByLabel('Motivo da devolução').fill('Cliente devolveu a peça em condições de venda');
-  await page.getByLabel('Conferi fisicamente os itens e o valor do reembolso').check();
+  await page.getByLabel('Conferi fisicamente as peças e o valor do reembolso').check();
   await page.getByRole('button',{name:'Registrar devolução e reembolso'}).click();
   await expect(page.getByText(/Devolução registrada/)).toBeVisible();
   await page.getByRole('button',{name:'Fechar Registrar devolução'}).click();

@@ -116,8 +116,11 @@ export function registerPhysicalInventory(app:FastifyInstance,db:Pool){
     const delta=reconcileCount({expected:Number(line.expected_on_hand),current:Number(bal.rows[0].on_hand),
      reserved:Number(bal.rows[0].reserved),counted:Number(line.counted_on_hand)});
     if(delta){
-     await client.query(`UPDATE stock_balances SET on_hand=$3,revision=revision+1
-      WHERE store_id=$1 AND variant_id=$2`,[auth.storeId,line.variant_id,Number(line.counted_on_hand)]);
+     const updated=await client.query<{revision:string}>(`UPDATE stock_balances SET on_hand=$3,revision=revision+1
+      WHERE store_id=$1 AND variant_id=$2 RETURNING revision::text`,[auth.storeId,line.variant_id,Number(line.counted_on_hand)]);
+     await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
+      VALUES($1,'inventory.stock.changed.v1',$2,$3,$4::jsonb)`,[auth.storeId,line.variant_id,
+      Number(updated.rows[0].revision),JSON.stringify({inventory_count_id:id,delta})]);
      await client.query(`INSERT INTO stock_movements(store_id,variant_id,source_type,source_id,movement_kind,qty_delta)
       VALUES($1,$2,'inventory_count',$3,'adjustment',$4)`,[auth.storeId,line.variant_id,id,delta]);
      adjusted++;if(delta<0)missing-=delta;else extra+=delta;

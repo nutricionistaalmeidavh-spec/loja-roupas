@@ -4,6 +4,7 @@ import {purchaseState,transition} from '@loja/domain/operations';
 import type {PurchaseReceiptRequest} from '@loja/domain/operations';
 import type { AuthContext } from './auth.ts';
 import { requirePermission } from './auth.ts';
+import { releasePickupReservation } from './reservations.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
 
 const uuid = {type:'string',pattern:'^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'};
@@ -63,6 +64,51 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
         [auth.storeId,body.supplier_id,body.variant_id,body.quantity,body.unit_cost_cents,body.promised_on??null]);
       await audit(client,auth,'purchase.create',result.rows[0].id);
       return result.rows[0];
+    });
+    return reply.code(201).send(out.result);
+  });
+
+  type Batch={supplier_id:string;promised_on?:string;lines:Array<{variant_id:string;quantity:number;unit_cost_cents:number}>;
+    payable?:{due_on:string}};
+  // Compra de uma grade inteira de uma vez, com conta a pagar opcional para o fornecedor.
+  app.post<{Body:Batch}>('/v1/management/purchases/batch',{
+    schema:{body:{type:'object',additionalProperties:false,required:['supplier_id','lines'],properties:{
+      supplier_id:uuid,promised_on:{type:'string',format:'date'},
+      lines:{type:'array',minItems:1,maxItems:200,items:{type:'object',additionalProperties:false,
+        required:['variant_id','quantity','unit_cost_cents'],properties:{variant_id:uuid,
+          quantity:{type:'integer',minimum:1,maximum:100000},unit_cost_cents:{type:'integer',minimum:0,maximum:100000000}}}},
+      payable:{type:'object',additionalProperties:false,required:['due_on'],properties:{due_on:{type:'string',format:'date'}}}}}},
+  },async(request,reply)=>{
+    if(requirePermission(request,reply,'purchase.write'))return reply;
+    const auth=request.authContext!,body=request.body;
+    if(new Set(body.lines.map(l=>l.variant_id.toLowerCase())).size!==body.lines.length)
+      throw new DomainError(422,'DUPLICATE_VARIANT','Junte as quantidades da mesma variante');
+    if(body.payable&&!auth.roles.includes('manager')&&!auth.roles.includes('buyer'))
+      throw new DomainError(403,'FORBIDDEN','Sem permissão para gerar conta a pagar');
+    const out=await withIdempotentTransaction(db,auth,'purchase.batch',key(request),body,async client=>{
+      const supplier=await client.query<{name:string}>('SELECT name FROM suppliers WHERE store_id=$1 AND id=$2',[auth.storeId,body.supplier_id]);
+      if(!supplier.rowCount)throw new DomainError(404,'SUPPLIER_NOT_FOUND','Fornecedor não encontrado');
+      const batch=await client.query<{id:string}>('SELECT gen_random_uuid()::text AS id');
+      const batchId=batch.rows[0].id,ids:string[]=[];let total=0;
+      for(const line of body.lines){
+        const r=await client.query<{id:string}>(`INSERT INTO purchase_orders
+          (store_id,supplier_id,variant_id,quantity,unit_cost_cents,promised_on,batch_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id::text`,
+          [auth.storeId,body.supplier_id,line.variant_id,line.quantity,line.unit_cost_cents,body.promised_on??null,batchId]);
+        ids.push(r.rows[0].id);total+=line.quantity*line.unit_cost_cents;
+      }
+      if(!Number.isSafeInteger(total))throw new DomainError(422,'TOTAL_OVERFLOW','Total da compra fora do limite');
+      let accountId:string|null=null;
+      if(body.payable&&total>0){
+        // Mercadoria não é despesa do mês: o custo entra no resultado quando a peça é vendida.
+        const account=await client.query<{id:string}>(`INSERT INTO retail_accounts
+          (store_id,kind,supplier_id,source_type,source_id,description,amount_cents,due_on,created_by)
+          VALUES($1,'payable',$2,'purchase',$3,$4,$5,$6,$7) RETURNING id::text`,
+          [auth.storeId,body.supplier_id,batchId,('Compra de mercadoria · '+supplier.rows[0].name).slice(0,240),total,body.payable.due_on,auth.userId]);
+        accountId=account.rows[0].id;
+      }
+      await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail) VALUES($1,$2,'purchase.batch',$3,$4::jsonb)`,
+        [auth.storeId,auth.userId,batchId,JSON.stringify({orders:ids,total_cents:total,payable_id:accountId})]);
+      return {batch_id:batchId,order_ids:ids,total_cents:total,payable_id:accountId};
     });
     return reply.code(201).send(out.result);
   });
@@ -143,6 +189,7 @@ export function registerOperationalCompletion(app:FastifyInstance,db:Pool) {
         WHERE store_id=$1 AND id=$2 AND sale_id IS NULL AND cancelled_at IS NULL
           AND created_at>now()-interval '48 hours' RETURNING id`,[auth.storeId,id]);
       if(!result.rowCount)throw new DomainError(409,'ORDER_UNAVAILABLE','Pedido indisponível para cancelamento');
+      await releasePickupReservation(client,auth.storeId,id,'cancelled');
       await audit(client,auth,'pickup.cancel',id);
       return {id,cancelled:true};
     });

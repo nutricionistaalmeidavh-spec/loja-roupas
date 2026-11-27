@@ -25,6 +25,59 @@ function canUseCash(auth:AuthContext,openUser:string){
   throw new DomainError(403,'CASH_OWNER','Este caixa pertence a outro operador');
 }
 export function registerCash(app:FastifyInstance,db:Pool){
+ app.get<{Querystring:{limit?:number;before?:string}}>('/v1/cash-sessions',{
+  schema:{querystring:{type:'object',additionalProperties:false,properties:{
+   limit:{type:'integer',minimum:1,maximum:200},before:{type:'string',format:'date-time'}}}}
+ },async(request,reply)=>{
+  if(requirePermission(request,reply,'finance.read'))return reply;
+  const q=await db.query(`SELECT c.id::text,c.terminal_code,c.opened_at,c.closed_at,c.opening_cents::text,
+    c.expected_cash_cents::text,c.counted_cash_cents::text,c.difference_cents::text,
+    coalesce(o.display_name,o.login) AS opened_by,coalesce(x.display_name,x.login) AS closed_by,
+    (SELECT count(*) FROM sales s WHERE s.store_id=c.store_id AND s.cash_session_id=c.id)::int AS sale_count,
+    (SELECT coalesce(sum(total_cents),0)::text FROM sales s WHERE s.store_id=c.store_id AND s.cash_session_id=c.id) AS sales_cents,
+    (SELECT a.detail->>'reason' FROM audit_logs a WHERE a.store_id=c.store_id AND a.aggregate_id=c.id
+      AND a.action='cash.close' ORDER BY a.occurred_at DESC LIMIT 1) AS close_reason
+   FROM cash_sessions c JOIN users o ON o.id=c.opened_by LEFT JOIN users x ON x.id=c.closed_by
+   WHERE c.store_id=$1 AND ($2::timestamptz IS NULL OR c.opened_at<$2)
+   ORDER BY c.opened_at DESC,c.id DESC LIMIT $3`,
+   [request.authContext!.storeId,request.query.before??null,request.query.limit??50]);
+  return {items:q.rows};
+ });
+ app.get<{Params:{id:string}}>('/v1/cash-sessions/:id/summary',{
+  schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uid}}}}
+ },async(request,reply)=>{
+  if(requirePermission(request,reply,'cash.manage'))return reply;
+  const auth=request.authContext!,id=request.params.id;
+  const cash=await db.query<CashRow&{expected_cash_cents:string|null;counted_cash_cents:string|null;difference_cents:string|null}>(
+   'SELECT * FROM cash_sessions WHERE id=$1 AND store_id=$2',[id,auth.storeId]);
+  if(!cash.rowCount)throw new DomainError(404,'CASH_NOT_FOUND','Caixa não encontrado');
+  const row=cash.rows[0];
+  if(!auth.roles.includes('manager')&&!auth.roles.includes('technician'))canUseCash(auth,row.opened_by);
+  const payments=await db.query<{method:string;amount_cents:string;count:string}>(`SELECT sp.method,
+    sum(sp.amount_cents)::text AS amount_cents,count(DISTINCT sp.sale_id)::text AS count
+   FROM sale_payments sp JOIN sales s ON s.id=sp.sale_id AND s.store_id=sp.store_id
+   WHERE s.store_id=$1 AND s.cash_session_id=$2 GROUP BY sp.method ORDER BY sp.method`,[auth.storeId,id]);
+  const sales=await db.query<{count:string;total:string;discount:string;change:string}>(`SELECT count(*)::text AS count,
+   coalesce(sum(total_cents),0)::text AS total,coalesce(sum(discount_cents),0)::text AS discount,
+   coalesce(sum(change_cents),0)::text AS change FROM sales WHERE store_id=$1 AND cash_session_id=$2`,[auth.storeId,id]);
+  const movements=await db.query<{kind:string;amount_cents:string;count:string}>(`SELECT kind,sum(amount_cents)::text AS amount_cents,
+   count(*)::text AS count FROM cash_movements WHERE store_id=$1 AND cash_session_id=$2 GROUP BY kind ORDER BY kind`,[auth.storeId,id]);
+  const refunds=await db.query<{method:string;amount_cents:string}>(`SELECT p.method,sum(p.amount_cents)::text AS amount_cents
+   FROM retail_refund_parts p JOIN retail_after_sales a ON a.id=p.operation_id AND a.store_id=p.store_id
+   WHERE a.store_id=$1 AND a.cash_session_id=$2 GROUP BY p.method
+   UNION ALL SELECT 'cash',coalesce(sum(amount_cents),0)::text FROM cash_sale_returns WHERE store_id=$1 AND cash_session_id=$2
+   HAVING count(*)>0`,[auth.storeId,id]);
+  const expected=row.closed_at?Number(row.expected_cash_cents):await expectedCash(db,auth.storeId,id,Number(row.opening_cents));
+  return {id,terminal_code:row.terminal_code,opened_at:row.opened_at,closed_at:row.closed_at,
+   opening_cents:Number(row.opening_cents),expected_cash_cents:expected,
+   counted_cash_cents:row.counted_cash_cents===null?null:Number(row.counted_cash_cents),
+   difference_cents:row.difference_cents===null?null:Number(row.difference_cents),
+   sales:{count:Number(sales.rows[0].count),total_cents:Number(sales.rows[0].total),
+    discount_cents:Number(sales.rows[0].discount),change_cents:Number(sales.rows[0].change)},
+   payments:payments.rows.map(p=>({method:p.method,amount_cents:Number(p.amount_cents),sales:Number(p.count)})),
+   movements:movements.rows.map(m=>({kind:m.kind,amount_cents:Number(m.amount_cents),count:Number(m.count)})),
+   refunds:refunds.rows.map(r=>({method:r.method,amount_cents:Number(r.amount_cents)}))};
+ });
  app.post<{Body:{terminal_code:string;opening_cents:number}}>('/v1/cash-sessions',{
   schema:{body:{type:'object',additionalProperties:false,required:['terminal_code','opening_cents'],properties:{
    terminal_code:{type:'string',pattern:'^[A-Za-z0-9-]{3,32}$'},opening_cents:{type:'integer',minimum:0}

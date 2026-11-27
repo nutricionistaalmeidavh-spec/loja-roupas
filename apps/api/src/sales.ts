@@ -4,17 +4,21 @@ import { requirePermission } from './auth.ts';
 import type { AuthContext } from './auth.ts';
 import { validatePickupSale } from './pickup-orders.ts';
 import { DomainError, requireIdempotencyKey, withIdempotentTransaction } from './transactions.ts';
-import {commissionCents,creditInstallments,loyaltyPoints} from './retail-rules.ts';
+import {allocateDiscounts,commissionCents,creditInstallments,loyaltyPoints} from './retail-rules.ts';
+import {consumeHolds,releasePickupReservation,sweepExpiredReservations,sweepExpiredReservationsTx} from './reservations.ts';
 
 const uid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
-type Line={variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number};
-type QuoteLine={variant_id:string;quantity:number};
+type Line={variant_id:string;quantity:number;expected_price_cents:number;expected_price_revision:number;discount_cents?:number};
+type QuoteLine={variant_id:string;quantity:number;discount_cents?:number};
 type Pay={method:'cash'|'pix_manual'|'card_external'|'store_credit'|'customer_credit';amount_cents:number;confirmed:boolean;external_reference?:string};
 type Commit={cash_session_id:string;pickup_order_id?:string;customer_id?:string;seller_id?:string;
+ discount_cents?:number;discount_reason?:string;stock_hold_ids?:string[];
  credit_installments?:Array<{due_on:string;amount_cents:number}>;lines:Line[];payments:Pay[]};
-type VariantRow={id:string;price_cents:string;revision:string;sku:string;color:string;size:string;name:string;available:string};
+type VariantRow={id:string;price_cents:string;revision:string;sku:string;color:string;size:string;name:string;available:string;cost_cents:string|null};
 type SaleRow={id:string;store_id:string;sale_number:string;status:string;total_cents:string;tendered_cents:string;
  change_cents:string;created_at:Date;cash_session_id:string};
+export const PAYMENT_LABELS:Record<string,string>={cash:'DINHEIRO',pix_manual:'PIX',card_external:'CARTÃO',
+ store_credit:'CREDIÁRIO A RECEBER',customer_credit:'CRÉDITO DO CLIENTE',exchange_credit:'CRÉDITO DA TROCA'};
 function exactInteger(value:number,minimum=0){return Number.isSafeInteger(value)&&value>=minimum;}
 function validateLines(lines:readonly QuoteLine[]){
  if(lines.length<1||lines.length>100)throw new DomainError(422,'LINES_INVALID','Informe de 1 a 100 itens');
@@ -50,7 +54,7 @@ function validatePayments(payments:readonly Pay[],total:number) {
 }
 async function variantData(db:Pick<PoolClient,'query'>,store:string,id:string,lock:boolean){
  const result=await db.query<VariantRow>(`SELECT v.id::text,v.price_cents::text,v.revision::text,
-  v.sku,v.color,v.size,p.name,(coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available
+  v.sku,v.color,v.size,p.name,v.cost_cents::text,(coalesce(s.on_hand,0)-coalesce(s.reserved,0))::text AS available
   FROM product_variants v
   JOIN products p ON p.id=v.product_id AND p.store_id=v.store_id
   LEFT JOIN stock_balances s ON s.variant_id=v.id AND s.store_id=v.store_id
@@ -83,30 +87,69 @@ async function readSale(db:Pick<Pool,'query'>,store:string,id:string){
   payments:payments.rows.map(p=>({...p,amount_cents:toMoney(p.amount_cents)}))};
 }
 const quoteLines={type:'array',minItems:1,maxItems:100,items:{type:'object',additionalProperties:false,required:['variant_id','quantity'],
- properties:{variant_id:{type:'string',pattern:uid},quantity:{type:'integer',minimum:1,maximum:10000}}}} as const;
+ properties:{variant_id:{type:'string',pattern:uid},quantity:{type:'integer',minimum:1,maximum:10000},
+  discount_cents:{type:'integer',minimum:0}}}} as const;
+/** Aplica desconto por linha e no total; confere o limite do caixa e a justificativa. */
+export async function applySaleDiscounts(db:Pick<PoolClient,'query'>,auth:AuthContext,
+ gross:ReadonlyArray<{gross_cents:number;discount_cents:number}>,orderDiscount:number,reason:string|undefined,enforce:boolean){
+ const perLine=allocateDiscounts(gross,orderDiscount);
+ const subtotal=gross.reduce((n,l)=>n+l.gross_cents,0);
+ const discount=perLine.reduce((n,d)=>n+d,0);
+ const total=subtotal-discount;
+ const store=await db.query<{max_cashier_discount_bps:number}>('SELECT max_cashier_discount_bps FROM stores WHERE id=$1',[auth.storeId]);
+ const limit=store.rows[0]?.max_cashier_discount_bps??0;
+ const needsManager=discount>0&&discount*10000>subtotal*limit;
+ if(enforce&&discount>0){
+  if(!reason||reason.trim().length<3)throw new DomainError(422,'DISCOUNT_REASON','Informe o motivo do desconto');
+  if(needsManager&&!auth.roles.includes('manager'))
+   throw new DomainError(403,'DISCOUNT_LIMIT','Desconto acima do limite do caixa ('+(limit/100).toLocaleString('pt-BR')+'%). Peça ao gestor.');
+  if(total<1)throw new DomainError(422,'DISCOUNT_TOO_HIGH','A venda não pode ficar com valor zero');
+ }
+ return {perLine,subtotal,discount,total,needsManager,limit_bps:limit};
+}
 export function registerSales(app:FastifyInstance,db:Pool){
- app.post<{Body:{lines:QuoteLine[]}}>('/v1/sales/quotes',{
-  schema:{body:{type:'object',additionalProperties:false,required:['lines'],properties:{lines:quoteLines}}}
+ app.post<{Body:{lines:QuoteLine[];discount_cents?:number;pickup_order_id?:string}}>('/v1/sales/quotes',{
+  schema:{body:{type:'object',additionalProperties:false,required:['lines'],properties:{lines:quoteLines,
+   discount_cents:{type:'integer',minimum:0},pickup_order_id:{type:'string',pattern:uid}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'sale.commit'))return reply;
   validateLines(request.body.lines);
-  let total=0;
+  const auth=request.authContext!;
+  await sweepExpiredReservationsTx(db,auth.storeId);
+  // Peças já separadas para este pedido de retirada contam como disponíveis para a própria venda.
+  const ownReserved=new Map<string,number>();
+  if(request.body.pickup_order_id){
+   const r=await db.query<{variant_id:string;quantity:string}>(`SELECT l.variant_id::text,sum(l.quantity)::text AS quantity
+    FROM pickup_order_lines l JOIN pickup_orders o ON o.id=l.order_id AND o.store_id=l.store_id
+    WHERE o.store_id=$1 AND o.id=$2 AND o.reservation_released_at IS NULL AND o.sale_id IS NULL GROUP BY l.variant_id`,
+    [auth.storeId,request.body.pickup_order_id]);
+   for(const row of r.rows)ownReserved.set(row.variant_id.toLowerCase(),Number(row.quantity));
+  }
+  let gross=0;
   const lines=[];
   for(const line of request.body.lines){
-   const item=await variantData(db,request.authContext!.storeId,line.variant_id,false);
-   const price=toMoney(item.price_cents),available=toMoney(item.available),priceRevision=Number(item.revision);
+   const item=await variantData(db,auth.storeId,line.variant_id,false);
+   const price=toMoney(item.price_cents),priceRevision=Number(item.revision);
+   const available=toMoney(item.available)+(ownReserved.get(line.variant_id.toLowerCase())??0);
    const subtotal=line.quantity*price;
-   if(!Number.isSafeInteger(subtotal)||!Number.isSafeInteger(total+subtotal))
+   if(!Number.isSafeInteger(subtotal)||!Number.isSafeInteger(gross+subtotal))
     throw new DomainError(422,'TOTAL_OVERFLOW','Total excede limite permitido');
-   total+=subtotal;
+   gross+=subtotal;
    lines.push({variant_id:line.variant_id,quantity:line.quantity,sku:item.sku,product_name:item.name,
-    price_cents:price,price_revision:priceRevision,available});
+    color:item.color,size:item.size,price_cents:price,price_revision:priceRevision,available,
+    gross_cents:subtotal,discount_cents:line.discount_cents??0});
   }
-  return {total_cents:total,can_commit:lines.every(l=>l.available>=l.quantity),lines};
+  const d=await applySaleDiscounts(db,auth,lines,request.body.discount_cents??0,undefined,false);
+  return {subtotal_cents:d.subtotal,discount_cents:d.discount,total_cents:d.total,
+   discount_requires_manager:d.needsManager,cashier_discount_limit_bps:d.limit_bps,
+   can_commit:lines.every(l=>l.available>=l.quantity),
+   lines:lines.map((l,i)=>({...l,discount_cents:d.perLine[i],line_total_cents:l.gross_cents-d.perLine[i]}))};
  });
  app.post<{Body:Commit}>('/v1/sales',{
   schema:{body:{type:'object',additionalProperties:false,required:['cash_session_id','lines','payments'],properties:{
    cash_session_id:{type:'string',pattern:uid},pickup_order_id:{type:'string',pattern:uid},
+   discount_cents:{type:'integer',minimum:0},discount_reason:{type:'string',maxLength:160},
+   stock_hold_ids:{type:'array',maxItems:100,uniqueItems:true,items:{type:'string',pattern:uid}},
    customer_id:{type:'string',pattern:uid},seller_id:{type:'string',pattern:uid},
    credit_installments:{type:'array',minItems:1,maxItems:24,items:{
     type:'object',additionalProperties:false,required:['amount_cents','due_on'],
@@ -114,7 +157,8 @@ export function registerSales(app:FastifyInstance,db:Pool){
    lines:{type:'array',minItems:1,maxItems:100,items:{
     type:'object',additionalProperties:false,required:['variant_id','quantity','expected_price_cents','expected_price_revision'],
     properties:{variant_id:{type:'string',pattern:uid},quantity:{type:'integer',minimum:1,maximum:10000},
-     expected_price_cents:{type:'integer',minimum:0},expected_price_revision:{type:'integer',minimum:1}}
+     expected_price_cents:{type:'integer',minimum:0},expected_price_revision:{type:'integer',minimum:1},
+     discount_cents:{type:'integer',minimum:0}}
    }},
    payments:{type:'array',minItems:1,maxItems:6,items:{
     type:'object',additionalProperties:false,required:['method','amount_cents','confirmed'],
@@ -134,7 +178,12 @@ export function registerSales(app:FastifyInstance,db:Pool){
    if(!cash.rowCount||cash.rows[0].closed_at)
     throw new DomainError(409,'CASH_CLOSED','Abra o caixa antes de confirmar a venda');
    validateCashOwner(auth,cash.rows[0].opened_by);
-   if(body.pickup_order_id)await validatePickupSale(client,auth.storeId,body.pickup_order_id,body.lines);
+   await sweepExpiredReservations(client,auth.storeId);
+   if(body.pickup_order_id){
+    await validatePickupSale(client,auth.storeId,body.pickup_order_id,body.lines);
+    await releasePickupReservation(client,auth.storeId,body.pickup_order_id,'sold');
+   }
+   if(body.stock_hold_ids?.length)await consumeHolds(client,auth,body.stock_hold_ids,body.lines);
    const sorted=[...body.lines].sort((a,b)=>a.variant_id.localeCompare(b.variant_id));
    const priced:{line:Line;row:VariantRow;price:number;subtotal:number}[]=[];
    let total=0;
@@ -152,6 +201,9 @@ export function registerSales(app:FastifyInstance,db:Pool){
      throw new DomainError(422,'TOTAL_OVERFLOW','Valor da venda excede os limites');
     total+=subtotal;priced.push({line,row,price,subtotal});
    }
+   const discounts=await applySaleDiscounts(client,auth,priced.map(x=>({gross_cents:x.subtotal,discount_cents:x.line.discount_cents??0})),
+    body.discount_cents??0,body.discount_reason,true);
+   const subtotalCents=total;total=discounts.total;
    const {tendered,change}=validatePayments(body.payments,total);
    const storeCredit=body.payments.filter(p=>p.method==='store_credit').reduce((sum,p)=>sum+p.amount_cents,0);
    const loyaltyCredit=body.payments.filter(p=>p.method==='customer_credit').reduce((sum,p)=>sum+p.amount_cents,0);
@@ -211,22 +263,26 @@ export function registerSales(app:FastifyInstance,db:Pool){
      last_number=store_counters.last_number+1 RETURNING last_number::text`,[auth.storeId]);
    const number=toMoney(num.rows[0].last_number);
    const created=await client.query<{id:string;created_at:Date}>(`INSERT INTO sales
-    (store_id,sale_number,cash_session_id,cashier_id,total_cents,tendered_cents,change_cents,customer_id,seller_id)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id::text,created_at`,
-    [auth.storeId,number,body.cash_session_id,auth.userId,total,tendered,change,body.customer_id||null,sellerId]);
+    (store_id,sale_number,cash_session_id,cashier_id,total_cents,tendered_cents,change_cents,customer_id,seller_id,
+     subtotal_cents,discount_cents,discount_reason,discount_by)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id::text,created_at`,
+    [auth.storeId,number,body.cash_session_id,auth.userId,total,tendered,change,body.customer_id||null,sellerId,
+     subtotalCents,discounts.discount,discounts.discount?body.discount_reason!.trim():null,discounts.discount?auth.userId:null]);
    const saleId=created.rows[0].id;
    if(body.pickup_order_id)await client.query('UPDATE pickup_orders SET sale_id=$3 WHERE store_id=$1 AND id=$2',
      [auth.storeId,body.pickup_order_id,saleId]);
-   for(const x of priced){
+   for(const [index,x] of priced.entries()){
+    const lineDiscount=discounts.perLine[index];
     const lastCost=await client.query<{unit_cost_cents:string}>(`SELECT unit_cost_cents::text
      FROM purchase_orders WHERE store_id=$1 AND variant_id=$2 AND quality_finalized=true
      ORDER BY received_at DESC NULLS LAST,id DESC LIMIT 1`,[auth.storeId,x.line.variant_id]);
-    const unitCost=lastCost.rowCount?Number(lastCost.rows[0].unit_cost_cents):null;
+    const unitCost=lastCost.rowCount?Number(lastCost.rows[0].unit_cost_cents):
+     x.row.cost_cents!==null?Number(x.row.cost_cents):null;
     await client.query(`INSERT INTO sale_lines(store_id,sale_id,variant_id,product_name,sku,color,size,
-      quantity,unit_price_cents,line_total_cents,cost_unit_cents)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      quantity,unit_price_cents,line_total_cents,cost_unit_cents,discount_cents)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
      [auth.storeId,saleId,x.line.variant_id,x.row.name,x.row.sku,x.row.color,x.row.size,
-      x.line.quantity,x.price,x.subtotal,unitCost]);
+      x.line.quantity,x.price,x.subtotal-lineDiscount,unitCost,lineDiscount]);
     const balance=await client.query<{revision:string}>(`UPDATE stock_balances
       SET on_hand=on_hand-$3,revision=revision+1
       WHERE store_id=$1 AND variant_id=$2 AND on_hand-reserved>=$3 RETURNING revision::text`,
@@ -250,11 +306,13 @@ export function registerSales(app:FastifyInstance,db:Pool){
      VALUES($1,'receivable',$2,'sale_credit',$3,$4,$5,$6,$7)`,
      [auth.storeId,body.customer_id,saleId,'Crediário da venda '+number,part.amount_cents,part.due_on,auth.userId]);
    }
-   if(loyaltyAllowed&&body.customer_id&&loyaltyPoints(total)>0){
+   // Pontos só sobre dinheiro novo: crediário rende pontos na quitação, crédito/pontos não rendem pontos.
+   const loyaltyBase=total-storeCredit-loyaltyCredit;
+   if(loyaltyAllowed&&body.customer_id&&loyaltyPoints(loyaltyBase)>0){
     await client.query(`INSERT INTO retail_loyalty_events
      (store_id,customer_id,sale_id,points,kind,note,actor_id)
      VALUES($1,$2,$3,$4,'earn','Pontos da compra presencial',$5)`,
-     [auth.storeId,body.customer_id,saleId,loyaltyPoints(total),auth.userId]);
+     [auth.storeId,body.customer_id,saleId,loyaltyPoints(loyaltyBase),auth.userId]);
    }
    const rate=await client.query<{rate_bps:number}>(`SELECT rate_bps FROM retail_commission_rules
      WHERE store_id=$1 AND seller_id=$2`,[auth.storeId,sellerId]);
@@ -266,11 +324,13 @@ export function registerSales(app:FastifyInstance,db:Pool){
    }
    await client.query(`INSERT INTO audit_logs(store_id,actor_id,action,aggregate_id,detail)
      VALUES($1,$2,'sales.confirm',$3,$4::jsonb)`,
-    [auth.storeId,auth.userId,saleId,JSON.stringify({number,total,change,cash_session_id:body.cash_session_id,pickup_order_id:body.pickup_order_id})]);
+    [auth.storeId,auth.userId,saleId,JSON.stringify({number,total,subtotal:subtotalCents,discount:discounts.discount,discount_reason:body.discount_reason,
+     change,cash_session_id:body.cash_session_id,pickup_order_id:body.pickup_order_id,stock_hold_ids:body.stock_hold_ids})]);
    await client.query(`INSERT INTO outbox_events(store_id,event_type,aggregate_id,aggregate_revision,payload)
      VALUES($1,'sales.sale.confirmed.v1',$2,1,$3::jsonb)`,
     [auth.storeId,saleId,JSON.stringify({sale_number:number,total_cents:total})]);
-   return {id:saleId,sale_number:number,status:'confirmed',total_cents:total,tendered_cents:tendered,
+   return {id:saleId,sale_number:number,status:'confirmed',subtotal_cents:subtotalCents,discount_cents:discounts.discount,
+    total_cents:total,tendered_cents:tendered,
     credit_due_cents:storeCredit,change_cents:change,created_at:created.rows[0].created_at,
     cash_session_id:body.cash_session_id};
   });
@@ -286,22 +346,51 @@ export function registerSales(app:FastifyInstance,db:Pool){
   schema:{params:{type:'object',required:['id'],properties:{id:{type:'string',pattern:uid}}}}
  },async(request,reply)=>{
   if(requirePermission(request,reply,'sale.read'))return reply;
-  const sale=await readSale(db,request.authContext!.storeId,request.params.id);
+  const storeId=request.authContext!.storeId;
+  const sale=await readSale(db,storeId,request.params.id);
+  const extra=await db.query<{subtotal_cents:string|null;discount_cents:string;discount_reason:string|null;customer:string|null;
+   seller:string|null;store_name:string;legal_name:string|null;document:string|null;address:string|null;phone:string|null;
+   receipt_footer:string|null;timezone:string}>(`SELECT s.subtotal_cents::text,s.discount_cents::text,s.discount_reason,
+    c.name AS customer,coalesce(u.display_name,u.login) AS seller,st.name AS store_name,st.legal_name,st.document,st.address,
+    st.phone,st.receipt_footer,st.timezone
+   FROM sales s JOIN stores st ON st.id=s.store_id LEFT JOIN retail_customers c ON c.id=s.customer_id AND c.store_id=s.store_id
+   LEFT JOIN users u ON u.id=s.seller_id WHERE s.store_id=$1 AND s.id=$2`,[storeId,sale.id]);
+  const info=extra.rows[0];
+  const installments=await db.query<{due_on:string;amount_cents:string}>(`SELECT due_on::text,amount_cents::text FROM retail_accounts
+   WHERE store_id=$1 AND source_type='sale_credit' AND source_id=$2 AND cancelled_at IS NULL ORDER BY due_on`,[storeId,sale.id]);
+  const lineDiscounts=await db.query<{discount_cents:string}>(`SELECT discount_cents::text FROM sale_lines
+   WHERE sale_id=$1 AND store_id=$2 ORDER BY id`,[sale.id,storeId]);
   const money=(n:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
+  const date=(iso:string)=>iso.split('-').reverse().join('/');
+  const discount=Number(info.discount_cents);
   const body=[
-    'LOJA DE ROUPAS','COMPROVANTE NÃO FISCAL','Não substitui documento fiscal quando exigido.',
+    info.store_name.toUpperCase(),
+    ...(info.legal_name?[info.legal_name]:[]),
+    ...(info.document?['CNPJ/CPF: '+info.document]:[]),
+    ...(info.address?[info.address]:[]),
+    ...(info.phone?['Tel.: '+info.phone]:[]),
+    'COMPROVANTE NÃO FISCAL','Não substitui documento fiscal quando exigido.',
     '--------------------------------',
     'Venda Nº '+sale.sale_number,
-    ...(sale.status==='returned'?['VENDA DEVOLVIDA']:[]),
-    'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}),
-    ...sale.lines.map(l=>l.quantity+' × '+l.product_name+' ('+l.color+'/'+l.size+') '+money(l.line_total_cents)),
-    '--------------------------------','TOTAL '+money(sale.total_cents),
-    ...sale.payments.map(p=>p.method==='store_credit'
-      ?'CREDIÁRIO A RECEBER '+money(p.amount_cents)
-      :p.method==='customer_credit'
-       ?'CRÉDITO DO CLIENTE '+money(p.amount_cents)
-       :p.method+' '+money(p.amount_cents)),
+    ...(sale.status==='returned'?['VENDA DEVOLVIDA']:sale.status==='partially_returned'?['VENDA COM DEVOLUÇÃO PARCIAL']:[]),
+    'Data: '+new Date(sale.created_at).toLocaleString('pt-BR',{timeZone:info.timezone||'America/Sao_Paulo'}),
+    ...(info.customer?['Cliente: '+info.customer]:[]),
+    ...(info.seller?['Vendedor: '+info.seller]:[]),
+    '--------------------------------',
+    ...sale.lines.flatMap((l,i)=>{
+      const d=Number(lineDiscounts.rows[i]?.discount_cents??0);
+      return [l.quantity+' × '+l.product_name+' ('+l.color+'/'+l.size+') '+money(l.line_total_cents),
+        ...(d?['   desconto '+money(d)]:[])];
+    }),
+    '--------------------------------',
+    ...(discount?['SUBTOTAL '+money(Number(info.subtotal_cents??sale.total_cents+discount)),
+      'DESCONTO -'+money(discount)+(info.discount_reason?' ('+info.discount_reason+')':'')]:[]),
+    'TOTAL '+money(sale.total_cents),
+    ...sale.payments.map(p=>(PAYMENT_LABELS[p.method]??p.method)+' '+money(p.amount_cents)),
     'TROCO '+money(sale.change_cents),
+    ...(installments.rowCount?['PARCELAS DO CREDIÁRIO',...installments.rows.map((x,i)=>
+      (i+1)+'ª '+date(x.due_on)+' '+money(Number(x.amount_cents)))]:[]),
+    ...(info.receipt_footer?['--------------------------------',info.receipt_footer]:[]),
     'ID: '+sale.id,
   ].join('\n');
   return reply.header('cache-control','private,no-store').type('text/plain; charset=utf-8').send(body);
