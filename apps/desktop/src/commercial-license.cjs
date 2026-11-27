@@ -5,6 +5,9 @@ const path=require('node:path');
 const ENDPOINT='https://pdv-artisys.sistema-artisys.workers.dev';
 const PRODUCT='LOJA_ROUPAS';
 const REFRESH_MS=15*60*1000;
+// Uma licença ativa continua funcionando sem internet, mas precisa ser
+// revalidada na central ao menos uma vez nesse período.
+const OFFLINE_GRACE_MS=30*24*60*60*1000;
 
 function validActivation(value){
  const email=String(value?.email||'').trim().toLowerCase();
@@ -16,6 +19,9 @@ function validActivation(value){
 function activeOffline(record,at=Date.now()){
  return Boolean(record?.active&&record?.licenseId&&(!record.expiresAt||
   Number.isFinite(Date.parse(record.expiresAt))&&Date.parse(record.expiresAt)>at));
+}
+function withinOfflineGrace(record,at=Date.now()){
+ return Number.isFinite(record?.checkedAt)&&record.checkedAt>0&&at-record.checkedAt<=OFFLINE_GRACE_MS;
 }
 function validateRecord(v){
  if(!/^loja-[a-f0-9-]{36}$/.test(v?.installationId)||typeof v?.active!=='boolean'||
@@ -47,7 +53,9 @@ function createCommercialLicense({directory,fetchImpl=fetch,clock=Date.now}={}){
  }
  const get=()=>statePromise??=(load());
  function view(state,{offline=false}={}){
-  return {installationId:state.installationId,active:activeOffline(state,clock()),
+  const valid=activeOffline(state,clock());
+  const needsOnline=valid&&offline&&!withinOfflineGrace(state,clock());
+  return {installationId:state.installationId,active:valid&&!needsOnline,needsOnline,
    accountEmail:state.accountEmail||null,expiresAt:state.expiresAt||null,offline};
  }
  async function call(route,options={}){
@@ -96,4 +104,4 @@ function createCommercialLicense({directory,fetchImpl=fetch,clock=Date.now}={}){
  }
  return Object.freeze({status,activate});
 }
-module.exports={createCommercialLicense,validActivation,activeOffline};
+module.exports={createCommercialLicense,validActivation,activeOffline,withinOfflineGrace,OFFLINE_GRACE_MS};
