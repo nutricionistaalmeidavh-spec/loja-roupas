@@ -8,6 +8,10 @@ on:
         description: 'Versão da edição comercial (x.y.z)'
         required: true
         default: '1.0.0'
+      publish:
+        description: 'Publicar release loja-comercial-vX.Y.Z (download enviado pelo e-mail da Central)'
+        type: boolean
+        default: false
   pull_request:
     paths:
       - 'apps/desktop/src/commercial-license.cjs'
@@ -18,9 +22,10 @@ on:
       - 'docs/comercial/termos-de-uso.txt'
       - 'scripts/package-desktop.mjs'
       - 'scripts/smoke-commercial-activation.mjs'
+      - 'docs/comercial/Manual-Loja-de-Roupas.pdf'
       - '.github/workflows/build-loja-comercial.yml'
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: loja-comercial-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -134,3 +139,38 @@ jobs:
             dist/SHA256SUMS
           retention-days: 30
           if-no-files-found: error
+      - name: Publicar release comercial (somente por comando manual na main)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $repo='${{ github.repository }}'
+          $tag="loja-comercial-v$($env:LOJA_COMMERCIAL_VERSION)"
+          $exe='dist/Loja-de-Roupas-Comercial-Setup-x64.exe'
+          $manual='docs/comercial/Manual-Loja-de-Roupas.pdf'
+          foreach($file in @($exe,'dist/SHA256SUMS',$manual)){
+            if(!(Test-Path $file -PathType Leaf)){throw "Arquivo ausente: $file"}
+          }
+          if((Get-Item $exe).Length -lt 30000000){throw 'Instalador inválido ou incompleto'}
+          $digest=(Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if((Get-Content 'dist/SHA256SUMS' -Raw).Trim() -ne "$digest  Loja-de-Roupas-Comercial-Setup-x64.exe"){throw 'Checksum divergente'}
+          gh release view $tag --repo $repo --json tagName *> $null
+          if($LASTEXITCODE -eq 0){throw "Release $tag já publicada: não sobrescrever"}
+          @"
+          ## Loja de Roupas ArtiSys — edição comercial v$($env:LOJA_COMMERCIAL_VERSION)
+
+          Instalador Windows 64 bits com **ativação obrigatória** (e-mail + código de 6 dígitos liberado na Central ArtiSys).
+          O link de download e o código são enviados automaticamente ao comprador quando a licença é liberada.
+
+          - Manual em PDF: Manual-Loja-de-Roupas.pdf
+          - Confira o SHA256SUMS.
+          - Comprovante NÃO FISCAL: o sistema não emite NFC-e/NF-e.
+          "@ | Set-Content -LiteralPath 'dist/RELEASE_NOTES_COMERCIAL.md' -Encoding UTF8
+          gh release create $tag $exe 'dist/SHA256SUMS' $manual --repo $repo --target '${{ github.sha }}' --title "Loja de Roupas ArtiSys v$($env:LOJA_COMMERCIAL_VERSION) (comercial)" --notes-file 'dist/RELEASE_NOTES_COMERCIAL.md' --latest=false
+          if($LASTEXITCODE -ne 0){throw 'Falha ao publicar a release comercial'}
+          $published=gh release view $tag --repo $repo --json assets,url | ConvertFrom-Json
+          foreach($name in @('Loja-de-Roupas-Comercial-Setup-x64.exe','SHA256SUMS','Manual-Loja-de-Roupas.pdf')){
+            if(!($published.assets.name -contains $name)){throw "Asset não publicado: $name"}
+          }
+          Write-Host "PUBLICADO: $($published.url)"

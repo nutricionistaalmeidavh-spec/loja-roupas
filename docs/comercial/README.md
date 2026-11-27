@@ -4,8 +4,13 @@ A edição comercial é a mesma edição física (banco local, caixa sem interne
 
 ## Como gerar o instalador
 1. GitHub → Actions → **Loja Comercial - instalador com ativação (Windows)** → *Run workflow* com a versão (ex.: `1.0.0`).
-2. Baixe o artefato `loja-comercial-vX.Y.Z-windows` (instalador + `SHA256SUMS`). O workflow **não publica release**.
+2. Sem marcar **publish**, baixe o artefato `loja-comercial-vX.Y.Z-windows` (instalador + `SHA256SUMS`). Marcando **publish** (somente na `main`), o workflow cria a release `loja-comercial-vX.Y.Z` com instalador, `SHA256SUMS` e `Manual-Loja-de-Roupas.pdf`.
 3. O workflow testa: marcadores da edição, instalação silenciosa, atalhos, tela de ativação obrigatória antes de criar a loja e desinstalação.
+
+## Liberação e e-mail automático
+Na Central ArtiSys (`/admin` do Worker `pdv-artisys`), escolha o produto **Loja Roupas**, informe o e-mail do comprador e clique em **Gerar código**. A Central envia automaticamente, pelo relay `oficina-mail.artisys.dev`, o código de ativação, o download direto (`/download/loja-roupas`), o manual em PDF (`/manual/loja-roupas.pdf`) e o link destes documentos. As rotas apontam sempre para a release `loja-comercial-v*` mais nova; sem ela respondem 503.
+
+O manual é gerado de `docs/comercial/manual/manual.html` com `node scripts/build-manual-pdf.mjs`.
 
 ## Atualizações
 O programa instalado procura releases com tag `loja-comercial-vX.Y.Z` contendo `Loja-de-Roupas-Comercial-Setup-x64.exe` e `SHA256SUMS`. Releases `loja-fisica-*` nunca são oferecidas à edição comercial. Se o repositório ficar privado, o atualizador deixa de enxergar as releases e é preciso hospedar o canal comercial em outro lugar.
